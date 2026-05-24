@@ -137,9 +137,9 @@ export default function CheckoutPage() {
     e.preventDefault()
     setLoading(true)
 
-    try {
-      const supabase = createClient()
+    const supabase = createClient()
 
+    try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -149,6 +149,7 @@ export default function CheckoutPage() {
       })
 
       if (error) {
+        console.error('SignUp error completo:', error)
         toast.error(error.message)
         return
       }
@@ -167,9 +168,9 @@ export default function CheckoutPage() {
 
       setStep(3)
       toast.success('Conta criada com sucesso!')
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erro de conexão. Tente novamente.'
-      toast.error(message)
+    } catch (err: any) {
+      console.error('SignUp catch:', err)
+      toast.error(err?.message ?? `Erro desconhecido: ${String(err)}`)
     } finally {
       setLoading(false)
     }
