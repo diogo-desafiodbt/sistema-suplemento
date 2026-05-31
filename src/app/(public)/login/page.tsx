@@ -2,11 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { toast } from 'sonner'
 
 export default function LoginPage() {
@@ -46,50 +43,73 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Desafio Diabetes</CardTitle>
-          <CardDescription>Entre na sua conta</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="seu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Entrando...' : 'Entrar'}
-            </Button>
-          </form>
-          <div className="mt-4 text-center">
-            <a
-              href="/recuperar-senha"
-              className="text-sm text-gray-500 hover:text-gray-700"
-            >
-              Esqueceu a senha?
-            </a>
+    <div className="min-h-screen bg-[#f5f0eb] flex flex-col">
+
+      <header className="bg-[#f5f0eb] px-6 pt-5 pb-4 border-b border-[#13244f]/10">
+        <div className="max-w-md mx-auto">
+          <Link href="/">
+            <img src="/logo-azul.png" alt="Desafio Diabetes" className="h-7 w-auto" />
+          </Link>
+        </div>
+      </header>
+
+      <main className="flex-1 flex items-center justify-center px-4 py-10">
+        <div className="w-full max-w-md space-y-6">
+
+          <div className="text-center space-y-1">
+            <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">Acesso</p>
+            <h1 className="text-2xl font-bold text-[#13244f]">Entrar na sua conta</h1>
+            <p className="text-sm text-gray-500">Acompanhe seu protocolo e pedidos</p>
           </div>
-        </CardContent>
-      </Card>
+
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+            <form onSubmit={handleLogin} className="space-y-3">
+              <input
+                type="email"
+                placeholder="E-mail"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+              />
+              <input
+                type="password"
+                placeholder="Senha"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-[#f4001e] hover:bg-[#a30000] text-white py-3.5 rounded-xl font-bold text-sm uppercase tracking-wide transition active:scale-95 disabled:opacity-50"
+              >
+                {loading ? 'Entrando...' : 'Entrar'}
+              </button>
+            </form>
+
+            <div className="text-center pt-1">
+              <Link
+                href="/recuperar-senha"
+                className="text-sm text-[#f4001e] font-semibold hover:underline"
+              >
+                Esqueceu a senha?
+              </Link>
+            </div>
+          </div>
+
+          <p className="text-center text-sm text-gray-400">
+            Ainda não tem conta?{' '}
+            <Link href="/quiz" className="text-[#13244f] font-semibold hover:underline">
+              Faça o quiz e comece seu protocolo
+            </Link>
+          </p>
+
+        </div>
+      </main>
     </div>
   )
 }

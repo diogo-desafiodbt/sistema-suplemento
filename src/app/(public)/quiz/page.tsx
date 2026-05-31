@@ -2,8 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
 import { toast } from 'sonner'
 import { QuizFormData } from '@/lib/quiz/schema'
 
@@ -93,38 +91,59 @@ export default function QuizPage() {
       <button
         type="button"
         onClick={onClick}
-        className={`w-full text-left px-4 py-3 rounded-lg border text-sm transition-colors ${
-          selected ? 'border-black bg-black text-white' : 'border-gray-200 hover:border-gray-400 bg-white'
+        className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border text-sm text-left transition-all ${
+          selected
+            ? 'border-[#13244f] bg-[#13244f]/5 text-[#13244f] font-medium'
+            : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
         }`}
       >
+        <span className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${
+          selected ? 'border-[#13244f]' : 'border-gray-300'
+        }`}>
+          {selected && <span className="w-2 h-2 rounded-full bg-[#13244f]" />}
+        </span>
         {label}
       </button>
     )
   }
 
   function QuestionWrapper({
-    title, subtitle, children, showContinue = false,
+    title, subtitle, category, children, showContinue = false,
   }: {
-    title: string; subtitle?: string; children: React.ReactNode; showContinue?: boolean
+    title: string; subtitle?: string; category?: string; children: React.ReactNode; showContinue?: boolean
   }) {
     const showAllergyContinue = showContinue && form.allergies !== 'nao' && form.allergies !== 'nao_sei'
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <div>
-          <h2 className="text-xl font-semibold">{title}</h2>
-          {subtitle && <p className="text-gray-500 text-sm mt-1">{subtitle}</p>}
+          {category && (
+            <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-2">{category}</p>
+          )}
+          <h2 className="text-2xl font-bold text-[#13244f] leading-snug">{title}</h2>
+          {subtitle && <p className="text-sm text-gray-500 mt-1.5 leading-relaxed">{subtitle}</p>}
         </div>
         <div className="space-y-3">{children}</div>
         {(step > 1 || showAllergyContinue) && (
           <div className="flex gap-3 pt-2">
             {step > 1 && (
-              <Button variant="outline" onClick={() => setStep(s => s - 1)} className="flex-1">Voltar</Button>
+              <button
+                type="button"
+                onClick={() => setStep(s => s - 1)}
+                className="flex-1 border border-[#13244f] text-[#13244f] py-3 rounded-full text-sm font-semibold hover:bg-[#13244f]/5 transition"
+              >
+                Voltar
+              </button>
             )}
             {showAllergyContinue && (
-              <Button onClick={goNext} disabled={!form.allergies?.trim()} className="flex-1">
+              <button
+                type="button"
+                onClick={goNext}
+                disabled={!form.allergies?.trim()}
+                className="flex-1 bg-[#f4001e] text-white py-3 rounded-full text-sm font-semibold hover:bg-[#a30000] transition disabled:opacity-40"
+              >
                 Continuar
-              </Button>
+              </button>
             )}
           </div>
         )}
@@ -149,7 +168,7 @@ export default function QuizPage() {
     switch (step) {
       case 1:
         return (
-          <QuestionWrapper title="Qual é o seu diagnóstico?">
+          <QuestionWrapper category="DIABETES" title="Qual é o seu diagnóstico?">
             {[
               { value: 'type2', label: 'Diabetes tipo 2' },
               { value: 'prediabetes', label: 'Pré-diabetes' },
@@ -359,17 +378,26 @@ export default function QuizPage() {
             ))}
             <button type="button"
               onClick={() => setSingle('allergies', '')}
-              className={`w-full text-left px-4 py-3 rounded-lg border text-sm transition-colors ${
+              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border text-sm text-left transition-all ${
                 form.allergies !== null && form.allergies !== 'nao' && form.allergies !== 'nao_sei'
-                  ? 'border-black bg-black text-white' : 'border-gray-200 hover:border-gray-400 bg-white'
+                  ? 'border-[#13244f] bg-[#13244f]/5 text-[#13244f] font-medium'
+                  : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
               }`}>
+              <span className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                form.allergies !== null && form.allergies !== 'nao' && form.allergies !== 'nao_sei'
+                  ? 'border-[#13244f]' : 'border-gray-300'
+              }`}>
+                {form.allergies !== null && form.allergies !== 'nao' && form.allergies !== 'nao_sei' && (
+                  <span className="w-2 h-2 rounded-full bg-[#13244f]" />
+                )}
+              </span>
               Sim, tenho alergia
             </button>
             {form.allergies !== null && form.allergies !== 'nao' && form.allergies !== 'nao_sei' && (
               <input type="text" placeholder="Descreva sua alergia..."
                 value={form.allergies ?? ''}
                 onChange={e => setSingle('allergies', e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-black" />
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f]" />
             )}
           </QuestionWrapper>
         )
@@ -389,7 +417,7 @@ export default function QuizPage() {
                 onClick={() => !loading && selectMultipleAndAdvance('prior_treatment', opt.value, true)} />
             ))}
             {loading && (
-              <p className="text-sm text-gray-500 text-center pt-2">Gerando protocolo...</p>
+              <p className="text-sm text-[#13244f]/60 text-center pt-2 font-medium">Gerando protocolo...</p>
             )}
           </QuestionWrapper>
         )
@@ -400,17 +428,22 @@ export default function QuizPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <header className="bg-white border-b px-6 py-4">
+    <div className="min-h-screen bg-[#f5f0eb] flex flex-col">
+      <header className="bg-[#f5f0eb] px-6 pt-5 pb-3">
         <div className="max-w-lg mx-auto">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700">Desafio Diabetes</span>
-            <span className="text-sm text-gray-400">{step} de {TOTAL_STEPS}</span>
+          <div className="flex items-center justify-between mb-4">
+            <img src="/logo-azul.png" alt="Desafio Diabetes" className="h-7 w-auto" />
+            <span className="text-xs text-gray-400 font-medium">{step} de {TOTAL_STEPS}</span>
           </div>
-          <Progress value={progress} className="h-1" />
+          <div className="w-full h-0.5 bg-gray-200 rounded-full">
+            <div
+              className="h-0.5 bg-[#13244f] rounded-full transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
         </div>
       </header>
-      <main className="flex-1 flex items-center justify-center p-6">
+      <main className="flex-1 flex items-start justify-center px-6 pt-10 pb-10">
         <div className="w-full max-w-lg">{renderStep()}</div>
       </main>
     </div>

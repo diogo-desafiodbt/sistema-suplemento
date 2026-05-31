@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import Link from 'next/link'
-import { Badge } from '@/components/ui/badge'
 import { ProfessionalNav } from '@/components/professional/ProfessionalNav'
 
 type ProtocolItem = {
@@ -80,60 +79,77 @@ export default async function FilaPage() {
   const pendingProtocols = (protocols ?? []) as unknown as PendingProtocol[]
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-6 py-4 flex items-center justify-between">
-        <div>
-          <h1 className="font-semibold">Painel do Profissional</h1>
-          <p className="text-sm text-gray-500">{profile?.full_name}</p>
-          <ProfessionalNav active="pendentes" />
+    <div className="min-h-screen bg-[#f5f0eb]">
+
+      {/* Header */}
+      <header className="bg-[#13244f] px-6 py-4">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center gap-4">
+              <img src="/logo-branca.png" alt="Desafio Diabetes" className="h-7 w-auto" />
+              <span className="text-white/40 text-sm">Área do Profissional</span>
+            </div>
+            <ProfessionalNav />
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-white/60 text-sm hidden sm:block">{profile?.full_name}</span>
+            <form action="/api/auth/signout" method="POST">
+              <button type="submit" className="text-sm text-white/60 hover:text-white transition">Sair</button>
+            </form>
+          </div>
         </div>
-        <form action="/api/auth/signout" method="POST">
-          <button type="submit" className="text-sm text-gray-500 hover:text-gray-700">Sair</button>
-        </form>
       </header>
 
-      <main className="max-w-4xl mx-auto p-6 space-y-6">
+      <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Prescrições pendentes</h2>
-          <Badge variant="secondary">{pendingProtocols.length} pendentes</Badge>
+          <div>
+            <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-1">Fila de assinatura</p>
+            <h1 className="text-2xl font-bold text-[#13244f]">Prescrições pendentes</h1>
+          </div>
+          <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-amber-100 text-amber-700">
+            {pendingProtocols.length} pendente{pendingProtocols.length !== 1 ? 's' : ''}
+          </span>
         </div>
 
         {pendingProtocols.length === 0 ? (
-          <div className="bg-white rounded-lg border p-8 text-center text-gray-500">
-            Nenhuma prescrição pendente de assinatura.
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
+            <p className="text-4xl mb-3">✓</p>
+            <p className="text-[#13244f] font-semibold">Nenhuma prescrição pendente</p>
+            <p className="text-gray-400 text-sm mt-1">Todas as prescrições foram assinadas.</p>
           </div>
         ) : (
           <div className="space-y-3">
             {pendingProtocols.map(protocol => {
-              const activeItems = protocol.protocol_items?.filter(
-                item => !item.removed_by_patient
-              )
+              const activeItems = protocol.protocol_items?.filter(item => !item.removed_by_patient)
               const generatedAt = new Date(protocol.generated_at).toLocaleDateString('pt-BR')
 
               return (
                 <Link
                   key={protocol.id}
                   href={`/profissional/protocolo/${protocol.id}`}
-                  className="block bg-white rounded-lg border p-4 hover:border-gray-400 transition-colors"
+                  className="block bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:border-[#13244f]/30 hover:shadow-md transition-all"
                 >
                   <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{protocol.users?.full_name}</span>
-                        <span className="text-xs text-gray-400">{protocol.users?.client_code}</span>
+                    <div className="space-y-2 flex-1">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span className="font-bold text-[#13244f]">{protocol.users?.full_name}</span>
+                        <span className="font-mono text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">{protocol.users?.client_code}</span>
                       </div>
-                      <p className="text-sm text-gray-500">{protocol.users?.email}</p>
-                      <div className="flex gap-2 flex-wrap mt-2">
+                      <p className="text-sm text-gray-400">{protocol.users?.email}</p>
+                      <div className="flex gap-2 flex-wrap">
                         {activeItems?.map(item => (
-                          <Badge key={item.products?.name} variant="outline" className="text-xs">
+                          <span key={item.products?.name} className="text-xs bg-[#13244f]/5 text-[#13244f] font-medium px-2.5 py-1 rounded-full border border-[#13244f]/10">
                             {item.products?.name}
-                          </Badge>
+                          </span>
                         ))}
                       </div>
                     </div>
-                    <div className="text-right flex-shrink-0">
-                      <Badge className="bg-amber-100 text-amber-700 border-0">Pendente</Badge>
-                      <p className="text-xs text-gray-400 mt-1">{generatedAt}</p>
+                    <div className="text-right flex-shrink-0 space-y-1">
+                      <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-amber-100 text-amber-700 block">
+                        Pendente
+                      </span>
+                      <p className="text-xs text-gray-400">{generatedAt}</p>
+                      <p className="text-xs text-[#f4001e] font-semibold">Assinar →</p>
                     </div>
                   </div>
                 </Link>

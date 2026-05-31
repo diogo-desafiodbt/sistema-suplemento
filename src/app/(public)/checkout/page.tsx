@@ -2,13 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 
-type Step = 1 | 2 | 3 | 4
+type Step = 2 | 3 | 4
 
 type LocalProtocolItem = {
   product_id: string
@@ -43,7 +40,7 @@ async function submitQuizAndGetProtocolId(plan: string): Promise<string | null> 
 
 export default function CheckoutPage() {
   const router = useRouter()
-  const [step, setStep] = useState<Step>(1)
+  const [step, setStep] = useState<Step>(2)
   const [items, setItems] = useState<LocalProtocolItem[]>([])
   const [plan, setPlan] = useState<string>('1mes')
   const [loading, setLoading] = useState(false)
@@ -68,6 +65,9 @@ export default function CheckoutPage() {
   const [cardCvv, setCardCvv] = useState('')
   const [cpf, setCpf] = useState('')
   const [processingPayment, setProcessingPayment] = useState(false)
+
+  const [accountSummary, setAccountSummary] = useState<{ name: string; email: string } | null>(null)
+  const [addressSummary, setAddressSummary] = useState<string | null>(null)
 
   useEffect(() => {
     const itemsRaw = sessionStorage.getItem('protocol_items')
@@ -166,6 +166,7 @@ export default function CheckoutPage() {
         setProtocolId(newProtocolId)
       }
 
+      setAccountSummary({ name: fullName, email })
       setStep(3)
       toast.success('Conta criada com sucesso!')
     } catch (err: any) {
@@ -255,255 +256,334 @@ export default function CheckoutPage() {
     }
   }
 
-  function renderStep() {
-    switch (step) {
-      case 1:
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-xl font-semibold">Seu tratamento</h2>
-              <p className="text-gray-500 text-sm mt-1">Confirme os produtos selecionados</p>
-            </div>
-            <div className="space-y-3">
-              {getActiveItems().map(item => (
-                <div key={item.product_id} className="flex justify-between items-center bg-white border rounded-lg px-4 py-3">
-                  <span className="text-sm font-medium">{item.product_name}</span>
-                  <span className="text-sm">R$ {getPrice(item).toFixed(2).replace('.', ',')}</span>
-                </div>
-              ))}
-              <div className="flex justify-between items-center pt-2 border-t">
-                <span className="font-medium">Total</span>
-                <span className="font-semibold text-lg">R$ {getTotal().toFixed(2).replace('.', ',')}</span>
-              </div>
-            </div>
-            <Button onClick={() => setStep(2)} className="w-full" size="lg">
-              Continuar
-            </Button>
-          </div>
-        )
+  const PLAN_LABELS: Record<string, string> = {
+    '1mes': '1 mês',
+    '3meses': '3 meses',
+    '1ano': '1 ano',
+  }
 
-      case 2:
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-xl font-semibold">Criar sua conta</h2>
-              <p className="text-gray-500 text-sm mt-1">
-                Já tem conta?{' '}
-                <a href="/login" className="underline">Faça login</a>
-              </p>
-            </div>
-            <form onSubmit={handleCreateAccount} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Nome completo</Label>
-                <Input
-                  id="fullName"
-                  type="text"
-                  placeholder="Seu nome completo"
-                  value={fullName}
-                  onChange={e => setFullName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Senha</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Mínimo 6 caracteres"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  minLength={6}
-                  required
-                />
-              </div>
-              <Button type="submit" disabled={loading} className="w-full" size="lg">
-                {loading ? 'Criando conta...' : 'Criar conta e continuar'}
-              </Button>
-            </form>
-          </div>
-        )
+  return (
+    <div className="min-h-screen bg-[#f5f0eb]">
 
-      case 3:
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-xl font-semibold">Endereço de entrega</h2>
-              <p className="text-gray-500 text-sm mt-1">Para onde enviamos seu tratamento</p>
+      {/* Header */}
+      <header className="bg-[#f5f0eb] px-6 py-5 border-b border-[#13244f]/10">
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
+          <img src="/logo-azul.png" alt="Desafio Diabetes" className="h-7 w-auto" />
+          {/* Breadcrumb */}
+          <nav className="hidden sm:flex items-center gap-2 text-xs text-[#13244f]/50 font-medium">
+            {['Conta', 'Entrega', 'Pagamento'].map((label, i) => {
+              const stepNum = i + 2
+              const isActive = step === stepNum
+              const isDone = step > stepNum
+              return (
+                <span key={label} className="flex items-center gap-2">
+                  {i > 0 && <span className="opacity-30">›</span>}
+                  <span className={`${isActive ? 'text-[#13244f] font-bold' : isDone ? 'text-[#13244f]/70' : ''}`}>
+                    {isDone ? `✓ ${label}` : label}
+                  </span>
+                </span>
+              )
+            })}
+          </nav>
+        </div>
+      </header>
+
+      <main className="max-w-5xl mx-auto px-4 py-8 flex flex-col lg:flex-row gap-8 items-start">
+
+        {/* ── COLUNA ESQUERDA — Formulário ── */}
+        <div className="flex-1 space-y-3 w-full">
+
+          {/* ── STEP 2: CONTA ── */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4">
+              <div className="flex items-center gap-3">
+                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${step > 2 ? 'bg-[#13244f] text-white' : step === 2 ? 'bg-[#13244f] text-white' : 'border-2 border-gray-300 text-gray-400'}`}>
+                  {step > 2 ? '✓' : '1'}
+                </span>
+                <h2 className="font-bold text-[#13244f]">Criar sua conta</h2>
+              </div>
+              {step > 2 && (
+                <button onClick={() => setStep(2)} className="text-xs text-[#f4001e] font-semibold hover:underline">
+                  Editar
+                </button>
+              )}
             </div>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="cep">CEP</Label>
-                <Input
-                  id="cep"
-                  placeholder="00000-000"
+
+            {step === 2 && (
+              <div className="px-6 pb-6 space-y-3 border-t border-gray-50">
+                <p className="text-sm text-gray-400 pt-3">
+                  Já tem conta?{' '}
+                  <a href="/login" className="text-[#f4001e] font-semibold hover:underline">Faça login</a>
+                </p>
+                <form onSubmit={handleCreateAccount} className="space-y-3">
+                  <input
+                    type="text"
+                    placeholder="Nome completo"
+                    value={fullName}
+                    onChange={e => setFullName(e.target.value)}
+                    required
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                  />
+                  <input
+                    type="email"
+                    placeholder="E-mail"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    required
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                  />
+                  <input
+                    type="password"
+                    placeholder="Crie uma senha (mínimo 6 caracteres)"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    minLength={6}
+                    required
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                  />
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-[#f4001e] hover:bg-[#a30000] text-white py-3.5 rounded-xl font-bold text-sm uppercase tracking-wide transition active:scale-95 disabled:opacity-50"
+                  >
+                    {loading ? 'Criando conta...' : 'Continuar'}
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {step > 2 && accountSummary && (
+              <div className="px-6 pb-4 border-t border-gray-50 pt-3">
+                <p className="text-sm text-[#13244f] font-medium">{accountSummary.name}</p>
+                <p className="text-sm text-gray-400">{accountSummary.email}</p>
+              </div>
+            )}
+          </div>
+
+          {/* ── STEP 3: ENDEREÇO ── */}
+          <div className={`bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden ${step < 3 ? 'opacity-50' : ''}`}>
+            <div className="flex items-center justify-between px-6 py-4">
+              <div className="flex items-center gap-3">
+                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${step > 3 ? 'bg-[#13244f] text-white' : step === 3 ? 'bg-[#13244f] text-white' : 'border-2 border-gray-300 text-gray-400'}`}>
+                  {step > 3 ? '✓' : '2'}
+                </span>
+                <h2 className="font-bold text-[#13244f]">Endereço de entrega</h2>
+              </div>
+              {step > 3 && (
+                <button onClick={() => setStep(3)} className="text-xs text-[#f4001e] font-semibold hover:underline">
+                  Editar
+                </button>
+              )}
+            </div>
+
+            {step === 3 && (
+              <div className="px-6 pb-6 space-y-3 border-t border-gray-50 pt-4">
+                <input
+                  placeholder="CEP"
                   value={cep}
                   onChange={e => setCep(e.target.value)}
                   onBlur={handleCepBlur}
                   maxLength={9}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                 />
                 {loadingCep && <p className="text-xs text-gray-400">Buscando CEP...</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="street">Rua</Label>
-                <Input id="street" value={street} onChange={e => setStreet(e.target.value)} required />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="number">Número</Label>
-                  <Input id="number" value={number} onChange={e => setNumber(e.target.value)} required />
+                <input
+                  placeholder="Rua"
+                  value={street}
+                  onChange={e => setStreet(e.target.value)}
+                  required
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    placeholder="Número"
+                    value={number}
+                    onChange={e => setNumber(e.target.value)}
+                    required
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                  />
+                  <input
+                    placeholder="Complemento"
+                    value={complement}
+                    onChange={e => setComplement(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                  />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="complement">Complemento</Label>
-                  <Input id="complement" value={complement} onChange={e => setComplement(e.target.value)} placeholder="Apto, sala..." />
+                <input
+                  placeholder="Bairro"
+                  value={neighborhood}
+                  onChange={e => setNeighborhood(e.target.value)}
+                  required
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                />
+                <div className="grid grid-cols-3 gap-3">
+                  <input
+                    placeholder="Cidade"
+                    value={city}
+                    onChange={e => setCity(e.target.value)}
+                    required
+                    className="col-span-2 w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                  />
+                  <input
+                    placeholder="UF"
+                    value={state}
+                    onChange={e => setState(e.target.value)}
+                    maxLength={2}
+                    required
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                  />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="neighborhood">Bairro</Label>
-                <Input id="neighborhood" value={neighborhood} onChange={e => setNeighborhood(e.target.value)} required />
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-2 space-y-2">
-                  <Label htmlFor="city">Cidade</Label>
-                  <Input id="city" value={city} onChange={e => setCity(e.target.value)} required />
+                <div className="flex items-center gap-2 text-sm text-[#13244f] font-medium bg-[#13244f]/5 rounded-xl px-4 py-3">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M5 12h14M12 5l7 7-7 7" stroke="#13244f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  Entrega grátis para todo o Brasil
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="state">UF</Label>
-                  <Input id="state" value={state} onChange={e => setState(e.target.value)} maxLength={2} required />
-                </div>
+                <button
+                  onClick={() => {
+                    setAddressSummary(`${street}, ${number}${complement ? ` ${complement}` : ''} — ${city}/${state}`)
+                    setStep(4)
+                  }}
+                  disabled={!cep || !street || !number || !city || !state}
+                  className="w-full bg-[#f4001e] hover:bg-[#a30000] text-white py-3.5 rounded-xl font-bold text-sm uppercase tracking-wide transition active:scale-95 disabled:opacity-40"
+                >
+                  Ir para o pagamento
+                </button>
               </div>
-            </div>
-            <Button
-              onClick={() => setStep(4)}
-              disabled={!cep || !street || !number || !city || !state}
-              className="w-full"
-              size="lg"
-            >
-              Continuar para pagamento
-            </Button>
-          </div>
-        )
+            )}
 
-      case 4:
-        return (
-          <div className="space-y-6">
+            {step > 3 && addressSummary && (
+              <div className="px-6 pb-4 border-t border-gray-50 pt-3">
+                <p className="text-sm text-[#13244f]">{addressSummary}</p>
+              </div>
+            )}
+          </div>
+
+          {/* ── STEP 4: PAGAMENTO ── */}
+          <div className={`bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden ${step < 4 ? 'opacity-50' : ''}`}>
+            <div className="px-6 py-4 flex items-center gap-3">
+              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${step === 4 ? 'bg-[#13244f] text-white' : 'border-2 border-gray-300 text-gray-400'}`}>
+                3
+              </span>
+              <h2 className="font-bold text-[#13244f]">Pagamento</h2>
+            </div>
+
+            {step === 4 && (
+              <div className="px-6 pb-6 space-y-3 border-t border-gray-50 pt-4">
+                <form onSubmit={handlePayment} className="space-y-3">
+                  <input
+                    placeholder="CPF do titular"
+                    value={cpf}
+                    onChange={e => setCpf(e.target.value)}
+                    required
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                  />
+                  <input
+                    placeholder="Número do cartão"
+                    value={cardNumber}
+                    onChange={e => setCardNumber(e.target.value)}
+                    maxLength={19}
+                    required
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                  />
+                  <input
+                    placeholder="Nome no cartão"
+                    value={cardName}
+                    onChange={e => setCardName(e.target.value)}
+                    required
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      placeholder="Validade (MM/AA)"
+                      value={cardExpiry}
+                      onChange={e => setCardExpiry(e.target.value)}
+                      maxLength={5}
+                      required
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                    />
+                    <input
+                      placeholder="CVV"
+                      value={cardCvv}
+                      onChange={e => setCardCvv(e.target.value)}
+                      maxLength={4}
+                      required
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={processingPayment}
+                    className="w-full bg-[#f4001e] hover:bg-[#a30000] text-white py-4 rounded-xl font-bold text-sm uppercase tracking-wide transition active:scale-95 disabled:opacity-50"
+                  >
+                    {processingPayment ? 'Processando...' : `Pagar R$ ${getTotal().toFixed(2).replace('.', ',')}`}
+                  </button>
+                </form>
+
+                <div className="pt-2 space-y-2">
+                  {[
+                    'Pagamento 100% seguro e criptografado',
+                    'Farmácias credenciadas pela ANVISA',
+                    'Cancele quando quiser, sem burocracia',
+                    'Entrega discreta direto na sua porta',
+                  ].map(item => (
+                    <div key={item} className="flex items-center gap-2 text-xs text-gray-400">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                        <path d="M5 13l4 4L19 7" stroke="#13244f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+        </div>
+
+        {/* ── COLUNA DIREITA — Sidebar resumo ── */}
+        <div className="w-full lg:w-80 lg:sticky lg:top-8">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
             <div>
-              <h2 className="text-xl font-semibold">Pagamento</h2>
-              <p className="text-gray-500 text-sm mt-1">Seus dados são criptografados e seguros</p>
+              <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-1">Resumo da compra</p>
+              <p className="text-sm text-gray-400">{PLAN_LABELS[plan] ?? plan} de tratamento</p>
             </div>
-            <form onSubmit={handlePayment} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="cpf">CPF do titular</Label>
-                <Input
-                  id="cpf"
-                  placeholder="000.000.000-00"
-                  value={cpf}
-                  onChange={e => setCpf(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cardNumber">Número do cartão</Label>
-                <Input
-                  id="cardNumber"
-                  placeholder="0000 0000 0000 0000"
-                  value={cardNumber}
-                  onChange={e => setCardNumber(e.target.value)}
-                  maxLength={19}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cardName">Nome no cartão</Label>
-                <Input
-                  id="cardName"
-                  placeholder="Como está no cartão"
-                  value={cardName}
-                  onChange={e => setCardName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="cardExpiry">Validade</Label>
-                  <Input
-                    id="cardExpiry"
-                    placeholder="MM/AA"
-                    value={cardExpiry}
-                    onChange={e => setCardExpiry(e.target.value)}
-                    maxLength={5}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cardCvv">CVV</Label>
-                  <Input
-                    id="cardCvv"
-                    placeholder="000"
-                    value={cardCvv}
-                    onChange={e => setCardCvv(e.target.value)}
-                    maxLength={4}
-                    required
-                  />
-                </div>
-              </div>
 
-              <div className="bg-gray-50 rounded-lg p-4 border">
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-500">Subtotal</span>
-                  <span>R$ {getTotal().toFixed(2).replace('.', ',')}</span>
+            <div className="space-y-3">
+              {getActiveItems().map(item => (
+                <div key={item.product_id} className="flex items-center justify-between gap-3">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-[#13244f]">{item.product_name}</p>
+                    <p className="text-xs text-gray-400">{item.is_required ? 'Tratamento principal' : 'Complementar'}</p>
+                  </div>
+                  <p className="text-sm font-semibold text-[#13244f] flex-shrink-0">
+                    R$ {getPrice(item).toFixed(2).replace('.', ',')}
+                  </p>
                 </div>
-                <div className="flex justify-between font-semibold">
-                  <span>Total</span>
-                  <span>R$ {getTotal().toFixed(2).replace('.', ',')}</span>
-                </div>
-                <p className="text-xs text-gray-400 mt-2">Renovação automática. Cancele quando quiser.</p>
+              ))}
+            </div>
+
+            <div className="border-t border-gray-100 pt-3 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-500">Entrega</span>
+                <span className="text-[#13244f] font-semibold">Grátis</span>
               </div>
-
-              <Button type="submit" disabled={processingPayment} className="w-full" size="lg">
-                {processingPayment ? 'Processando pagamento...' : `Pagar R$ ${getTotal().toFixed(2).replace('.', ',')}`}
-              </Button>
-            </form>
-          </div>
-        )
-    }
-  }
-
-  const STEP_LABELS = ['Tratamento', 'Conta', 'Entrega', 'Pagamento']
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-6 py-4">
-        <div className="max-w-lg mx-auto">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-medium">Desafio Diabetes</span>
-            <span className="text-sm text-gray-400">Passo {step} de 4</span>
-          </div>
-          <div className="flex gap-1">
-            {STEP_LABELS.map((label, i) => (
-              <div key={label} className="flex-1">
-                <div className={`h-1 rounded-full ${i + 1 <= step ? 'bg-black' : 'bg-gray-200'}`} />
-                <p className={`text-xs mt-1 text-center ${i + 1 === step ? 'text-black font-medium' : 'text-gray-400'}`}>
-                  {label}
-                </p>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-[#13244f]">Total</span>
+                <span className="text-xl font-bold text-[#13244f]">
+                  R$ {getTotal().toFixed(2).replace('.', ',')}
+                </span>
               </div>
-            ))}
+              <p className="text-xs text-gray-400 text-right">por {PLAN_LABELS[plan] ?? plan}</p>
+            </div>
+
+            <div className="bg-[#13244f]/5 rounded-xl px-4 py-3 text-xs text-[#13244f] leading-relaxed">
+              Planos flexíveis — cancele, pause ou adie quando quiser
+            </div>
           </div>
         </div>
-      </header>
 
-      <main className="max-w-lg mx-auto p-6">
-        {renderStep()}
       </main>
     </div>
   )

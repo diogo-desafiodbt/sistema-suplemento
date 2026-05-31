@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { Badge } from '@/components/ui/badge'
 import { AdminNav } from '@/components/admin/AdminNav'
 
 type UserRow = {
@@ -41,60 +40,75 @@ export default async function AdminUsuariosPage() {
 
   const userList = (users ?? []) as unknown as UserRow[]
 
-  const roleColor: Record<string, string> = {
-    patient: 'bg-gray-100 text-gray-700',
-    professional: 'bg-blue-100 text-blue-700',
-    admin: 'bg-purple-100 text-purple-700',
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-[#f5f0eb]">
+
+      {/* Header */}
+      <header className="bg-[#13244f] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-6">
-          <h1 className="font-semibold">Admin</h1>
-          <AdminNav active="usuarios" />
+          <img src="/logo-branca.png" alt="Desafio Diabetes" className="h-7 w-auto" />
+          <span className="text-white/40 text-sm">Admin</span>
         </div>
         <form action="/api/auth/signout" method="POST">
-          <button type="submit" className="text-sm text-gray-500 hover:text-gray-700">Sair</button>
+          <button type="submit" className="text-sm text-white/60 hover:text-white transition">Sair</button>
         </form>
       </header>
 
-      <main className="max-w-6xl mx-auto p-6">
-        <h2 className="text-xl font-semibold mb-4">Usuários</h2>
-        <div className="bg-white rounded-lg border overflow-hidden">
+      {/* Nav */}
+      <div className="bg-white border-b border-gray-100 px-6 py-3">
+        <AdminNav active="usuarios" />
+      </div>
+
+      <main className="max-w-6xl mx-auto px-6 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-1">Gestão</p>
+            <h1 className="text-2xl font-bold text-[#13244f]">Usuários</h1>
+          </div>
+          <span className="text-sm text-gray-400">{userList.length} registros</span>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Paciente</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Código</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Role</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Plano</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Cadastro</th>
+            <thead>
+              <tr className="border-b border-gray-100">
+                <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">Paciente</th>
+                <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">Código</th>
+                <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">Role</th>
+                <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">Plano</th>
+                <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">Cadastro</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody>
               {userList.map(u => {
                 const activeSub = u.subscriptions?.find(s => s.status === 'active')
+                const roleBg: Record<string, string> = {
+                  patient: 'bg-gray-100 text-gray-600',
+                  professional: 'bg-blue-50 text-blue-700',
+                  admin: 'bg-[#13244f]/10 text-[#13244f]',
+                }
                 return (
-                  <tr key={u.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">
-                      <p className="font-medium">{u.full_name}</p>
-                      <p className="text-gray-400 text-xs">{u.email}</p>
+                  <tr key={u.id} className="border-b border-gray-50 hover:bg-[#f5f0eb]/50 transition-colors">
+                    <td className="px-5 py-4">
+                      <p className="font-semibold text-[#13244f]">{u.full_name}</p>
+                      <p className="text-gray-400 text-xs mt-0.5">{u.email}</p>
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-gray-500">{u.client_code}</td>
-                    <td className="px-4 py-3">
-                      <Badge className={`${roleColor[u.role]} border-0 text-xs`}>{u.role}</Badge>
+                    <td className="px-5 py-4 font-mono text-xs text-gray-400">{u.client_code}</td>
+                    <td className="px-5 py-4">
+                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${roleBg[u.role] ?? 'bg-gray-100 text-gray-600'}`}>
+                        {u.role}
+                      </span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-5 py-4">
                       {activeSub ? (
-                        <Badge className="bg-green-100 text-green-700 border-0 text-xs">
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-green-50 text-green-700">
                           {activeSub.plan_type}
-                        </Badge>
+                        </span>
                       ) : (
-                        <span className="text-gray-400 text-xs">—</span>
+                        <span className="text-gray-300 text-xs">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">
+                    <td className="px-5 py-4 text-gray-400 text-xs">
                       {new Date(u.created_at).toLocaleDateString('pt-BR')}
                     </td>
                   </tr>

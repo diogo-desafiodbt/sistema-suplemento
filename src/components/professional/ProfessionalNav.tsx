@@ -1,23 +1,31 @@
+'use client'
+
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 
-type ProfessionalNavProps = {
-  active: 'pendentes' | 'assinados'
-}
+const tabs = [
+  { label: 'Pendentes', href: '/profissional/fila' },
+  { label: 'Assinados', href: '/profissional/assinados' },
+]
 
-export function ProfessionalNav({ active }: ProfessionalNavProps) {
-  const linkClass = (tab: ProfessionalNavProps['active']) =>
-    tab === active
-      ? 'text-sm font-medium text-gray-900'
-      : 'text-sm text-gray-500 hover:text-gray-700'
+export function ProfessionalNav() {
+  const pathname = usePathname()
 
   return (
-    <nav className="flex items-center gap-4 mt-2">
-      <Link href="/profissional/fila" className={linkClass('pendentes')}>
-        Pendentes
-      </Link>
-      <Link href="/profissional/assinados" className={linkClass('assinados')}>
-        Assinados
-      </Link>
+    <nav className="flex gap-1">
+      {tabs.map(tab => (
+        <Link
+          key={tab.href}
+          href={tab.href}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            pathname.startsWith(tab.href)
+              ? 'bg-white text-[#13244f]'
+              : 'text-white/60 hover:text-white hover:bg-white/10'
+          }`}
+        >
+          {tab.label}
+        </Link>
+      ))}
     </nav>
   )
 }

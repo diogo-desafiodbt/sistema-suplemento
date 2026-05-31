@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 
 export function AssinarButton({ protocolId }: { protocolId: string }) {
@@ -42,23 +41,26 @@ export function AssinarButton({ protocolId }: { protocolId: string }) {
   return (
     <div className="space-y-3">
       {confirmed && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800">
           <strong>Confirmação:</strong> Ao assinar, você atesta que revisou o perfil clínico do paciente e que o protocolo prescrito é adequado para o caso. Esta ação é registrada de forma imutável.
         </div>
       )}
-      <Button
+      <button
+        type="button"
         onClick={handleAssinar}
         disabled={loading}
-        className="w-full"
-        size="lg"
-        variant={confirmed ? 'default' : 'outline'}
+        className={`w-full py-4 rounded-full font-bold text-sm transition active:scale-95 disabled:opacity-50 ${
+          confirmed
+            ? 'bg-[#f4001e] hover:bg-[#a30000] text-white'
+            : 'border-2 border-[#13244f] text-[#13244f] hover:bg-[#13244f]/5'
+        }`}
       >
         {loading
           ? 'Assinando...'
           : confirmed
           ? 'Confirmar assinatura'
           : 'Assinar prescrição'}
-      </Button>
+      </button>
       {confirmed && (
         <button
           type="button"

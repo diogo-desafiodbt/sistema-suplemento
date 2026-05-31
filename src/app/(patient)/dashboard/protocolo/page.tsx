@@ -1,8 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import Link from 'next/link'
-import { Badge } from '@/components/ui/badge'
+import { DashboardNav } from '@/components/patient/DashboardNav'
 import { getPatientOrderStatus, getPatientOrderStatusColor } from '@/lib/order-status'
 
 type ProtocolItem = {
@@ -65,41 +64,55 @@ export default async function ProtocoloPage() {
   )
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-6 py-4 flex items-center gap-4">
-        <Link href="/dashboard" className="text-sm text-gray-500 hover:text-gray-700">← Dashboard</Link>
-        <h1 className="font-semibold">Meu protocolo</h1>
+    <div className="min-h-screen bg-[#f5f0eb]">
+      <header className="bg-white border-b border-gray-100 px-4 md:px-6 py-4 flex items-center justify-between">
+        <img src="/logo-azul.png" alt="Desafio Diabetes" className="h-7 w-auto" />
+        <form action="/api/auth/signout" method="POST">
+          <button type="submit" className="text-sm text-[#f4001e] font-medium hover:underline">Sair</button>
+        </form>
       </header>
 
-      <main className="max-w-2xl mx-auto p-6 space-y-6">
-        <div className="bg-white rounded-lg border p-5 flex items-center justify-between">
-          <p className="font-medium">Status do pedido</p>
-          <Badge className={`${getPatientOrderStatusColor(orderStatus)} border-0`}>
-            {orderStatus}
-          </Badge>
+      <DashboardNav />
+
+      <main className="max-w-3xl mx-auto px-4 py-8 space-y-5">
+        <div>
+          <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-1">Seu tratamento</p>
+          <h1 className="text-2xl font-bold text-[#13244f]">Meu Protocolo</h1>
         </div>
 
+        {/* Status */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center justify-between">
+          <p className="text-sm font-medium text-[#13244f]">Status do pedido</p>
+          <span className={`text-xs font-bold px-3 py-1 rounded-full ${getPatientOrderStatusColor(orderStatus)}`}>
+            {orderStatus}
+          </span>
+        </div>
+
+        {/* Rastreio */}
         {orderStatus === 'Em trânsito' && latestOrder?.tracking_code && (
-          <div className="bg-blue-50 rounded-lg border border-blue-200 p-4 text-sm">
-            <p className="text-blue-700 font-medium">Código de rastreio</p>
-            <p className="text-blue-600 font-mono mt-0.5">{latestOrder.tracking_code}</p>
+          <div className="bg-[#13244f] rounded-2xl p-5 text-white">
+            <p className="text-xs font-bold tracking-widest uppercase opacity-60 mb-1">Código de rastreio</p>
+            <p className="font-mono font-bold text-lg">{latestOrder.tracking_code}</p>
           </div>
         )}
 
-        <div className="bg-white rounded-lg border p-5 space-y-4">
-          <h2 className="font-medium">Seus suplementos</h2>
+        {/* Suplementos */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+          <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">Seus suplementos</p>
           {activeItems?.map(item => (
-            <div key={item.id} className="flex items-start justify-between gap-4 pb-3 border-b last:border-0 last:pb-0">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-sm">{item.products?.name}</span>
-                  {item.is_required && <Badge variant="secondary" className="text-xs">Principal</Badge>}
+            <div key={item.id} className="flex items-start justify-between gap-4 pb-4 border-b border-gray-50 last:border-0 last:pb-0">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-sm text-[#13244f]">{item.products?.name}</span>
+                  {item.is_required && (
+                    <span className="text-[10px] bg-[#13244f]/10 text-[#13244f] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Principal</span>
+                  )}
                 </div>
-                <p className="text-xs text-gray-500 mt-0.5">{item.activation_reason}</p>
+                <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{item.activation_reason}</p>
               </div>
-              <span className="text-sm font-medium text-gray-700">
+              <span className="text-sm font-bold text-[#13244f] flex-shrink-0">
                 R$ {item.products?.price_monthly?.toFixed(2).replace('.', ',')}
-                <span className="text-xs text-gray-400 font-normal">/mês</span>
+                <span className="text-xs font-normal text-gray-400">/mês</span>
               </span>
             </div>
           ))}
