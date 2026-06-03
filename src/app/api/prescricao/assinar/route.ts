@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Resend } from 'resend'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { generatePrescriptionPdf } from '@/lib/pdf/generator'
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -147,6 +156,72 @@ export async function POST(request: NextRequest) {
     if (auditError) {
       console.error('Audit error:', auditError)
       return NextResponse.json({ error: 'Erro ao registrar auditoria' }, { status: 500 })
+    }
+
+    const resendApiKey = process.env.RESEND_API_KEY
+    if (resendApiKey && patient.email) {
+      try {
+        const resend = new Resend(resendApiKey)
+        const firstName = escapeHtml(patient.full_name?.split(' ')[0] ?? 'Olá')
+        const doctorName = escapeHtml(professionalUser?.full_name ?? 'nossa equipe médica')
+
+        await resend.emails.send({
+          from: 'Desafio Diabetes <noreply@desafiodiabetes.com>',
+          to: patient.email,
+          subject: 'Boas notícias — seu tratamento foi aprovado',
+          html: `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<body style="margin:0;padding:0;background-color:#f5f0eb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f0eb;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background-color:#ffffff;border-radius:16px;border:1px solid #f0f0f0;overflow:hidden;">
+          <tr>
+            <td style="background-color:#13244f;padding:28px 32px;text-align:center;">
+              <p style="margin:0;color:#ffffff;font-size:18px;font-weight:700;letter-spacing:0.02em;">Desafio Diabetes</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px;">
+              <p style="margin:0 0 16px;color:#13244f;font-size:16px;line-height:1.6;">Olá, <strong>${firstName}</strong>,</p>
+              <p style="margin:0 0 16px;color:#4b5563;font-size:15px;line-height:1.7;">
+                Temos uma ótima notícia para você: um profissional de saúde da nossa equipe revisou seu caso e <strong style="color:#13244f;">aprovou seu tratamento personalizado</strong>.
+              </p>
+              <p style="margin:0 0 16px;color:#4b5563;font-size:15px;line-height:1.7;">
+                Isso significa que seus suplementos já estão sendo preparados com todo o cuidado, para seguirem em direção à sua casa em breve.
+              </p>
+              <p style="margin:0 0 24px;color:#4b5563;font-size:15px;line-height:1.7;">
+                Você não precisa fazer nada agora — assim que houver novidades sobre o envio, avisaremos você por aqui. Estamos com você em cada passo dessa jornada.
+              </p>
+              <p style="margin:0 0 8px;color:#9ca3af;font-size:13px;line-height:1.6;">
+                Com carinho,
+              </p>
+              <p style="margin:0;color:#13244f;font-size:14px;font-weight:600;">
+                ${doctorName}<br>
+                <span style="font-weight:400;color:#6b7280;">Equipe Desafio Diabetes</span>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 32px;background-color:#fafafa;border-top:1px solid #f0f0f0;">
+              <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.5;text-align:center;">
+                Este é um e-mail automático. Por favor, não responda diretamente a esta mensagem.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+          `.trim(),
+        })
+      } catch (emailError) {
+        console.error('Erro ao enviar email de aprovação ao paciente:', emailError)
+      }
     }
 
     return NextResponse.json({ ok: true, pdf_url: pdfUrl })

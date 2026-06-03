@@ -99,75 +99,121 @@ export async function POST(request: NextRequest) {
       ? 2000 + parseInt(data.card.exp_year, 10)
       : parseInt(data.card.exp_year, 10)
 
-    const pagarmePayload = {
-      items: [
-        {
-          amount: Math.round(data.total_amount * 100),
-          description: `Desafio Diabetes — Plano ${data.plan_type}`,
-          quantity: 1,
-          code: `DD-${data.plan_type.toUpperCase()}`,
+    const pagarmeAuth = `Basic ${Buffer.from(process.env.PAGARME_API_KEY + ':').toString('base64')}`
+    const pagarmeHeaders = {
+      'Content-Type': 'application/json',
+      Authorization: pagarmeAuth,
+    }
+
+    const customer = {
+      name: profile.full_name,
+      email: profile.email,
+      type: 'individual' as const,
+      document: data.cpf.replace(/\D/g, ''),
+      document_type: 'CPF' as const,
+      phones: {
+        mobile_phone: {
+          country_code: '55',
+          area_code: '11',
+          number: '999999999',
         },
-      ],
-      customer: {
-        name: profile.full_name,
-        email: profile.email,
-        type: 'individual',
-        document: data.cpf.replace(/\D/g, ''),
-        document_type: 'CPF',
-        phones: {
-          mobile_phone: {
-            country_code: '55',
-            area_code: '11',
-            number: '999999999',
-          },
-        },
-      },
-      payments: [
-        {
-          payment_method: 'credit_card',
-          credit_card: {
-            recurrence: false,
-            installments: 1,
-            statement_descriptor: 'DESAF DIABETS',
-            card: {
-              number: data.card.number.replace(/\s/g, ''),
-              holder_name: data.card.holder_name,
-              exp_month: parseInt(data.card.exp_month, 10),
-              exp_year: expYear,
-              cvv: data.card.cvv,
-              billing_address: {
-                zip_code: data.address.zip_code,
-                city: data.address.city,
-                state: data.address.state,
-                country: 'BR',
-                line_1: `${data.address.number}, ${data.address.street}, ${data.address.neighborhood}`,
-              },
-            },
-          },
-        },
-      ],
-      metadata: {
-        subscription_id: subscription.id,
-        user_id: user.id,
-        protocol_id: data.protocol_id,
-        plan_type: data.plan_type,
-        client_code: profile.client_code,
       },
     }
 
-    const pagarmeRes = await fetch('https://api.pagar.me/core/v5/orders', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Basic ${Buffer.from(process.env.PAGARME_API_KEY + ':').toString('base64')}`,
+    const metadata = {
+      subscription_id: subscription.id,
+      user_id: user.id,
+      protocol_id: data.protocol_id,
+      plan_type: data.plan_type,
+      client_code: profile.client_code,
+    }
+
+    const card = {
+      number: data.card.number.replace(/\s/g, ''),
+      holder_name: data.card.holder_name,
+      exp_month: parseInt(data.card.exp_month, 10),
+      exp_year: expYear,
+      cvv: data.card.cvv,
+      billing_address: {
+        zip_code: data.address.zip_code,
+        city: data.address.city,
+        state: data.address.state,
+        country: 'BR',
+        line_1: `${data.address.number}, ${data.address.street}, ${data.address.neighborhood}`,
       },
-      body: JSON.stringify(pagarmePayload),
-    })
+    }
+
+    let pagarmeRes: Response
+
+    if (data.plan_type === '1mes') {
+      const pagarmePayload = {
+        items: [
+          {
+            amount: Math.round(data.total_amount * 100),
+            description: `Desafio Diabetes — Plano ${data.plan_type}`,
+            quantity: 1,
+            code: `DD-${data.plan_type.toUpperCase()}`,
+          },
+        ],
+        customer,
+        payments: [
+          {
+            payment_method: 'credit_card',
+            credit_card: {
+              recurrence: false,
+              installments: 1,
+              statement_descriptor: 'DESAF DIABETS',
+              card,
+            },
+          },
+        ],
+        metadata,
+      }
+
+      pagarmeRes = await fetch('https://api.pagar.me/core/v5/orders', {
+        method: 'POST',
+        headers: pagarmeHeaders,
+        body: JSON.stringify(pagarmePayload),
+      })
+    } else {
+      const intervalCount = data.plan_type === '3meses' ? 3 : 12
+      const planItemName =
+        data.plan_type === '3meses'
+          ? 'Desafio Diabetes — Plano 3 meses'
+          : 'Desafio Diabetes — Plano 1 ano'
+
+      const pagarmeSubscriptionPayload = {
+        payment_method: 'credit_card',
+        currency: 'BRL',
+        interval: 'month',
+        interval_count: intervalCount,
+        billing_type: 'prepaid',
+        installments: 1,
+        items: [
+          {
+            name: planItemName,
+            quantity: 1,
+            pricing_scheme: {
+              scheme_type: 'unit',
+              price: Math.round(data.total_amount * 100),
+            },
+          },
+        ],
+        customer,
+        card,
+        metadata,
+      }
+
+      pagarmeRes = await fetch('https://api.pagar.me/core/v5/subscriptions', {
+        method: 'POST',
+        headers: pagarmeHeaders,
+        body: JSON.stringify(pagarmeSubscriptionPayload),
+      })
+    }
 
     const pagarmeData = await pagarmeRes.json()
     console.log('PAGARME STATUS:', pagarmeRes.status)
     console.log('PAGARME RESPONSE:', JSON.stringify(pagarmeData, null, 2))
-    console.log('CHARGE:', JSON.stringify(pagarmeData.charges?.[0], null, 2))
 
     if (!pagarmeRes.ok) {
       console.error('Pagar.me error:', pagarmeData)
@@ -178,17 +224,65 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const charge = pagarmeData.charges?.[0]
+    if (data.plan_type === '1mes') {
+      const charge = pagarmeData.charges?.[0]
+      console.log('CHARGE:', JSON.stringify(charge, null, 2))
+
+      await admin.from('payments').insert({
+        subscription_id: subscription.id,
+        amount: data.total_amount,
+        status: charge?.status === 'paid' ? 'paid' : 'pending',
+        pagarme_charge_id: charge?.id ?? pagarmeData.id,
+        paid_at: charge?.status === 'paid' ? new Date().toISOString() : null,
+        webhook_payload: pagarmeData,
+      })
+
+      if (charge?.status === 'paid') {
+        await admin.from('user_entitlements').insert({
+          user_id: user.id,
+          product_key: 'treatment',
+          status: 'active',
+          expires_at: expiresAt.toISOString(),
+          is_permanent: false,
+        })
+      }
+
+      await admin.from('webhook_logs').insert({
+        source: 'pagarme',
+        event_type: 'order.created',
+        payload: pagarmeData,
+        processed: true,
+      })
+
+      return NextResponse.json({
+        ok: true,
+        order_id: pagarmeData.id,
+        status: charge?.status ?? 'pending',
+        subscription_id: subscription.id,
+      })
+    }
+
+    await admin
+      .from('subscriptions')
+      .update({ pagarme_sub_id: pagarmeData.id })
+      .eq('id', subscription.id)
+
+    const cycleStatus = pagarmeData.current_cycle?.status as string | undefined
+    const cycleChargeId =
+      (pagarmeData.current_cycle?.id as string | undefined) ?? pagarmeData.id
+
+    console.log('CURRENT_CYCLE:', JSON.stringify(pagarmeData.current_cycle, null, 2))
+
     await admin.from('payments').insert({
       subscription_id: subscription.id,
       amount: data.total_amount,
-      status: charge?.status === 'paid' ? 'paid' : 'pending',
-      pagarme_charge_id: charge?.id ?? pagarmeData.id,
-      paid_at: charge?.status === 'paid' ? new Date().toISOString() : null,
+      status: cycleStatus === 'paid' ? 'paid' : 'pending',
+      pagarme_charge_id: cycleChargeId,
+      paid_at: cycleStatus === 'paid' ? new Date().toISOString() : null,
       webhook_payload: pagarmeData,
     })
 
-    if (charge?.status === 'paid') {
+    if (cycleStatus === 'paid') {
       await admin.from('user_entitlements').insert({
         user_id: user.id,
         product_key: 'treatment',
@@ -200,7 +294,7 @@ export async function POST(request: NextRequest) {
 
     await admin.from('webhook_logs').insert({
       source: 'pagarme',
-      event_type: 'order.created',
+      event_type: 'subscription.created',
       payload: pagarmeData,
       processed: true,
     })
@@ -208,7 +302,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       order_id: pagarmeData.id,
-      status: charge?.status ?? 'pending',
+      status: cycleStatus ?? 'pending',
       subscription_id: subscription.id,
     })
   } catch (error) {
