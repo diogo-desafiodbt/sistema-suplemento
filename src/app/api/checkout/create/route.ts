@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
         interval: 'month',
         interval_count: intervalCount,
         billing_type: 'prepaid',
-        installments: 1,
+        installments: intervalCount,
         items: [
           {
             name: planItemName,

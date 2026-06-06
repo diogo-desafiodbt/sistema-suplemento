@@ -29,6 +29,40 @@ function getChargeId(payload: PagarmePayload): string | undefined {
   return payload.data?.id ?? payload.id
 }
 
+async function shouldDispatchPharmacy(
+  admin: SupabaseClient,
+  subscriptionId: string,
+  eventType: string | undefined
+): Promise<boolean> {
+  const triggersPharmacy =
+    eventType === 'charge.paid' ||
+    eventType === 'order.paid' ||
+    eventType === 'subscription.payment_succeeded'
+
+  if (!triggersPharmacy) return false
+
+  const since = new Date()
+  since.setHours(since.getHours() - 24)
+
+  const { data: recentOrder } = await admin
+    .from('orders')
+    .select('id')
+    .eq('subscription_id', subscriptionId)
+    .not('pharmacy_sent_at', 'is', null)
+    .gte('pharmacy_sent_at', since.toISOString())
+    .limit(1)
+    .maybeSingle()
+
+  if (recentOrder) {
+    console.log(
+      `Farmácia não disparada — pedido recente já existe para subscription ${subscriptionId}`
+    )
+    return false
+  }
+
+  return true
+}
+
 async function handlePaymentSucceeded(
   admin: SupabaseClient,
   metadata: Record<string, string>,
@@ -113,40 +147,44 @@ async function handlePaymentSucceeded(
   }
 }
 
-async function handlePaymentFailed(
+async function handleSubscriptionPaymentFailed(
   admin: SupabaseClient,
   metadata: Record<string, string>,
   chargeId: string | undefined,
   webhookLogId: string | undefined
 ): Promise<void> {
   const subscriptionId = metadata.subscription_id
-
   if (!subscriptionId) return
-
-  const { data: sub } = await admin
-    .from('subscriptions')
-    .select('retry_count')
-    .eq('id', subscriptionId)
-    .single()
-
-  const retryCount = (sub?.retry_count ?? 0) + 1
-  const gracePeriodEnd = new Date()
-  gracePeriodEnd.setDate(gracePeriodEnd.getDate() + 10)
-
-  await admin
-    .from('subscriptions')
-    .update({
-      status: retryCount >= 3 ? 'past_due' : 'active',
-      retry_count: retryCount,
-      grace_period_ends_at: gracePeriodEnd.toISOString(),
-    })
-    .eq('id', subscriptionId)
 
   if (chargeId) {
     await admin
       .from('payments')
       .update({ status: 'failed' })
       .eq('pagarme_charge_id', chargeId)
+  }
+
+  const { data: sub } = await admin
+    .from('subscriptions')
+    .select('user_id, plan_type')
+    .eq('id', subscriptionId)
+    .single()
+
+  if (sub?.plan_type === '1mes') return
+
+  const userId = metadata.user_id ?? sub?.user_id
+
+  if (!userId) {
+    console.error('subscription.payment_failed sem user_id:', metadata)
+    return
+  }
+
+  try {
+    await inngest.send({
+      name: 'pagamento/falhou',
+      data: { subscription_id: subscriptionId, user_id: userId },
+    })
+  } catch (inngestError) {
+    console.error('Erro ao disparar pagamento/falhou:', inngestError)
   }
 
   if (webhookLogId) {
@@ -184,20 +222,26 @@ export async function POST(request: NextRequest) {
       eventType === 'order.paid' ||
       eventType === 'subscription.payment_succeeded'
     ) {
+      const dispatchPharmacy = metadata.subscription_id
+        ? await shouldDispatchPharmacy(admin, metadata.subscription_id, eventType)
+        : false
+
       await handlePaymentSucceeded(
         admin,
         metadata,
         chargeId,
         webhookLog?.id,
-        eventType === 'charge.paid' || eventType === 'order.paid'
+        dispatchPharmacy
       )
     }
 
-    if (
-      eventType === 'charge.payment_failed' ||
-      eventType === 'subscription.payment_failed'
-    ) {
-      await handlePaymentFailed(admin, metadata, chargeId, webhookLog?.id)
+    if (eventType === 'subscription.payment_failed') {
+      await handleSubscriptionPaymentFailed(
+        admin,
+        metadata,
+        chargeId,
+        webhookLog?.id
+      )
     }
 
     return NextResponse.json({ ok: true })
