@@ -8,6 +8,8 @@ const tabs = [
   { label: 'Minha Dieta', href: '/dashboard/dieta' },
   { label: 'Guia Digital', href: '/dashboard/guia' },
   { label: 'Planeje a Semana', href: '/dashboard/semana' },
+  { label: 'Minha Assinatura', href: '/dashboard/assinatura' },
+  { label: 'Meu Perfil', href: '/dashboard/perfil' },
 ]
 
 export function DashboardNav() {

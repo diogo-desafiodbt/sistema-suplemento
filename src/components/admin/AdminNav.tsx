@@ -3,13 +3,15 @@
 import Link from 'next/link'
 
 type AdminNavProps = {
-  active: 'usuarios' | 'pedidos' | 'auditoria'
+  active: 'usuarios' | 'pedidos' | 'auditoria' | 'cupons' | 'config'
 }
 
 const tabs = [
   { label: 'Usuários', href: '/admin/usuarios', key: 'usuarios' },
   { label: 'Pedidos', href: '/admin/pedidos', key: 'pedidos' },
   { label: 'Auditoria', href: '/admin/auditoria', key: 'auditoria' },
+  { label: 'Cupons', href: '/admin/cupons', key: 'cupons' },
+  { label: 'Configurações', href: '/admin/config', key: 'config' },
 ]
 
 export function AdminNav({ active }: AdminNavProps) {

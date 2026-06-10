@@ -3,6 +3,8 @@ import { Resend } from 'resend'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { generatePrescriptionPdf } from '@/lib/pdf/generator'
+import { sendToPharmacyWithPdf } from '@/lib/pharmacy/sender'
+import type { PharmacyOrder } from '@/types/pharmacy'
 
 function escapeHtml(text: string): string {
   return text
@@ -156,6 +158,41 @@ export async function POST(request: NextRequest) {
     if (auditError) {
       console.error('Audit error:', auditError)
       return NextResponse.json({ error: 'Erro ao registrar auditoria' }, { status: 500 })
+    }
+
+    const { data: linkedSubscription } = await admin
+      .from('subscriptions')
+      .select('id')
+      .eq('protocol_id', protocol_id)
+      .maybeSingle()
+
+    if (linkedSubscription) {
+      const { data: pendingOrder } = await admin
+        .from('orders')
+        .select('id, pharmacy_json')
+        .eq('subscription_id', linkedSubscription.id)
+        .is('pharmacy_sent_at', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (pendingOrder?.pharmacy_json) {
+        try {
+          await sendToPharmacyWithPdf(
+            pendingOrder.pharmacy_json as PharmacyOrder,
+            buffer
+          )
+          await admin
+            .from('orders')
+            .update({
+              status: 'sent_to_pharmacy',
+              pharmacy_sent_at: new Date().toISOString(),
+            })
+            .eq('id', pendingOrder.id)
+        } catch (pharmError) {
+          console.error('Erro ao enviar prescrição para farmácia:', pharmError)
+        }
+      }
     }
 
     const resendApiKey = process.env.RESEND_API_KEY

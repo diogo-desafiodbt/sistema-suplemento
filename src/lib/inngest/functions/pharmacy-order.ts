@@ -5,7 +5,6 @@ import {
   buildTransportadoraCodigo,
   buildFormaPagamentoCodigo,
 } from '@/lib/pharmacy/json-builder'
-import { sendToPharmacy } from '@/lib/pharmacy/sender'
 import type { PharmacyOrderItem } from '@/types/pharmacy'
 
 type ProtocolItemRow = {
@@ -180,8 +179,6 @@ export const pharmacyOrder = inngest.createFunction(
       pharmacyCompanyId: parseInt(configMap.pharmacy_company_id ?? '2', 10),
     })
 
-    await sendToPharmacy(pharmacyJson)
-
     const totalAmount = activeItems.reduce(
       (sum, item) => sum + getUnitPrice(item.products, planType),
       0
@@ -192,10 +189,9 @@ export const pharmacyOrder = inngest.createFunction(
       .insert({
         user_id,
         subscription_id,
-        status: 'sent_to_pharmacy',
+        status: 'pending',
         total_amount: totalAmount,
         pharmacy_json: pharmacyJson,
-        pharmacy_sent_at: new Date().toISOString(),
       })
       .select('id')
       .single()
