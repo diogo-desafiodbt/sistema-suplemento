@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { QuizFormData } from '@/lib/quiz/schema'
+import { useCart } from '@/lib/use-cart'
+import type { ProtocolItem } from '@/types/protocol'
 
 const TOTAL_STEPS = 13
 
@@ -22,6 +24,7 @@ export default function QuizPage() {
   const [step, setStep] = useState(1)
   const [form, setForm] = useState<Partial<QuizFormData>>(initialState)
   const [loading, setLoading] = useState(false)
+  const { items: cartItems, plan: cartPlan } = useCart()
 
   const progress = (step / TOTAL_STEPS) * 100
 
@@ -43,8 +46,24 @@ export default function QuizPage() {
     try {
       sessionStorage.setItem('quiz_data', JSON.stringify(data))
 
-      const { generateProtocol } = await import('@/lib/protocol/generator')
-      const items = generateProtocol(data as QuizFormData, data.plan_type ?? '1mes')
+      let items: ProtocolItem[]
+
+      if (cartItems.length > 0) {
+        items = cartItems.map((cartItem) => ({
+          product_id: cartItem.product_id,
+          product_name: cartItem.name,
+          pharmacy_sku: '',
+          is_required: false,
+          activation_reason: 'Selecionado por você no carrinho',
+          quantity: cartItem.quantity,
+        }))
+        sessionStorage.setItem('cart_locked_plan', cartPlan)
+      } else {
+        const { generateProtocol } = await import('@/lib/protocol/generator')
+        items = generateProtocol(data as QuizFormData, data.plan_type ?? '1mes')
+        sessionStorage.removeItem('cart_locked_plan')
+      }
+
       sessionStorage.setItem('protocol_items', JSON.stringify(items))
 
       router.push('/recomendacoes')
@@ -118,9 +137,9 @@ export default function QuizPage() {
       <div className="space-y-5">
         <div>
           {category && (
-            <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-2">{category}</p>
+            <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-2">{category}</p>
           )}
-          <h2 className="text-2xl font-bold text-[#13244f] leading-snug">{title}</h2>
+          <h2 className="font-display text-2xl md:text-3xl text-[#13244f] leading-snug">{title}</h2>
           {subtitle && <p className="text-sm text-gray-500 mt-1.5 leading-relaxed">{subtitle}</p>}
         </div>
         <div className="space-y-3">{children}</div>

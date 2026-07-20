@@ -10,22 +10,13 @@ const PRODUCTS = {
       '1ano': 'DD-BERB-STD-0X360',
     },
   },
-  BERBERINA_HOM: {
-    id: 'berberina-homeopata',
-    name: 'Berberina Homeopata',
+  NEUROPATIA: {
+    id: 'neuropatia',
+    name: 'Neuropatia',
     skus: {
-      '1mes': 'DD-BERB-HOM-0X30',
-      '3meses': 'DD-BERB-HOM-0X90',
-      '1ano': 'DD-BERB-HOM-0X360',
-    },
-  },
-  VITAMINA_B12: {
-    id: 'vitamina-b12',
-    name: 'Vitamina B12',
-    skus: {
-      '1mes': 'DD-VTB12-STD-0X30',
-      '3meses': 'DD-VTB12-STD-0X90',
-      '1ano': 'DD-VTB12-STD-0X360',
+      '1mes': 'DD-NEURO-STD-0X30',
+      '3meses': 'DD-NEURO-STD-0X90',
+      '1ano': 'DD-NEURO-STD-0X360',
     },
   },
   OMEGA3: {
@@ -44,37 +35,30 @@ export function generateProtocol(
   planType: '1mes' | '3meses' | '1ano' = '1mes'
 ): ProtocolItem[] {
   const items: ProtocolItem[] = []
-  const hasSeriosCondition = quiz.conditions_serious.length > 0
-
-  const berberina = hasSeriosCondition
-    ? PRODUCTS.BERBERINA_HOM
-    : PRODUCTS.BERBERINA_STD
 
   items.push({
-    product_id: berberina.id,
-    product_name: berberina.name,
-    pharmacy_sku: berberina.skus[planType],
+    product_id: PRODUCTS.BERBERINA_STD.id,
+    product_name: PRODUCTS.BERBERINA_STD.name,
+    pharmacy_sku: PRODUCTS.BERBERINA_STD.skus[planType],
     is_required: true,
-    activation_reason: hasSeriosCondition
-      ? 'Berberina Homeopata indicada por condição de saúde séria'
-      : 'Protocolo base para controle glicêmico',
+    activation_reason: 'Protocolo base para controle glicêmico',
     quantity: 1,
   })
 
-  const ativaB12 =
+  const ativaNeuropatia =
     quiz.years_diagnosed === '5-10anos' ||
     quiz.years_diagnosed === '>10anos' ||
     quiz.medications.includes('metformina')
 
-  if (ativaB12) {
+  if (ativaNeuropatia) {
     const reason = quiz.medications.includes('metformina')
-      ? 'Metformina pode reduzir absorção de B12'
-      : 'Diagnóstico há mais de 5 anos aumenta risco de deficiência de B12'
+      ? 'Metformina prolongada aumenta o risco de neuropatia periférica'
+      : 'Diagnóstico há mais de 5 anos aumenta o risco de neuropatia periférica'
 
     items.push({
-      product_id: PRODUCTS.VITAMINA_B12.id,
-      product_name: PRODUCTS.VITAMINA_B12.name,
-      pharmacy_sku: PRODUCTS.VITAMINA_B12.skus[planType],
+      product_id: PRODUCTS.NEUROPATIA.id,
+      product_name: PRODUCTS.NEUROPATIA.name,
+      pharmacy_sku: PRODUCTS.NEUROPATIA.skus[planType],
       is_required: false,
       activation_reason: reason,
       quantity: 1,
@@ -100,7 +84,7 @@ export function generateProtocol(
     return items.filter((item) => {
       if (alergiaLower.includes('berberina') && item.product_id.includes('berberina')) return false
       if (alergiaLower.includes('b12') || alergiaLower.includes('cobalamina')) {
-        if (item.product_id === 'vitamina-b12') return false
+        if (item.product_id === 'neuropatia') return false
       }
       if (alergiaLower.includes('omega') || alergiaLower.includes('peixe')) {
         if (item.product_id === 'omega3') return false

@@ -40,6 +40,7 @@ export default function RecomendacoesPage() {
   const router = useRouter()
   const [items, setItems] = useState<LocalProtocolItem[]>([])
   const [plan, setPlan] = useState<PlanType>('3meses')
+  const [planLocked, setPlanLocked] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -55,6 +56,12 @@ export default function RecomendacoesPage() {
       }
 
       const parsedItems: LocalProtocolItem[] = JSON.parse(itemsRaw)
+
+      const lockedPlan = sessionStorage.getItem('cart_locked_plan')
+      if (lockedPlan === '1mes' || lockedPlan === '3meses' || lockedPlan === '1ano') {
+        setPlan(lockedPlan)
+        setPlanLocked(true)
+      }
 
       const res = await fetch('/api/products')
       if (res.ok) {
@@ -178,8 +185,8 @@ export default function RecomendacoesPage() {
 
         {/* Título */}
         <div>
-          <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-1">SEU PROTOCOLO</p>
-          <h1 className="text-2xl font-bold text-[#13244f]">Protocolo personalizado</h1>
+          <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-1">SEU PROTOCOLO</p>
+          <h1 className="font-display text-2xl md:text-3xl text-[#13244f]">Protocolo personalizado</h1>
           <p className="text-gray-500 text-sm mt-1">
             Baseado nas suas respostas, preparamos o tratamento ideal para você.
           </p>
@@ -232,6 +239,11 @@ export default function RecomendacoesPage() {
         {/* Seleção de plano */}
         <div>
           <h2 className="font-bold text-[#13244f] mb-3">Escolha a frequência</h2>
+          {planLocked ? (
+            <div className="rounded-2xl border border-[#13244f]/20 bg-[#13244f]/5 px-4 py-3 text-sm text-[#13244f] font-medium text-center">
+              Plano escolhido no carrinho: {PLAN_LABELS[plan]}
+            </div>
+          ) : (
           <div className="grid grid-cols-3 gap-3">
             {(['1mes', '3meses', '1ano'] as PlanType[]).map(p => {
               const savings = getSavingsInReais(p)
@@ -269,6 +281,7 @@ export default function RecomendacoesPage() {
               )
             })}
           </div>
+          )}
 
           {/* Nota informativa sobre assinatura */}
           {plan !== '1mes' && (

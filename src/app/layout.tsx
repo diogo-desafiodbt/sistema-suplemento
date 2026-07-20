@@ -1,11 +1,19 @@
 import type { Metadata } from 'next'
-import { Merriweather } from 'next/font/google'
+import { Anton, Poppins } from 'next/font/google'
 import { Toaster } from 'sonner'
 import './globals.css'
 
-const merriweather = Merriweather({
+const anton = Anton({
+  weight: '400',
   subsets: ['latin'],
-  weight: ['300', '400', '700', '900'],
+  variable: '--font-anton',
+  display: 'swap',
+})
+
+const poppins = Poppins({
+  weight: ['300', '400', '500', '600', '700'],
+  subsets: ['latin'],
+  variable: '--font-poppins',
   display: 'swap',
 })
 
@@ -22,7 +30,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR">
-      <body className={merriweather.className}>
+      <body className={`${anton.variable} ${poppins.variable} font-sans antialiased`}>
         {children}
         <Toaster />
       </body>

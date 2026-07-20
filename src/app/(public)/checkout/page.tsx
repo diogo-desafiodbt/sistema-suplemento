@@ -344,7 +344,7 @@ export default function CheckoutPage() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-[#f4001e] hover:bg-[#a30000] text-white py-3.5 rounded-xl font-bold text-sm uppercase tracking-wide transition active:scale-95 disabled:opacity-50"
+                    className="w-full bg-[#f4001e] hover:bg-[#a30000] text-white py-3.5 rounded-full font-bold text-sm transition active:scale-95 disabled:opacity-50"
                   >
                     {loading ? 'Criando conta...' : 'Continuar'}
                   </button>
@@ -445,7 +445,7 @@ export default function CheckoutPage() {
                     setStep(4)
                   }}
                   disabled={!cep || !street || !number || !city || !state}
-                  className="w-full bg-[#f4001e] hover:bg-[#a30000] text-white py-3.5 rounded-xl font-bold text-sm uppercase tracking-wide transition active:scale-95 disabled:opacity-40"
+                  className="w-full bg-[#f4001e] hover:bg-[#a30000] text-white py-3.5 rounded-full font-bold text-sm transition active:scale-95 disabled:opacity-40"
                 >
                   Ir para o pagamento
                 </button>
@@ -515,7 +515,7 @@ export default function CheckoutPage() {
                   <button
                     type="submit"
                     disabled={processingPayment}
-                    className="w-full bg-[#f4001e] hover:bg-[#a30000] text-white py-4 rounded-xl font-bold text-sm uppercase tracking-wide transition active:scale-95 disabled:opacity-50"
+                    className="w-full bg-[#f4001e] hover:bg-[#a30000] text-white py-4 rounded-full font-bold text-sm transition active:scale-95 disabled:opacity-50"
                   >
                     {processingPayment ? 'Processando...' : `Pagar R$ ${getTotal().toFixed(2).replace('.', ',')}`}
                   </button>
@@ -546,7 +546,7 @@ export default function CheckoutPage() {
         <div className="w-full lg:w-80 lg:sticky lg:top-8">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
             <div>
-              <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-1">Resumo da compra</p>
+              <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-1">Resumo da compra</p>
               <p className="text-sm text-gray-400">{PLAN_LABELS[plan] ?? plan} de tratamento</p>
             </div>
 
