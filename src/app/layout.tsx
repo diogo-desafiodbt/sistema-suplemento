@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Anton, Poppins } from 'next/font/google'
 import { Toaster } from 'sonner'
+import { gobold } from '@/fonts'
 import './globals.css'
 
 const anton = Anton({
@@ -30,7 +31,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR">
-      <body className={`${anton.variable} ${poppins.variable} font-sans antialiased`}>
+      <body className={`${anton.variable} ${poppins.variable} ${gobold.variable} font-sans antialiased`}>
         {children}
         <Toaster />
       </body>

@@ -1,62 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
-import FloatingCTA from '@/components/FloatingCTA'
 import BannerCarousel from '@/components/BannerCarousel'
 import CategoryCarousel from '@/components/CategoryCarousel'
-import { QUIZ_URL } from '@/lib/constants'
-
-type Product = {
-  id: string
-  name: string
-  price_monthly: number
-  price_quarterly: number
-  price_yearly: number
-  is_fixed: boolean
-  is_active: boolean
-}
-
-function formatPrice(value: number) {
-  return value.toLocaleString('pt-BR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
-}
-
-function CapsuleIcon() {
-  return (
-    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" aria-hidden>
-      <rect x="10" y="18" width="28" height="12" rx="6" stroke="#13244f" strokeWidth="2" />
-      <path d="M24 18v12" stroke="#13244f" strokeWidth="2" />
-      <path d="M14 21c1.5-1.5 4-1.5 5.5 0" stroke="#f4001e" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  )
-}
 
 export default function SuplementosPage() {
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const res = await fetch('/api/products')
-        if (res.ok) {
-          const data = await res.json()
-          setProducts(data.products ?? [])
-        }
-      } catch {
-        setProducts([])
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [])
-
   return (
     <>
       <Header />
@@ -73,54 +23,47 @@ export default function SuplementosPage() {
         </div>
       </section>
 
-      <section className="bg-[#f5f5f0] py-10 md:py-16 px-4 md:px-6">
-        <div className="max-w-6xl mx-auto">
-          {loading ? (
-            <p className="text-center text-sm text-gray-500">Carregando suplementos…</p>
-          ) : products.length === 0 ? (
-            <p className="text-center text-sm text-gray-500">Nenhum suplemento disponível no momento.</p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-              {products.map((product) => (
-                <article
-                  key={product.id}
-                  className="bg-white rounded-2xl border border-gray-100 p-6 flex flex-col gap-4 shadow-sm"
-                >
-                  <div className="w-full aspect-square rounded-xl bg-[#ececec] flex items-center justify-center">
-                    <CapsuleIcon />
-                  </div>
+      <section className="relative bg-[#f4001e] overflow-hidden">
+        {/* Efeito de fundo — brilho radial atrás do Dr. Turí */}
+        <div
+          className="pointer-events-none absolute right-0 md:right-10 top-1/2 -translate-y-1/2 w-[28rem] h-[28rem] md:w-[36rem] md:h-[36rem] rounded-full bg-[#ff6666]/40 blur-3xl"
+          aria-hidden
+        />
 
-                  <div className="flex flex-col gap-2 flex-1">
-                    <span
-                      className={`inline-flex self-start text-[10px] font-bold tracking-wide uppercase px-2 py-1 rounded-md ${
-                        product.is_fixed
-                          ? 'bg-[#f4001e]/10 text-[#f4001e]'
-                          : 'bg-[#13244f]/10 text-[#13244f]'
-                      }`}
-                    >
-                      {product.is_fixed ? 'Tratamento principal' : 'Complementar'}
-                    </span>
-                    <h2 className="text-lg font-bold text-[#13244f] leading-snug">{product.name}</h2>
-                    <p className="text-sm text-gray-600">
-                      a partir de R$ {formatPrice(product.price_monthly ?? 0)}/mês
-                    </p>
-                  </div>
+        {/* Marca d'água — canto superior direito, colada na divisa com a seção branca */}
+        <img
+          src="/marca-dagua.png"
+          alt=""
+          aria-hidden
+          className="pointer-events-none absolute top-3 right-3 md:top-5 md:right-6 z-10 w-24 sm:w-32 md:w-36 h-auto opacity-70 select-none"
+        />
 
-                  <Link
-                    href={QUIZ_URL}
-                    className="block w-full text-center bg-[#f4001e] hover:bg-[#a30000] text-white rounded-full font-bold text-sm py-3 transition active:scale-95"
-                  >
-                    Quero esse no meu protocolo
-                  </Link>
-                </article>
-              ))}
-            </div>
-          )}
+        <div className="relative max-w-6xl mx-auto px-4 md:px-6 pt-32 md:pt-36 md:min-h-[560px] lg:min-h-[640px] grid md:grid-cols-2 gap-14 md:gap-10 md:items-stretch">
+          {/* Texto — no mobile, bem espaçado da marca d'água e da foto; no desktop, centralizado no meio da coluna esquerda */}
+          <div className="order-1 self-start md:self-center flex flex-col items-center justify-start md:justify-center gap-8 md:gap-8 text-center md:px-4 lg:px-8">
+            <h2 className="font-title-alt font-bold text-[2.15rem] sm:text-[2.6rem] md:text-[3.45rem] lg:text-[4.3rem] leading-tight text-white max-w-md md:max-w-lg">
+              A ciência da <span className="italic text-[#a30000]">reversão</span> do diabetes.
+            </h2>
+            <Link
+              href="/institucional#quem-somos"
+              className="inline-flex justify-center bg-[#a30000] hover:opacity-90 text-white rounded-full px-8 py-3 font-semibold text-base transition"
+            >
+              Quem somos
+            </Link>
+          </div>
+
+          {/* Foto do Dr. Turí — encostada na base da seção, onde o vermelho encontra o azul do rodapé (mobile e desktop) */}
+          <div className="order-2 self-end flex justify-center md:justify-end mt-2 md:mt-0">
+            <img
+              src="/dr-turi.png"
+              alt="Dr. Turí Souza"
+              className="w-72 sm:w-96 md:w-[30rem] lg:w-[36rem] h-auto object-contain transition-transform duration-500 ease-out hover:-translate-y-3 hover:scale-105"
+            />
+          </div>
         </div>
       </section>
 
       <Footer />
-      <FloatingCTA />
     </>
   )
 }

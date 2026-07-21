@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
-import FloatingCTA from '@/components/FloatingCTA'
 import { useCountdown, pad } from '@/components/PromoBar'
 import { QUIZ_URL } from '@/lib/constants'
 
@@ -91,7 +90,7 @@ const whyCards = [
 const faqs = [
   { q: 'O que é o Desafio Diabetes?',                          a: 'O Desafio Diabetes é uma plataforma healthtech que combina um questionário clínico, avaliação de profissional habilitado e entrega mensal de suplementos personalizados para pessoas com diabetes tipo 2 e pré-diabetes.' },
   { q: 'Os suplementos substituem os medicamentos?',           a: 'Não. Os suplementos do Desafio Diabetes são complementares ao tratamento médico convencional. Nunca interrompa ou altere medicações prescritas sem orientação do seu médico.' },
-  { q: 'Qual a diferença da Berberina para outros suplementos?', a: 'A Berberina é o ativo central do protocolo. Estudos mostram que ela age em mecanismos metabólicos similares à Metformina, auxiliando no controle da glicemia e da resistência à insulina.' },
+  { q: 'Qual a diferença da Berberina para outros suplementos?', a: 'A Berberina é o ativo central do protocolo — um dos mais estudados na nutrição funcional, com pesquisas associadas ao apoio no controle da glicemia e da resistência à insulina.' },
   { q: 'Quando verei resultados?',                              a: 'Os primeiros resultados costumam aparecer entre 4 e 8 semanas de uso regular. Resultados mais expressivos, como redução de HbA1c, são observados a partir de 3 a 6 meses.' },
   { q: 'O protocolo precisa de prescrição?',                    a: 'Sim. Um profissional habilitado avalia seu questionário clínico e assina digitalmente o protocolo antes do envio.' },
   { q: 'Quem não deve usar o protocolo?',                       a: 'Gestantes, lactantes, menores de 18 anos e pessoas com doença renal crônica grave, doença cardíaca severa ou cirrose não devem iniciar o protocolo sem autorização médica específica.' },
@@ -585,8 +584,6 @@ export default function LandingPage() {
       </section>
 
       <Footer />
-
-      <FloatingCTA />
 
     </>
   )

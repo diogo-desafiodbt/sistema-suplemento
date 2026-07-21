@@ -9,6 +9,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-poppins), system-ui, sans-serif;
   --font-display: var(--font-anton), sans-serif;
+  --font-title-alt: var(--font-gobold), sans-serif;
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);

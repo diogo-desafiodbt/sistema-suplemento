@@ -8,6 +8,7 @@ export type CartItem = {
   name: string
   price_monthly: number
   quantity: number
+  image: string
 }
 
 type CartStore = {
@@ -23,14 +24,28 @@ function normalizePlan(value: unknown): PlanType {
   return VALID_PLANS.includes(value as PlanType) ? (value as PlanType) : DEFAULT_PLAN
 }
 
+function normalizeItem(raw: Partial<CartItem>): CartItem | null {
+  if (!raw.product_id || !raw.name || typeof raw.price_monthly !== 'number') return null
+  return {
+    product_id: raw.product_id,
+    name: raw.name,
+    price_monthly: raw.price_monthly,
+    quantity: typeof raw.quantity === 'number' && raw.quantity > 0 ? raw.quantity : 1,
+    image: typeof raw.image === 'string' ? raw.image : '',
+  }
+}
+
 function readStore(): CartStore {
   if (typeof window === 'undefined') return { items: [], plan: DEFAULT_PLAN }
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return { items: [], plan: DEFAULT_PLAN }
     const parsed = JSON.parse(raw) as Partial<CartStore>
+    const items = Array.isArray(parsed.items)
+      ? parsed.items.map(normalizeItem).filter((i): i is CartItem => i !== null)
+      : []
     return {
-      items: Array.isArray(parsed.items) ? parsed.items : [],
+      items,
       plan: normalizePlan(parsed.plan),
     }
   } catch {
@@ -82,6 +97,7 @@ export function useCart() {
     name: string
     price_monthly: number
     plan: PlanType
+    image: string
     quantity?: number
   }) => {
     ensureHydrated()
@@ -92,7 +108,7 @@ export function useCart() {
         plan: item.plan,
         items: store.items.map((i) =>
           i.product_id === item.product_id
-            ? { ...i, quantity: i.quantity + qty }
+            ? { ...i, quantity: i.quantity + qty, image: item.image || i.image }
             : i
         ),
       }
@@ -106,6 +122,7 @@ export function useCart() {
             name: item.name,
             price_monthly: item.price_monthly,
             quantity: qty,
+            image: item.image,
           },
         ],
       }

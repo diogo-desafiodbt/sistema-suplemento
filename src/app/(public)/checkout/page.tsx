@@ -15,6 +15,7 @@ type LocalProtocolItem = {
   price_monthly?: number
   price_quarterly?: number
   price_yearly?: number
+  image?: string
 }
 
 async function submitQuizAndGetProtocolId(plan: string): Promise<string | null> {
@@ -288,10 +289,10 @@ export default function CheckoutPage() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-8 flex flex-col lg:flex-row gap-8 items-start">
+      <main className="max-w-6xl mx-auto px-4 py-8 flex flex-col lg:flex-row gap-8 items-start">
 
         {/* ── COLUNA ESQUERDA — Formulário ── */}
-        <div className="flex-1 space-y-3 w-full">
+        <div className="flex-1 space-y-3 w-full min-w-0">
 
           {/* ── STEP 2: CONTA ── */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -311,7 +312,7 @@ export default function CheckoutPage() {
 
             {step === 2 && (
               <div className="px-6 pb-6 space-y-3 border-t border-gray-50">
-                <p className="text-sm text-gray-400 pt-3">
+                <p className="text-sm md:text-base text-gray-400 pt-3">
                   Já tem conta?{' '}
                   <a href="/login" className="text-[#f4001e] font-semibold hover:underline">Faça login</a>
                 </p>
@@ -322,7 +323,7 @@ export default function CheckoutPage() {
                     value={fullName}
                     onChange={e => setFullName(e.target.value)}
                     required
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                   />
                   <input
                     type="email"
@@ -330,7 +331,7 @@ export default function CheckoutPage() {
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     required
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                   />
                   <input
                     type="password"
@@ -339,7 +340,7 @@ export default function CheckoutPage() {
                     onChange={e => setPassword(e.target.value)}
                     minLength={6}
                     required
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                   />
                   <button
                     type="submit"
@@ -354,8 +355,8 @@ export default function CheckoutPage() {
 
             {step > 2 && accountSummary && (
               <div className="px-6 pb-4 border-t border-gray-50 pt-3">
-                <p className="text-sm text-[#13244f] font-medium">{accountSummary.name}</p>
-                <p className="text-sm text-gray-400">{accountSummary.email}</p>
+                <p className="text-sm md:text-base text-[#13244f] font-medium">{accountSummary.name}</p>
+                <p className="text-sm md:text-base text-gray-400">{accountSummary.email}</p>
               </div>
             )}
           </div>
@@ -384,7 +385,7 @@ export default function CheckoutPage() {
                   onChange={e => setCep(e.target.value)}
                   onBlur={handleCepBlur}
                   maxLength={9}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                 />
                 {loadingCep && <p className="text-xs text-gray-400">Buscando CEP...</p>}
                 <input
@@ -392,7 +393,7 @@ export default function CheckoutPage() {
                   value={street}
                   onChange={e => setStreet(e.target.value)}
                   required
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                 />
                 <div className="grid grid-cols-2 gap-3">
                   <input
@@ -400,13 +401,13 @@ export default function CheckoutPage() {
                     value={number}
                     onChange={e => setNumber(e.target.value)}
                     required
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                   />
                   <input
                     placeholder="Complemento"
                     value={complement}
                     onChange={e => setComplement(e.target.value)}
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                   />
                 </div>
                 <input
@@ -414,7 +415,7 @@ export default function CheckoutPage() {
                   value={neighborhood}
                   onChange={e => setNeighborhood(e.target.value)}
                   required
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                 />
                 <div className="grid grid-cols-3 gap-3">
                   <input
@@ -422,7 +423,7 @@ export default function CheckoutPage() {
                     value={city}
                     onChange={e => setCity(e.target.value)}
                     required
-                    className="col-span-2 w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                    className="col-span-2 w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                   />
                   <input
                     placeholder="UF"
@@ -430,10 +431,10 @@ export default function CheckoutPage() {
                     onChange={e => setState(e.target.value)}
                     maxLength={2}
                     required
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                   />
                 </div>
-                <div className="flex items-center gap-2 text-sm text-[#13244f] font-medium bg-[#13244f]/5 rounded-xl px-4 py-3">
+                <div className="flex items-center gap-2 text-sm md:text-base text-[#13244f] font-medium bg-[#13244f]/5 rounded-xl px-4 py-3">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                     <path d="M5 12h14M12 5l7 7-7 7" stroke="#13244f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
@@ -454,7 +455,7 @@ export default function CheckoutPage() {
 
             {step > 3 && addressSummary && (
               <div className="px-6 pb-4 border-t border-gray-50 pt-3">
-                <p className="text-sm text-[#13244f]">{addressSummary}</p>
+                <p className="text-sm md:text-base text-[#13244f]">{addressSummary}</p>
               </div>
             )}
           </div>
@@ -476,7 +477,7 @@ export default function CheckoutPage() {
                     value={cpf}
                     onChange={e => setCpf(e.target.value)}
                     required
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                   />
                   <input
                     placeholder="Número do cartão"
@@ -484,14 +485,14 @@ export default function CheckoutPage() {
                     onChange={e => setCardNumber(e.target.value)}
                     maxLength={19}
                     required
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                   />
                   <input
                     placeholder="Nome no cartão"
                     value={cardName}
                     onChange={e => setCardName(e.target.value)}
                     required
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                   />
                   <div className="grid grid-cols-2 gap-3">
                     <input
@@ -500,7 +501,7 @@ export default function CheckoutPage() {
                       onChange={e => setCardExpiry(e.target.value)}
                       maxLength={5}
                       required
-                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                     />
                     <input
                       placeholder="CVV"
@@ -508,7 +509,7 @@ export default function CheckoutPage() {
                       onChange={e => setCardCvv(e.target.value)}
                       maxLength={4}
                       required
-                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                     />
                   </div>
 
@@ -543,21 +544,32 @@ export default function CheckoutPage() {
         </div>
 
         {/* ── COLUNA DIREITA — Sidebar resumo ── */}
-        <div className="w-full lg:w-80 lg:sticky lg:top-8">
+        <div className="w-full lg:w-96 lg:sticky lg:top-8">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
             <div>
               <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-1">Resumo da compra</p>
-              <p className="text-sm text-gray-400">{PLAN_LABELS[plan] ?? plan} de tratamento</p>
+              <p className="text-sm md:text-base text-gray-400">{PLAN_LABELS[plan] ?? plan} de tratamento</p>
             </div>
 
             <div className="space-y-3">
               {getActiveItems().map(item => (
                 <div key={item.product_id} className="flex items-center justify-between gap-3">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-[#13244f]">{item.product_name}</p>
-                    <p className="text-xs text-gray-400">{item.is_required ? 'Tratamento principal' : 'Complementar'}</p>
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    {item.image ? (
+                      <img
+                        src={item.image}
+                        alt={item.product_name}
+                        className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-[#ececec] flex-shrink-0" />
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm md:text-base font-medium text-[#13244f] truncate">{item.product_name}</p>
+                      <p className="text-xs text-gray-400">{item.is_required ? 'Tratamento principal' : 'Complementar'}</p>
+                    </div>
                   </div>
-                  <p className="text-sm font-semibold text-[#13244f] flex-shrink-0">
+                  <p className="text-sm md:text-base font-semibold text-[#13244f] flex-shrink-0">
                     R$ {getPrice(item).toFixed(2).replace('.', ',')}
                   </p>
                 </div>
@@ -565,12 +577,12 @@ export default function CheckoutPage() {
             </div>
 
             <div className="border-t border-gray-100 pt-3 space-y-2">
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-between text-sm md:text-base">
                 <span className="text-gray-500">Entrega</span>
                 <span className="text-[#13244f] font-semibold">Grátis</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-[#13244f]">Total</span>
+                <span className="text-sm md:text-base font-bold text-[#13244f]">Total</span>
                 <span className="text-xl font-bold text-[#13244f]">
                   R$ {getTotal().toFixed(2).replace('.', ',')}
                 </span>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { QuizFormData } from '@/lib/quiz/schema'
@@ -25,6 +25,15 @@ export default function QuizPage() {
   const [form, setForm] = useState<Partial<QuizFormData>>(initialState)
   const [loading, setLoading] = useState(false)
   const { items: cartItems, plan: cartPlan } = useCart()
+  const [introSeen, setIntroSeen] = useState(true)
+
+  useEffect(() => {
+    if (cartItems.length > 0) {
+      setIntroSeen(false)
+    }
+    // Evaluate cart once on mount (after client hydration of useCart)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const progress = (step / TOTAL_STEPS) * 100
 
@@ -110,7 +119,7 @@ export default function QuizPage() {
       <button
         type="button"
         onClick={onClick}
-        className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border text-sm text-left transition-all ${
+        className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border text-sm md:text-base text-left transition-all ${
           selected
             ? 'border-[#13244f] bg-[#13244f]/5 text-[#13244f] font-medium'
             : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
@@ -139,8 +148,8 @@ export default function QuizPage() {
           {category && (
             <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-2">{category}</p>
           )}
-          <h2 className="font-display text-2xl md:text-3xl text-[#13244f] leading-snug">{title}</h2>
-          {subtitle && <p className="text-sm text-gray-500 mt-1.5 leading-relaxed">{subtitle}</p>}
+          <h2 className="font-display text-2xl md:text-3xl lg:text-4xl text-[#13244f] leading-snug">{title}</h2>
+          {subtitle && <p className="text-sm md:text-base text-gray-500 mt-1.5 leading-relaxed">{subtitle}</p>}
         </div>
         <div className="space-y-3">{children}</div>
         {(step > 1 || showAllergyContinue) && (
@@ -449,10 +458,17 @@ export default function QuizPage() {
   return (
     <div className="min-h-screen bg-[#f5f0eb] flex flex-col">
       <header className="bg-[#f5f0eb] px-6 pt-5 pb-3">
-        <div className="max-w-lg mx-auto">
-          <div className="flex items-center justify-between mb-4">
+        <div className="max-w-lg md:max-w-5xl mx-auto">
+          <div className="flex items-center justify-between mb-4 gap-3">
             <img src="/logo-azul.png" alt="Desafio Diabetes" className="h-7 w-auto" />
-            <span className="text-xs text-gray-400 font-medium">{step} de {TOTAL_STEPS}</span>
+            <div className="flex items-center gap-2">
+              {cartItems.length > 0 && (
+                <span className="text-xs font-medium text-[#13244f] bg-white border border-[#ececec] rounded-full px-2.5 py-1">
+                  🛒 {cartItems.length} {cartItems.length === 1 ? 'item' : 'itens'} no carrinho
+                </span>
+              )}
+              <span className="text-xs text-gray-400 font-medium">{step} de {TOTAL_STEPS}</span>
+            </div>
           </div>
           <div className="w-full h-0.5 bg-gray-200 rounded-full">
             <div
@@ -462,8 +478,62 @@ export default function QuizPage() {
           </div>
         </div>
       </header>
-      <main className="flex-1 flex items-start justify-center px-6 pt-10 pb-10">
-        <div className="w-full max-w-lg">{renderStep()}</div>
+      <main className="flex-1 flex items-start md:items-center justify-center px-6 pt-10 pb-10">
+        <div className="w-full max-w-lg md:max-w-5xl md:grid md:grid-cols-[1fr_1.3fr] md:gap-12 md:items-center">
+          {/* Painel lateral — só desktop */}
+          <div className="hidden md:flex flex-col gap-5 bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
+            <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase">SUA SEGURANÇA EM PRIMEIRO LUGAR</p>
+            <h3 className="font-display text-2xl text-[#13244f] leading-snug">Desenvolvido pelo Dr. Turí Souza</h3>
+            <p className="text-base text-gray-600 leading-relaxed">
+              Cada resposta ajuda a gente a confirmar que o suplemento é seguro pro seu caso — alergias, medicações e histórico são revisados antes de qualquer aprovação.
+            </p>
+            <div className="border-t border-gray-100 pt-5 flex flex-col gap-3">
+              <div className="flex items-center gap-3 text-sm text-gray-600">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+                </svg>
+                Farmácia credenciada ANVISA
+              </div>
+              <div className="flex items-center gap-3 text-sm text-gray-600">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="2"/>
+                  <path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+                Pagamento seguro
+              </div>
+              <div className="flex items-center gap-3 text-sm text-gray-600">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Cancele quando quiser
+              </div>
+            </div>
+          </div>
+
+          {/* Conteúdo da pergunta */}
+          <div className="w-full">
+            {!introSeen ? (
+              <div className="space-y-5">
+                <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-2">SUA SEGURANÇA PRIMEIRO</p>
+                <h2 className="font-display text-2xl md:text-3xl text-[#13244f] leading-snug">
+                  Antes de liberar sua compra, vamos confirmar que é seguro pra você
+                </h2>
+                <p className="text-sm md:text-base text-gray-500 leading-relaxed">
+                  Esse questionário existe pra validar que seu corpo está preparado para receber o suplemento que você escolheu. A gente se preocupa com a sua saúde — por isso analisamos alergias, predisposições e histórico antes de aprovar sua compra. Desenvolvido pelo Dr. Turí Souza, pra te dar mais segurança na sua suplementação.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIntroSeen(true)}
+                  className="w-full bg-[#f4001e] text-white py-3 rounded-full text-sm font-semibold hover:bg-[#a30000] transition"
+                >
+                  Começar
+                </button>
+              </div>
+            ) : (
+              renderStep()
+            )}
+          </div>
+        </div>
       </main>
     </div>
   )
