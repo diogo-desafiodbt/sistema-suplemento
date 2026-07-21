@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { generatePrescriptionPdf } from '@/lib/pdf/generator'
 import { sendToPharmacyWithPdf } from '@/lib/pharmacy/sender'
+import { sendToTransportadora } from '@/lib/shipping/sender'
 import type { PharmacyOrder } from '@/types/pharmacy'
 
 function escapeHtml(text: string): string {
@@ -191,6 +192,12 @@ export async function POST(request: NextRequest) {
             .eq('id', pendingOrder.id)
         } catch (pharmError) {
           console.error('Erro ao enviar prescrição para farmácia:', pharmError)
+        }
+
+        try {
+          await sendToTransportadora(pendingOrder.pharmacy_json as PharmacyOrder)
+        } catch (shippingError) {
+          console.error('Erro ao enviar dados para transportadora:', shippingError)
         }
       }
     }
