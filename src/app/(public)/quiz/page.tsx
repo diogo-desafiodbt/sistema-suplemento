@@ -54,6 +54,9 @@ export default function QuizPage() {
     setLoading(true)
     try {
       sessionStorage.setItem('quiz_data', JSON.stringify(data))
+      sessionStorage.setItem('checkout_source', 'full_quiz')
+      sessionStorage.removeItem('mini_quiz_data')
+      sessionStorage.removeItem('protocol_id')
 
       let items: ProtocolItem[]
 
@@ -485,7 +488,7 @@ export default function QuizPage() {
             <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase">SUA SEGURANÇA EM PRIMEIRO LUGAR</p>
             <h3 className="font-display text-2xl text-[#13244f] leading-snug">Desenvolvido pelo Dr. Turí Souza</h3>
             <p className="text-base text-gray-600 leading-relaxed">
-              Cada resposta ajuda a gente a confirmar que o suplemento é seguro pro seu caso — alergias, medicações e histórico são revisados antes de qualquer aprovação.
+              Cada resposta ajuda a gente a montar a recomendação mais adequada pro seu perfil — alergias, medicações e histórico entram no protocolo personalizado.
             </p>
             <div className="border-t border-gray-100 pt-5 flex flex-col gap-3">
               <div className="flex items-center gap-3 text-sm text-gray-600">

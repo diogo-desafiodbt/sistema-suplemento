@@ -15,7 +15,7 @@ export const quizSchema = z.object({
   diet_quality: z.enum(['low_carb', 'tenta', 'sem_restricao', 'dificuldade']).nullable(),
   allergies: z.string().nullable(),
   prior_treatment: z.array(z.string()).default([]),
-  plan_type: z.enum(['1mes', '3meses', '1ano']).default('1mes'),
+  plan_type: z.enum(['1mes', 'assinatura_mensal', '3meses', '1ano']).default('1mes'),
 })
 
 export type QuizFormData = z.infer<typeof quizSchema>

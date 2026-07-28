@@ -14,6 +14,7 @@ type PendingProtocol = {
   id: string
   status: string
   generated_at: string
+  source: string | null
   users: {
     full_name: string
     email: string
@@ -25,6 +26,7 @@ type PendingProtocol = {
     medications: string[]
     symptoms: string[]
     conditions_serious: string[]
+    allergies: string | null
   } | null
   protocol_items: ProtocolItem[]
 }
@@ -53,6 +55,7 @@ export default async function FilaPage() {
       id,
       status,
       generated_at,
+      source,
       users (
         full_name,
         email,
@@ -63,7 +66,8 @@ export default async function FilaPage() {
         years_diagnosed,
         medications,
         symptoms,
-        conditions_serious
+        conditions_serious,
+        allergies
       ),
       protocol_items (
         is_required,
@@ -134,6 +138,17 @@ export default async function FilaPage() {
                       <div className="flex items-center gap-3 flex-wrap">
                         <span className="font-bold text-[#13244f]">{protocol.users?.full_name}</span>
                         <span className="font-mono text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">{protocol.users?.client_code}</span>
+                        <span
+                          className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${
+                            protocol.source === 'mini_quiz'
+                              ? 'bg-blue-50 text-blue-700'
+                              : 'bg-violet-50 text-violet-700'
+                          }`}
+                        >
+                          {protocol.source === 'mini_quiz'
+                            ? 'Compra direta (mini-questionário)'
+                            : 'Quiz completo'}
+                        </span>
                       </div>
                       <p className="text-sm text-gray-400">{protocol.users?.email}</p>
                       <div className="flex gap-2 flex-wrap">

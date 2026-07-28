@@ -11,17 +11,18 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { useCart } from '@/lib/use-cart'
-import type { PlanType } from '@/types/protocol'
+import {
+  PLAN_HINT,
+  PLAN_LABELS,
+  PURCHASE_PLAN_TYPES,
+  getChargePrice,
+  getSubscriptionDiscountAmount,
+  type PurchasePlanType,
+} from '@/lib/plans'
 
 type CartDrawerProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-}
-
-const PLAN_LABELS: Record<PlanType, string> = {
-  '1mes': '1 mês',
-  '3meses': '3 meses',
-  '1ano': '1 ano',
 }
 
 function formatPrice(value: number) {
@@ -33,16 +34,11 @@ function formatPrice(value: number) {
 
 export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
   const router = useRouter()
-  const { items, removeItem, plan } = useCart()
-
-  const total = items.reduce(
-    (sum, item) => sum + item.price_monthly * item.quantity,
-    0
-  )
+  const { items, removeItem, plan, setPlan, chargeTotal } = useCart()
 
   const handleFinish = () => {
     onOpenChange(false)
-    router.push('/quiz')
+    router.push('/checkout/triagem')
   }
 
   return (
@@ -74,39 +70,75 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
             </div>
           ) : (
             <>
-              <p className="text-xs font-medium text-[#13244f] bg-[#13244f]/5 rounded-lg px-3 py-2 mb-2">
-                Plano selecionado: {PLAN_LABELS[plan]}
-              </p>
+              <div className="mb-3 space-y-2">
+                <p className="text-xs font-semibold text-[#13244f]/60 uppercase tracking-wide">
+                  Forma de compra
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {PURCHASE_PLAN_TYPES.map((p) => {
+                    const selected = plan === p
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPlan(p)}
+                        className={`rounded-xl border px-2 py-2 text-center transition ${
+                          selected
+                            ? 'border-[#13244f] bg-[#13244f] text-white'
+                            : 'border-gray-200 text-[#13244f] hover:border-[#13244f]/40'
+                        }`}
+                      >
+                        <div className={`text-[10px] font-medium ${selected ? 'text-white/70' : 'text-gray-400'}`}>
+                          {p === 'assinatura_mensal' ? '10% off' : 'Avulso'}
+                        </div>
+                        <div className="text-xs font-bold">{PLAN_LABELS[p]}</div>
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="text-[11px] text-gray-400 text-center">
+                  {PLAN_HINT[plan as PurchasePlanType]}
+                </p>
+              </div>
               <ul className="divide-y divide-[#ececec]">
-                {items.map((item) => (
-                  <li key={item.product_id} className="py-4 flex gap-3">
-                    {item.image ? (
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="w-14 h-14 rounded-lg bg-[#ececec] flex-shrink-0" />
-                    )}
-                    <div className="flex flex-col gap-1 min-w-0">
-                      <span className="font-semibold text-[#13244f] text-sm">
-                        {item.name}
-                        {item.quantity > 1 ? ` × ${item.quantity}` : ''}
-                      </span>
-                      <span className="text-sm text-gray-600">
-                        R$ {formatPrice(item.price_monthly)}/mês
-                      </span>
+                {items.map((item) => {
+                  const line = getChargePrice(item.price_monthly, plan) * item.quantity
+                  const discount = plan === 'assinatura_mensal'
+                    ? getSubscriptionDiscountAmount(item.price_monthly) * item.quantity
+                    : 0
+                  return (
+                    <li key={item.product_id} className="flex items-center gap-3 py-3">
+                      {item.image ? (
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="h-14 w-14 rounded-lg object-cover"
+                        />
+                      ) : (
+                        <div className="h-14 w-14 rounded-lg bg-[#ececec]" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-[#13244f] truncate">{item.name}</p>
+                        <p className="text-xs text-gray-400">
+                          Qtd {item.quantity}
+                          {discount > 0 && (
+                            <span className="text-green-600"> · −R$ {formatPrice(discount)}</span>
+                          )}
+                        </p>
+                        <p className="text-sm font-semibold text-[#13244f]">
+                          R$ {formatPrice(line)}
+                        </p>
+                      </div>
                       <button
                         type="button"
                         onClick={() => removeItem(item.product_id)}
-                        className="self-start text-xs font-medium text-[#f4001e] hover:underline"
+                        className="text-xs text-gray-400 hover:text-[#f4001e]"
                       >
                         Remover
                       </button>
-                    </div>
-                  </li>
-                ))}
+                    </li>
+                  )
+                })}
               </ul>
             </>
           )}
@@ -115,7 +147,10 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
         <SheetFooter>
           <div className="flex items-center justify-between text-sm font-semibold text-[#13244f]">
             <span>Total</span>
-            <span>R$ {formatPrice(total)}/mês</span>
+            <span>
+              R$ {formatPrice(chargeTotal)}
+              {plan === 'assinatura_mensal' ? '/mês' : ''}
+            </span>
           </div>
           <Button
             disabled={items.length === 0}

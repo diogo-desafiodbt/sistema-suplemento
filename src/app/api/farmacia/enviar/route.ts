@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { buildPharmacyJson, buildTransportadoraCodigo, buildFormaPagamentoCodigo } from '@/lib/pharmacy/json-builder'
+import { getPharmacySkuKey } from '@/lib/plans'
 
 type ProtocolItemRow = {
   product_id: string
@@ -11,12 +12,6 @@ type ProtocolItemRow = {
     pharmacy_sku_yearly: string
     pharmacy_code: number | null
   } | null
-}
-
-function getSkuKey(planType: string): 'pharmacy_sku_monthly' | 'pharmacy_sku_quarterly' | 'pharmacy_sku_yearly' {
-  if (planType === '3meses') return 'pharmacy_sku_quarterly'
-  if (planType === '1ano') return 'pharmacy_sku_yearly'
-  return 'pharmacy_sku_monthly'
 }
 
 export async function POST(request: NextRequest) {
@@ -83,7 +78,7 @@ export async function POST(request: NextRequest) {
       (configs ?? []).map(c => [c.key, c.value])
     )
 
-    const skuKey = getSkuKey(subscription.plan_type)
+    const skuKey = getPharmacySkuKey(subscription.plan_type)
     const activeItems = (protocol?.protocol_items ?? []).filter(
       item => !item.removed_by_patient
     )

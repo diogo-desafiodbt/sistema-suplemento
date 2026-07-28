@@ -38,6 +38,7 @@ type ProtocolDetail = {
   id: string
   status: string
   generated_at: string
+  source: string | null
   users: Patient | null
   quiz_responses: QuizResponse | null
   protocol_items: ProtocolItem[]
@@ -72,6 +73,7 @@ export default async function ProtocoloPage({
       id,
       status,
       generated_at,
+      source,
       users (
         full_name,
         email,
@@ -146,6 +148,17 @@ export default async function ProtocoloPage({
           <div>
             <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-1">Revisão clínica</p>
             <h1 className="text-2xl font-bold text-[#13244f]">{patient?.full_name}</h1>
+            <span
+              className={`inline-block mt-2 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full ${
+                protocolData.source === 'mini_quiz'
+                  ? 'bg-blue-50 text-blue-700'
+                  : 'bg-violet-50 text-violet-700'
+              }`}
+            >
+              {protocolData.source === 'mini_quiz'
+                ? 'Compra direta (mini-questionário)'
+                : 'Quiz completo'}
+            </span>
           </div>
           <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${statusBadge}`}>
             {protocolData.status === 'signed' ? 'Assinada' : 'Pendente'}
@@ -185,7 +198,13 @@ export default async function ProtocoloPage({
             </div>
             <div>
               <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Tempo de diagnóstico</p>
-              <p className="font-semibold text-[#13244f]">{quiz?.years_diagnosed ?? '-'}</p>
+              <p className="font-semibold text-[#13244f]">
+                {protocolData.source === 'mini_quiz'
+                  ? (quiz?.allergies?.startsWith('idade:')
+                    ? `Não informado — idade ${quiz.allergies.replace('idade:', '')} anos`
+                    : 'Não informado (compra direta)')
+                  : (quiz?.years_diagnosed ?? '-')}
+              </p>
             </div>
             <div>
               <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">HbA1c</p>

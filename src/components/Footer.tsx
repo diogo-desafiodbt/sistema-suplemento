@@ -1,9 +1,27 @@
 'use client'
 
+import Link from 'next/link'
+import { QUIZ_URL } from '@/lib/constants'
+
 export default function Footer() {
   return (
     <footer className="bg-[#13244f] text-white py-12 md:py-16 px-4 md:px-6">
       <div className="max-w-4xl mx-auto">
+        <div className="mb-8 md:mb-10 rounded-2xl bg-white/10 px-5 py-6 text-center">
+          <p className="text-sm md:text-base font-semibold mb-2">
+            Ainda não sabe qual suplemento escolher?
+          </p>
+          <p className="text-xs opacity-70 mb-4 max-w-md mx-auto leading-relaxed">
+            Responda o questionário e descubra a recomendação personalizada para o seu perfil.
+          </p>
+          <Link
+            href={QUIZ_URL}
+            className="inline-flex bg-[#f4001e] hover:bg-[#a30000] text-white rounded-full px-6 py-3 text-sm font-bold transition"
+          >
+            Descubra qual suplemento é ideal pra você
+          </Link>
+        </div>
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 mb-8 md:mb-10">
           <div className="col-span-2 md:col-span-1">
             <h3 className="font-bold text-sm mb-3 md:mb-4">Ficou alguma dúvida?</h3>

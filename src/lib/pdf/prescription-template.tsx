@@ -114,6 +114,7 @@ type PrescriptionData = {
     diagnosis_type: string
     years_diagnosed: string
     medications: string[]
+    allergies?: string | null
   }
 }
 
@@ -149,9 +150,14 @@ export function PrescriptionDocument({ data }: { data: PrescriptionData }) {
           </View>
           <View style={styles.row}>
             <Text style={styles.label}>Tempo de diagnóstico:</Text>
-            <Text style={styles.value}>{data.quiz.years_diagnosed}</Text>
+            <Text style={styles.value}>
+              {data.quiz.allergies?.startsWith('idade:')
+                ? `Não informado (idade: ${data.quiz.allergies.replace('idade:', '')} anos)`
+                : data.quiz.years_diagnosed}
+            </Text>
           </View>
-          {data.quiz.medications?.length > 0 && (
+          {data.quiz.medications?.length > 0 &&
+            !data.quiz.allergies?.startsWith('idade:') && (
             <View style={styles.row}>
               <Text style={styles.label}>Medicamentos em uso:</Text>
               <Text style={styles.value}>{data.quiz.medications.join(', ')}</Text>

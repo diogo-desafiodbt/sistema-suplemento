@@ -2,11 +2,47 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { z } from 'zod'
+import { ensureProtocolAfterPayment } from '@/lib/protocol/create-from-checkout'
+import type { PendingCheckoutPayload } from '@/lib/protocol/create-from-checkout'
+import { addPlanPeriod, isRecurringPlan } from '@/lib/plans'
+
+const protocolItemSchema = z.object({
+  product_id: z.string().uuid().optional(),
+  product_name: z.string(),
+  is_required: z.boolean().optional(),
+  removed: z.boolean().optional(),
+  activation_reason: z.string().optional(),
+  quantity: z.number().optional(),
+  price_monthly: z.number().optional(),
+  price_quarterly: z.number().optional(),
+  price_yearly: z.number().optional(),
+  image: z.string().optional(),
+})
 
 const checkoutSchema = z.object({
-  protocol_id: z.string().uuid(),
-  plan_type: z.enum(['1mes', '3meses', '1ano']),
+  // Novos: 1mes | assinatura_mensal. Legado aceito só por compatibilidade de payload.
+  plan_type: z.enum(['1mes', 'assinatura_mensal', '3meses', '1ano']),
   total_amount: z.number().positive(),
+  source: z.enum(['full_quiz', 'mini_quiz']),
+  quiz: z.object({
+    diagnosis_type: z.enum(['type2', 'prediabetes', 'undiagnosed']),
+    years_diagnosed: z.string().optional(),
+    hba1c_range: z.string().nullable().optional(),
+    fasting_glucose: z.string().nullable().optional(),
+    medications: z.array(z.string()).optional(),
+    family_history: z.array(z.string()).optional(),
+    symptoms: z.array(z.string()).optional(),
+    conditions_mild: z.array(z.string()).optional(),
+    conditions_serious: z.array(z.string()).optional(),
+    weight_status: z.string().nullable().optional(),
+    exercise_freq: z.string().nullable().optional(),
+    diet_quality: z.string().nullable().optional(),
+    allergies: z.string().nullable().optional(),
+    prior_treatment: z.array(z.string()).optional(),
+    age: z.number().int().positive().optional(),
+    full_name: z.string().optional(),
+  }),
+  protocol_items: z.array(protocolItemSchema).min(1),
   address: z.object({
     zip_code: z.string(),
     street: z.string(),
@@ -25,6 +61,48 @@ const checkoutSchema = z.object({
   }),
   cpf: z.string(),
 })
+
+async function finalizePaidSubscription(
+  admin: ReturnType<typeof createAdminClient>,
+  opts: {
+    subscriptionId: string
+    userId: string
+    expiresAt: Date
+  }
+) {
+  const protocolId = await ensureProtocolAfterPayment(
+    admin,
+    opts.subscriptionId,
+    opts.userId
+  )
+
+  const { data: existing } = await admin
+    .from('user_entitlements')
+    .select('id')
+    .eq('user_id', opts.userId)
+    .eq('product_key', 'treatment')
+    .maybeSingle()
+
+  if (existing) {
+    await admin
+      .from('user_entitlements')
+      .update({
+        status: 'active',
+        expires_at: opts.expiresAt.toISOString(),
+      })
+      .eq('id', existing.id)
+  } else {
+    await admin.from('user_entitlements').insert({
+      user_id: opts.userId,
+      product_key: 'treatment',
+      status: 'active',
+      expires_at: opts.expiresAt.toISOString(),
+      is_permanent: false,
+    })
+  }
+
+  return protocolId
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -70,16 +148,22 @@ export async function POST(request: NextRequest) {
       is_default: true,
     }, { onConflict: 'user_id' })
 
-    const expiresAt = new Date()
-    if (data.plan_type === '1mes') expiresAt.setMonth(expiresAt.getMonth() + 1)
-    else if (data.plan_type === '3meses') expiresAt.setMonth(expiresAt.getMonth() + 3)
-    else expiresAt.setFullYear(expiresAt.getFullYear() + 1)
+    // Model A: expires_at = fim do período pago; next_billing_at alinhado.
+    const expiresAt = addPlanPeriod(new Date(), data.plan_type)
+
+    const pendingCheckout: PendingCheckoutPayload = {
+      source: data.source,
+      plan_type: data.plan_type,
+      quiz: data.quiz,
+      protocol_items: data.protocol_items,
+    }
 
     const { data: subscription, error: subError } = await admin
       .from('subscriptions')
       .insert({
         user_id: user.id,
-        protocol_id: data.protocol_id,
+        protocol_id: null,
+        pending_checkout: pendingCheckout,
         plan_type: data.plan_type,
         status: 'active',
         started_at: new Date().toISOString(),
@@ -123,7 +207,6 @@ export async function POST(request: NextRequest) {
     const metadata = {
       subscription_id: subscription.id,
       user_id: user.id,
-      protocol_id: data.protocol_id,
       plan_type: data.plan_type,
       client_code: profile.client_code,
     }
@@ -145,14 +228,14 @@ export async function POST(request: NextRequest) {
 
     let pagarmeRes: Response
 
-    if (data.plan_type === '1mes') {
+    if (!isRecurringPlan(data.plan_type)) {
       const pagarmePayload = {
         items: [
           {
             amount: Math.round(data.total_amount * 100),
-            description: `Desafio Diabetes — Plano ${data.plan_type}`,
+            description: 'Desafio Diabetes — Compra única',
             quantity: 1,
-            code: `DD-${data.plan_type.toUpperCase()}`,
+            code: 'DD-1MES',
           },
         ],
         customer,
@@ -176,11 +259,19 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify(pagarmePayload),
       })
     } else {
-      const intervalCount = data.plan_type === '3meses' ? 3 : 12
+      const intervalCount =
+        data.plan_type === 'assinatura_mensal'
+          ? 1
+          : data.plan_type === '3meses'
+            ? 3
+            : 12
+
       const planItemName =
-        data.plan_type === '3meses'
-          ? 'Desafio Diabetes — Plano 3 meses'
-          : 'Desafio Diabetes — Plano 1 ano'
+        data.plan_type === 'assinatura_mensal'
+          ? 'Desafio Diabetes — Assinatura mensal'
+          : data.plan_type === '3meses'
+            ? 'Desafio Diabetes — Plano 3 meses'
+            : 'Desafio Diabetes — Plano 1 ano'
 
       const pagarmeSubscriptionPayload = {
         payment_method: 'credit_card',
@@ -188,7 +279,7 @@ export async function POST(request: NextRequest) {
         interval: 'month',
         interval_count: intervalCount,
         billing_type: 'prepaid',
-        installments: intervalCount,
+        installments: 1,
         items: [
           {
             name: planItemName,
@@ -224,7 +315,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (data.plan_type === '1mes') {
+    if (!isRecurringPlan(data.plan_type)) {
       const charge = pagarmeData.charges?.[0]
       console.log('CHARGE:', JSON.stringify(charge, null, 2))
 
@@ -237,13 +328,12 @@ export async function POST(request: NextRequest) {
         webhook_payload: pagarmeData,
       })
 
+      let protocolId: string | null = null
       if (charge?.status === 'paid') {
-        await admin.from('user_entitlements').insert({
-          user_id: user.id,
-          product_key: 'treatment',
-          status: 'active',
-          expires_at: expiresAt.toISOString(),
-          is_permanent: false,
+        protocolId = await finalizePaidSubscription(admin, {
+          subscriptionId: subscription.id,
+          userId: user.id,
+          expiresAt,
         })
       }
 
@@ -259,6 +349,7 @@ export async function POST(request: NextRequest) {
         order_id: pagarmeData.id,
         status: charge?.status ?? 'pending',
         subscription_id: subscription.id,
+        protocol_id: protocolId,
       })
     }
 
@@ -282,13 +373,12 @@ export async function POST(request: NextRequest) {
       webhook_payload: pagarmeData,
     })
 
+    let protocolId: string | null = null
     if (cycleStatus === 'paid') {
-      await admin.from('user_entitlements').insert({
-        user_id: user.id,
-        product_key: 'treatment',
-        status: 'active',
-        expires_at: expiresAt.toISOString(),
-        is_permanent: false,
+      protocolId = await finalizePaidSubscription(admin, {
+        subscriptionId: subscription.id,
+        userId: user.id,
+        expiresAt,
       })
     }
 
@@ -304,6 +394,7 @@ export async function POST(request: NextRequest) {
       order_id: pagarmeData.id,
       status: cycleStatus ?? 'pending',
       subscription_id: subscription.id,
+      protocol_id: protocolId,
     })
   } catch (error) {
     console.error('Checkout error:', error)

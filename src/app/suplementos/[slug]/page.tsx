@@ -9,6 +9,17 @@ import Footer from '@/components/Footer'
 import AddedToCartDialog from '@/components/AddedToCartDialog'
 import { getSupplementBySlug, supplements } from '@/lib/supplements-content'
 import { useCart } from '@/lib/use-cart'
+import {
+  DEFAULT_PURCHASE_PLAN,
+  PLAN_BADGE,
+  PLAN_HINT,
+  PLAN_LABELS,
+  PLAN_TYPE_LABEL,
+  PURCHASE_PLAN_TYPES,
+  getChargePrice,
+  getSubscriptionDiscountAmount,
+  type PurchasePlanType,
+} from '@/lib/plans'
 
 type Product = {
   id: string
@@ -18,26 +29,6 @@ type Product = {
   price_yearly: number
   is_fixed: boolean
   is_active: boolean
-}
-
-type PlanType = '1mes' | '3meses' | '1ano'
-
-const PLAN_LABELS: Record<PlanType, string> = {
-  '1mes': '1 mês',
-  '3meses': '3 meses',
-  '1ano': '1 ano',
-}
-
-const PLAN_TYPE_LABEL: Record<PlanType, string> = {
-  '1mes': 'Compra única',
-  '3meses': 'Assinatura',
-  '1ano': 'Assinatura',
-}
-
-const PLAN_BADGE: Record<PlanType, string> = {
-  '1mes': '',
-  '3meses': 'Recomendado',
-  '1ano': 'Melhor valor',
 }
 
 const testimonials = [
@@ -72,18 +63,13 @@ function matchProduct(products: Product[], name: string): Product | undefined {
   )
 }
 
-function getPlanPrice(product: Product, plan: PlanType) {
-  if (plan === '1mes') return product.price_monthly
-  if (plan === '3meses') return product.price_quarterly
-  return product.price_yearly
+function getPlanPrice(product: Product, plan: PurchasePlanType) {
+  return getChargePrice(product.price_monthly, plan)
 }
 
-function getSavings(product: Product, plan: PlanType) {
+function getSavings(product: Product, plan: PurchasePlanType) {
   if (plan === '1mes') return 0
-  const months = plan === '3meses' ? 3 : 12
-  const full = product.price_monthly * months
-  const actual = getPlanPrice(product, plan)
-  return Math.max(0, full - actual)
+  return getSubscriptionDiscountAmount(product.price_monthly)
 }
 
 export default function SupplementPage() {
@@ -96,7 +82,7 @@ export default function SupplementPage() {
   const [product, setProduct] = useState<Product | null>(null)
   const [allProducts, setAllProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
-  const [plan, setPlan] = useState<PlanType>('3meses')
+  const [plan, setPlan] = useState<PurchasePlanType>(DEFAULT_PURCHASE_PLAN)
   const [openSection, setOpenSection] = useState<string | null>('descricao')
   const [showCartDialog, setShowCartDialog] = useState(false)
 
@@ -272,11 +258,11 @@ export default function SupplementPage() {
                 ) : product ? (
                   <p className="text-lg font-semibold text-[#13244f]">
                     {plan === '1mes'
-                      ? `R$ ${formatPrice(product.price_monthly)}/mês`
-                      : `R$ ${formatPrice(getPlanPrice(product, plan))} no plano de ${PLAN_LABELS[plan]}`}
-                    {plan !== '1mes' && (
+                      ? `R$ ${formatPrice(product.price_monthly)}`
+                      : `R$ ${formatPrice(getPlanPrice(product, plan))}/mês`}
+                    {plan === 'assinatura_mensal' && (
                       <span className="block text-sm font-normal text-gray-500 mt-0.5">
-                        estimativa a partir de R$ {formatPrice(product.price_monthly)}/mês
+                        de R$ {formatPrice(product.price_monthly)}/mês · 10% off
                       </span>
                     )}
                   </p>
@@ -285,9 +271,9 @@ export default function SupplementPage() {
                 )}
 
                 <div>
-                  <h2 className="font-bold text-[#13244f] mb-3 text-sm">Escolha a frequência</h2>
-                  <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                    {(['1mes', '3meses', '1ano'] as PlanType[]).map((p) => {
+                  <h2 className="font-bold text-[#13244f] mb-3 text-sm">Escolha a forma de compra</h2>
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                    {PURCHASE_PLAN_TYPES.map((p) => {
                       const isSelected = plan === p
                       const savings = product ? getSavings(product, p) : 0
                       return (
@@ -303,7 +289,7 @@ export default function SupplementPage() {
                         >
                           {PLAN_BADGE[p] && (
                             <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#f4001e] text-white">
-                              {p === '3meses' ? '⭐ Recomendado' : '💰 Melhor valor'}
+                              {PLAN_BADGE[p]}
                             </span>
                           )}
                           <div className={`text-[10px] sm:text-xs font-medium mb-0.5 mt-1 ${isSelected ? 'text-white/70' : 'text-gray-400'}`}>
@@ -312,7 +298,7 @@ export default function SupplementPage() {
                           <div className="text-xs sm:text-sm font-bold">{PLAN_LABELS[p]}</div>
                           {savings > 0 && (
                             <div className={`text-[10px] sm:text-xs mt-1 font-medium ${isSelected ? 'text-green-300' : 'text-green-600'}`}>
-                              Economize R$ {formatPrice(savings)}
+                              Economize R$ {formatPrice(savings)}/mês
                             </div>
                           )}
                         </button>
@@ -320,9 +306,7 @@ export default function SupplementPage() {
                     })}
                   </div>
                   <p className="text-xs text-gray-400 mt-2 text-center">
-                    {plan === '1mes'
-                      ? 'Compra única, sem renovação automática'
-                      : 'Assinatura com renovação automática · Cancele quando quiser'}
+                    {PLAN_HINT[plan]}
                   </p>
                 </div>
 
@@ -499,7 +483,7 @@ export default function SupplementPage() {
         productName={content.name}
         productImage={content.gallery[0]}
         productPrice={product?.price_monthly}
-        onFinish={() => router.push('/quiz')}
+        onFinish={() => router.push('/checkout/triagem')}
         onContinue={() => {
           setShowCartDialog(false)
           router.push('/suplementos')

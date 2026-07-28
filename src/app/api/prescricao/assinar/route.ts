@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       .select(`
         *,
         users ( full_name, email, client_code ),
-        quiz_responses ( diagnosis_type, years_diagnosed, medications ),
+        quiz_responses ( diagnosis_type, years_diagnosed, medications, allergies ),
         protocol_items (
           id, is_required, removed_by_patient, activation_reason,
           products ( name )
@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
       diagnosis_type: string
       years_diagnosed: string
       medications: string[]
+      allergies: string | null
     }
 
     const signedAt = new Date().toISOString()
@@ -212,7 +213,7 @@ export async function POST(request: NextRequest) {
         await resend.emails.send({
           from: 'Desafio Diabetes <noreply@desafiodiabetes.com>',
           to: patient.email,
-          subject: 'Boas notícias — seu tratamento foi aprovado',
+          subject: 'Seu pedido está em preparação',
           html: `
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -231,13 +232,13 @@ export async function POST(request: NextRequest) {
             <td style="padding:32px;">
               <p style="margin:0 0 16px;color:#13244f;font-size:16px;line-height:1.6;">Olá, <strong>${firstName}</strong>,</p>
               <p style="margin:0 0 16px;color:#4b5563;font-size:15px;line-height:1.7;">
-                Temos uma ótima notícia para você: um profissional de saúde da nossa equipe revisou seu caso e <strong style="color:#13244f;">aprovou seu tratamento personalizado</strong>.
+                Seu pedido está em boa mão: a farmácia parceira já está <strong style="color:#13244f;">preparando seus suplementos</strong> para envio.
               </p>
               <p style="margin:0 0 16px;color:#4b5563;font-size:15px;line-height:1.7;">
-                Isso significa que seus suplementos já estão sendo preparados com todo o cuidado, para seguirem em direção à sua casa em breve.
+                Você não precisa fazer nada agora — assim que houver novidades sobre o envio, avisaremos você por aqui.
               </p>
               <p style="margin:0 0 24px;color:#4b5563;font-size:15px;line-height:1.7;">
-                Você não precisa fazer nada agora — assim que houver novidades sobre o envio, avisaremos você por aqui. Estamos com você em cada passo dessa jornada.
+                Estamos com você em cada passo dessa jornada.
               </p>
               <p style="margin:0 0 8px;color:#9ca3af;font-size:13px;line-height:1.6;">
                 Com carinho,
@@ -264,7 +265,7 @@ export async function POST(request: NextRequest) {
           `.trim(),
         })
       } catch (emailError) {
-        console.error('Erro ao enviar email de aprovação ao paciente:', emailError)
+        console.error('Erro ao enviar email de preparação ao paciente:', emailError)
       }
     }
 

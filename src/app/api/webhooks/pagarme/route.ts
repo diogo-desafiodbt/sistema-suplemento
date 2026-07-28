@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { inngest } from '@/lib/inngest/client'
+import { ensureProtocolAfterPayment } from '@/lib/protocol/create-from-checkout'
+import { addPlanPeriod } from '@/lib/plans'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 type PagarmePayload = {
@@ -79,10 +81,8 @@ async function handlePaymentSucceeded(
     return
   }
 
-  const expiresAt = new Date()
-  if (planType === '1mes') expiresAt.setMonth(expiresAt.getMonth() + 1)
-  else if (planType === '3meses') expiresAt.setMonth(expiresAt.getMonth() + 3)
-  else expiresAt.setFullYear(expiresAt.getFullYear() + 1)
+  // Model A: a cada cobrança paga, avança expires_at e next_billing_at pelo período do plano.
+  const expiresAt = addPlanPeriod(new Date(), planType)
 
   await admin
     .from('subscriptions')
@@ -128,6 +128,8 @@ async function handlePaymentSucceeded(
     })
   }
 
+  await ensureProtocolAfterPayment(admin, subscriptionId, userId)
+
   if (webhookLogId) {
     await admin
       .from('webhook_logs')
@@ -136,6 +138,19 @@ async function handlePaymentSucceeded(
   }
 
   if (dispatchPharmacy) {
+    const { data: sub } = await admin
+      .from('subscriptions')
+      .select('protocol_id')
+      .eq('id', subscriptionId)
+      .maybeSingle()
+
+    if (!sub?.protocol_id) {
+      console.error(
+        `Farmácia não disparada — protocolo ainda ausente para subscription ${subscriptionId}`
+      )
+      return
+    }
+
     try {
       await inngest.send({
         name: 'pagamento/confirmado',

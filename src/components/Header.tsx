@@ -1,11 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import Link from 'next/link'
 import { ShoppingCart } from 'lucide-react'
 import PromoBar from '@/components/PromoBar'
 import CartDrawer from '@/components/CartDrawer'
-import { QUIZ_URL } from '@/lib/constants'
 import { useCart } from '@/lib/use-cart'
 
 const menuItems = [
@@ -59,13 +57,6 @@ export default function Header() {
           >
             <img src="/logo-principal.png" alt="Desafio Diabetes" className="h-12 sm:h-14 w-auto" />
           </a>
-
-          <Link
-            href={QUIZ_URL}
-            className="absolute left-1/2 hidden -translate-x-1/2 md:inline-flex bg-[#f4001e] hover:bg-[#a30000] text-white rounded-md px-4 py-2.5 sm:px-5 font-semibold text-sm transition"
-          >
-            Descubra seu suplemento ideal
-          </Link>
 
           <div className="relative z-10 flex items-center gap-1" ref={menuRef}>
             <button

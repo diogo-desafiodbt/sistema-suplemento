@@ -2,6 +2,12 @@
 
 import { useCallback, useSyncExternalStore } from 'react'
 import type { PlanType } from '@/types/protocol'
+import {
+  DEFAULT_PURCHASE_PLAN,
+  getChargePrice,
+  isPurchasePlanType,
+  type PurchasePlanType,
+} from '@/lib/plans'
 
 export type CartItem = {
   product_id: string
@@ -17,11 +23,12 @@ type CartStore = {
 }
 
 const STORAGE_KEY = 'dd_cart'
-const DEFAULT_PLAN: PlanType = '3meses'
-const VALID_PLANS: PlanType[] = ['1mes', '3meses', '1ano']
 
 function normalizePlan(value: unknown): PlanType {
-  return VALID_PLANS.includes(value as PlanType) ? (value as PlanType) : DEFAULT_PLAN
+  if (typeof value === 'string' && isPurchasePlanType(value)) return value
+  // Planos legados no carrinho antigo → assinatura mensal
+  if (value === '3meses' || value === '1ano') return DEFAULT_PURCHASE_PLAN
+  return DEFAULT_PURCHASE_PLAN
 }
 
 function normalizeItem(raw: Partial<CartItem>): CartItem | null {
@@ -36,10 +43,10 @@ function normalizeItem(raw: Partial<CartItem>): CartItem | null {
 }
 
 function readStore(): CartStore {
-  if (typeof window === 'undefined') return { items: [], plan: DEFAULT_PLAN }
+  if (typeof window === 'undefined') return { items: [], plan: DEFAULT_PURCHASE_PLAN }
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { items: [], plan: DEFAULT_PLAN }
+    if (!raw) return { items: [], plan: DEFAULT_PURCHASE_PLAN }
     const parsed = JSON.parse(raw) as Partial<CartStore>
     const items = Array.isArray(parsed.items)
       ? parsed.items.map(normalizeItem).filter((i): i is CartItem => i !== null)
@@ -49,11 +56,11 @@ function readStore(): CartStore {
       plan: normalizePlan(parsed.plan),
     }
   } catch {
-    return { items: [], plan: DEFAULT_PLAN }
+    return { items: [], plan: DEFAULT_PURCHASE_PLAN }
   }
 }
 
-let store: CartStore = { items: [], plan: DEFAULT_PLAN }
+let store: CartStore = { items: [], plan: DEFAULT_PURCHASE_PLAN }
 let hydrated = false
 const listeners = new Set<() => void>()
 
@@ -83,7 +90,7 @@ function getSnapshot() {
   return store
 }
 
-const EMPTY_STORE: CartStore = { items: [], plan: DEFAULT_PLAN }
+const EMPTY_STORE: CartStore = { items: [], plan: DEFAULT_PURCHASE_PLAN }
 
 function getServerSnapshot(): CartStore {
   return EMPTY_STORE
@@ -102,10 +109,11 @@ export function useCart() {
   }) => {
     ensureHydrated()
     const qty = item.quantity ?? 1
+    const plan = normalizePlan(item.plan)
     const existing = store.items.find((i) => i.product_id === item.product_id)
     if (existing) {
       store = {
-        plan: item.plan,
+        plan,
         items: store.items.map((i) =>
           i.product_id === item.product_id
             ? { ...i, quantity: i.quantity + qty, image: item.image || i.image }
@@ -114,7 +122,7 @@ export function useCart() {
       }
     } else {
       store = {
-        plan: item.plan,
+        plan,
         items: [
           ...store.items,
           {
@@ -141,10 +149,24 @@ export function useCart() {
     emit()
   }, [])
 
+  const setPlan = useCallback((plan: PurchasePlanType) => {
+    ensureHydrated()
+    store = { ...store, plan }
+    persist()
+    emit()
+  }, [])
+
+  const chargeTotal = snapshot.items.reduce(
+    (sum, item) => sum + getChargePrice(item.price_monthly, snapshot.plan) * item.quantity,
+    0
+  )
+
   return {
     items: snapshot.items,
     plan: snapshot.plan,
+    chargeTotal,
     addItem,
     removeItem,
+    setPlan,
   }
 }

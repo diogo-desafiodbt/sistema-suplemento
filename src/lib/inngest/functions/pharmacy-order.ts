@@ -6,6 +6,7 @@ import {
   buildFormaPagamentoCodigo,
 } from '@/lib/pharmacy/json-builder'
 import type { PharmacyOrderItem } from '@/types/pharmacy'
+import { getPharmacySkuKey, getUnitPriceFromProduct } from '@/lib/plans'
 
 type ProtocolItemRow = {
   product_id: string
@@ -20,22 +21,6 @@ type ProtocolItemRow = {
     price_quarterly: number | null
     price_yearly: number | null
   } | null
-}
-
-function getSkuKey(planType: string): 'pharmacy_sku_monthly' | 'pharmacy_sku_quarterly' | 'pharmacy_sku_yearly' {
-  if (planType === '3meses') return 'pharmacy_sku_quarterly'
-  if (planType === '1ano') return 'pharmacy_sku_yearly'
-  return 'pharmacy_sku_monthly'
-}
-
-function getUnitPrice(
-  product: ProtocolItemRow['products'],
-  planType: string
-): number {
-  if (!product) return 0
-  if (planType === '3meses') return product.price_quarterly ?? 0
-  if (planType === '1ano') return product.price_yearly ?? 0
-  return product.price_monthly ?? 0
 }
 
 export const pharmacyOrder = inngest.createFunction(
@@ -131,7 +116,7 @@ export const pharmacyOrder = inngest.createFunction(
     }
 
     const planType = subscription.plan_type as string
-    const skuKey = getSkuKey(planType)
+    const skuKey = getPharmacySkuKey(planType)
 
     const activeItems = (protocol.protocol_items ?? []).filter(
       item => !item.removed_by_patient
@@ -180,7 +165,7 @@ export const pharmacyOrder = inngest.createFunction(
     })
 
     const totalAmount = activeItems.reduce(
-      (sum, item) => sum + getUnitPrice(item.products, planType),
+      (sum, item) => sum + getUnitPriceFromProduct(item.products, planType),
       0
     )
 
@@ -206,7 +191,7 @@ export const pharmacyOrder = inngest.createFunction(
         product_id: item.product_id,
         pharmacy_sku: item.products?.[skuKey] ?? '',
         quantity: 1,
-        unit_price: getUnitPrice(item.products, planType),
+        unit_price: getUnitPriceFromProduct(item.products, planType),
       }))
     )
 

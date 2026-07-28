@@ -3,6 +3,18 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supplements } from '@/lib/supplements-content'
+import {
+  DEFAULT_PURCHASE_PLAN,
+  PLAN_BADGE,
+  PLAN_HINT,
+  PLAN_LABELS,
+  PLAN_TYPE_LABEL,
+  PURCHASE_PLAN_TYPES,
+  getChargePrice,
+  getSubscriptionDiscountAmount,
+  isPurchasePlanType,
+  type PurchasePlanType,
+} from '@/lib/plans'
 
 type LocalProtocolItem = {
   product_id: string
@@ -16,26 +28,6 @@ type LocalProtocolItem = {
   price_quarterly?: number
   price_yearly?: number
   image?: string
-}
-
-type PlanType = '1mes' | '3meses' | '1ano'
-
-const PLAN_LABELS: Record<PlanType, string> = {
-  '1mes': '1 mês',
-  '3meses': '3 meses',
-  '1ano': '1 ano',
-}
-
-const PLAN_TYPE_LABEL: Record<PlanType, string> = {
-  '1mes': 'Compra única',
-  '3meses': 'Assinatura',
-  '1ano': 'Assinatura',
-}
-
-const PLAN_BADGE: Record<PlanType, string> = {
-  '1mes': '',
-  '3meses': 'Tempo ideal para começar a ver resultados',
-  '1ano': 'Maior economia',
 }
 
 function matchSupplementImage(productName: string): string | undefined {
@@ -58,7 +50,7 @@ function formatProductList(names: string[]): string {
 export default function RecomendacoesPage() {
   const router = useRouter()
   const [items, setItems] = useState<LocalProtocolItem[]>([])
-  const [plan, setPlan] = useState<PlanType>('3meses')
+  const [plan, setPlan] = useState<PurchasePlanType>(DEFAULT_PURCHASE_PLAN)
   const [planLocked, setPlanLocked] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -77,8 +69,11 @@ export default function RecomendacoesPage() {
       const parsedItems: LocalProtocolItem[] = JSON.parse(itemsRaw)
 
       const lockedPlan = sessionStorage.getItem('cart_locked_plan')
-      if (lockedPlan === '1mes' || lockedPlan === '3meses' || lockedPlan === '1ano') {
+      if (lockedPlan && isPurchasePlanType(lockedPlan)) {
         setPlan(lockedPlan)
+        setPlanLocked(true)
+      } else if (lockedPlan === '3meses' || lockedPlan === '1ano') {
+        setPlan(DEFAULT_PURCHASE_PLAN)
         setPlanLocked(true)
       }
 
@@ -126,9 +121,7 @@ export default function RecomendacoesPage() {
   }
 
   function getPrice(item: LocalProtocolItem): number {
-    if (plan === '1mes') return item.price_monthly ?? 0
-    if (plan === '3meses') return item.price_quarterly ?? 0
-    return item.price_yearly ?? 0
+    return getChargePrice(item.price_monthly ?? 0, plan)
   }
 
   function getActiveItems(): LocalProtocolItem[] {
@@ -139,25 +132,18 @@ export default function RecomendacoesPage() {
     return getActiveItems().reduce((sum, item) => sum + getPrice(item), 0)
   }
 
-  function getSavingsInReais(targetPlan: PlanType): number {
-    const monthlyTotal = items
-      .filter(item => !item.removed)
-      .reduce((sum, item) => sum + (item.price_monthly ?? 0), 0)
-
-    const targetTotal = items
-      .filter(item => !item.removed)
-      .reduce((sum, item) => {
-        if (targetPlan === '3meses') return sum + (item.price_quarterly ?? 0)
-        if (targetPlan === '1ano') return sum + (item.price_yearly ?? 0)
-        return sum + (item.price_monthly ?? 0)
-      }, 0)
-
-    return Math.max(0, monthlyTotal - targetTotal)
+  function getSavingsInReais(targetPlan: PurchasePlanType): number {
+    if (targetPlan === '1mes') return 0
+    return getActiveItems().reduce(
+      (sum, item) => sum + getSubscriptionDiscountAmount(item.price_monthly ?? 0),
+      0
+    )
   }
 
   function handleContinue() {
     sessionStorage.setItem('protocol_items', JSON.stringify(items))
     sessionStorage.setItem('selected_plan', plan)
+    sessionStorage.setItem('checkout_source', 'full_quiz')
     router.push('/checkout')
   }
 
@@ -214,10 +200,10 @@ export default function RecomendacoesPage() {
             <div>
               {planLocked ? (
                 <>
-                  <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-1">APROVADO</p>
-                  <h1 className="font-display text-2xl md:text-3xl text-[#13244f]">Você está aprovado!</h1>
+                  <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-1">SEU PEDIDO</p>
+                  <h1 className="font-display text-2xl md:text-3xl text-[#13244f]">Pronto para finalizar</h1>
                   <p className="text-gray-500 text-sm md:text-base mt-1">
-                    Você está liberado para comprar <strong className="text-[#13244f] font-semibold">{approvedNames}</strong>.
+                    Confira os itens e escolha o plano para <strong className="text-[#13244f] font-semibold">{approvedNames}</strong>.
                   </p>
                 </>
               ) : (
@@ -288,14 +274,14 @@ export default function RecomendacoesPage() {
 
             {/* Seleção de plano */}
             <div>
-              <h2 className="font-bold text-[#13244f] mb-3">Escolha a frequência</h2>
+              <h2 className="font-bold text-[#13244f] mb-3">Escolha a forma de compra</h2>
               {planLocked ? (
                 <div className="rounded-2xl border border-[#13244f]/20 bg-[#13244f]/5 px-4 py-3 text-sm md:text-base text-[#13244f] font-medium text-center">
-                  Plano escolhido no carrinho: {PLAN_LABELS[plan]}
+                  Plano escolhido: {PLAN_LABELS[plan]}
                 </div>
               ) : (
-              <div className="grid grid-cols-3 gap-3">
-                {(['1mes', '3meses', '1ano'] as PlanType[]).map(p => {
+              <div className="grid grid-cols-2 gap-3">
+                {PURCHASE_PLAN_TYPES.map(p => {
                   const savings = getSavingsInReais(p)
                   const isSelected = plan === p
 
@@ -313,7 +299,7 @@ export default function RecomendacoesPage() {
                         <span className={`absolute -top-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-bold px-2 py-0.5 rounded-full ${
                           isSelected ? 'bg-[#f4001e] text-white' : 'bg-[#f4001e] text-white'
                         }`}>
-                          {p === '3meses' ? '⭐ Recomendado' : '💰 Melhor valor'}
+                          {PLAN_BADGE[p]}
                         </span>
                       )}
 
@@ -323,7 +309,7 @@ export default function RecomendacoesPage() {
                       <div className="text-sm font-bold">{PLAN_LABELS[p]}</div>
                       {savings > 0 && (
                         <div className={`text-xs mt-1 font-medium ${isSelected ? 'text-green-300' : 'text-green-600'}`}>
-                          Economize R$ {savings.toFixed(2).replace('.', ',')}
+                          Economize R$ {savings.toFixed(2).replace('.', ',')}/mês
                         </div>
                       )}
                     </button>
@@ -332,16 +318,9 @@ export default function RecomendacoesPage() {
               </div>
               )}
 
-              {plan !== '1mes' && (
-                <p className="text-xs text-gray-400 mt-2 text-center">
-                  Assinatura com renovação automática · Cancele quando quiser
-                </p>
-              )}
-              {plan === '1mes' && (
-                <p className="text-xs text-gray-400 mt-2 text-center">
-                  Compra única, sem renovação automática
-                </p>
-              )}
+              <p className="text-xs text-gray-400 mt-2 text-center">
+                {PLAN_HINT[plan]}
+              </p>
             </div>
 
             {/* Resumo + CTA */}

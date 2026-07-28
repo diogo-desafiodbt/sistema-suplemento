@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import { PLAN_LABELS, getChargePrice } from '@/lib/plans'
 
 type Step = 2 | 3 | 4
 
@@ -16,40 +17,23 @@ type LocalProtocolItem = {
   price_quarterly?: number
   price_yearly?: number
   image?: string
+  activation_reason?: string
+  quantity?: number
 }
 
-async function submitQuizAndGetProtocolId(plan: string): Promise<string | null> {
-  const quizDataRaw = sessionStorage.getItem('quiz_data')
-  const protocolItemsRaw = sessionStorage.getItem('protocol_items')
-  if (!quizDataRaw) return sessionStorage.getItem('protocol_id')
-
-  const quizData = JSON.parse(quizDataRaw)
-  const protocolItems = protocolItemsRaw ? JSON.parse(protocolItemsRaw) : undefined
-  const res = await fetch('/api/quiz/submit', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...quizData, plan_type: plan, protocol_items: protocolItems }),
-  })
-
-  if (!res.ok) return null
-
-  const result = await res.json()
-  sessionStorage.setItem('protocol_id', result.protocol_id)
-  sessionStorage.removeItem('quiz_data')
-  return result.protocol_id as string
-}
+type CheckoutSource = 'full_quiz' | 'mini_quiz'
 
 export default function CheckoutPage() {
   const router = useRouter()
   const [step, setStep] = useState<Step>(2)
   const [items, setItems] = useState<LocalProtocolItem[]>([])
-  const [plan, setPlan] = useState<string>('1mes')
+  const [plan, setPlan] = useState<string>('assinatura_mensal')
   const [loading, setLoading] = useState(false)
+  const [source, setSource] = useState<CheckoutSource>('full_quiz')
 
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [protocolId, setProtocolId] = useState<string | null>(null)
 
   const [cep, setCep] = useState('')
   const [street, setStreet] = useState('')
@@ -73,14 +57,30 @@ export default function CheckoutPage() {
   useEffect(() => {
     const itemsRaw = sessionStorage.getItem('protocol_items')
     const savedPlan = sessionStorage.getItem('selected_plan')
-    const savedProtocolId = sessionStorage.getItem('protocol_id')
+    const savedSource = sessionStorage.getItem('checkout_source') as CheckoutSource | null
+    const miniRaw = sessionStorage.getItem('mini_quiz_data')
+    const quizRaw = sessionStorage.getItem('quiz_data')
+
     if (!itemsRaw) {
-      router.push('/quiz')
+      router.push('/suplementos')
       return
     }
+
+    if (savedSource === 'mini_quiz') {
+      if (!miniRaw) {
+        router.push('/checkout/triagem')
+        return
+      }
+      setSource('mini_quiz')
+    } else if (!quizRaw) {
+      router.push('/quiz')
+      return
+    } else {
+      setSource('full_quiz')
+    }
+
     setItems(JSON.parse(itemsRaw))
     if (savedPlan) setPlan(savedPlan)
-    if (savedProtocolId) setProtocolId(savedProtocolId)
 
     checkExistingSession()
   }, [])
@@ -90,33 +90,18 @@ export default function CheckoutPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const currentPlan = sessionStorage.getItem('selected_plan') ?? plan
+    const { data: profile } = await supabase
+      .from('users')
+      .select('full_name, email')
+      .eq('id', user.id)
+      .single()
 
-    const savedProtocolId = sessionStorage.getItem('protocol_id')
-    if (savedProtocolId) {
-      setProtocolId(savedProtocolId)
-      setStep(3)
-      return
+    if (profile) {
+      setAccountSummary({
+        name: profile.full_name ?? '',
+        email: profile.email ?? user.email ?? '',
+      })
     }
-
-    const protocolIdFromQuiz = await submitQuizAndGetProtocolId(currentPlan)
-    if (protocolIdFromQuiz) {
-      setProtocolId(protocolIdFromQuiz)
-    } else {
-      const { data: protocol } = await supabase
-        .from('protocols')
-        .select('id')
-        .eq('user_id', user.id)
-        .order('generated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (protocol) {
-        setProtocolId(protocol.id)
-        sessionStorage.setItem('protocol_id', protocol.id)
-      }
-    }
-
     setStep(3)
   }
 
@@ -125,13 +110,23 @@ export default function CheckoutPage() {
   }
 
   function getPrice(item: LocalProtocolItem): number {
-    if (plan === '1mes') return item.price_monthly ?? 0
-    if (plan === '3meses') return item.price_quarterly ?? 0
-    return item.price_yearly ?? 0
+    return getChargePrice(item.price_monthly ?? 0, plan)
   }
 
   function getTotal(): number {
     return getActiveItems().reduce((sum, item) => sum + getPrice(item), 0)
+  }
+
+  function buildQuizPayload() {
+    if (source === 'mini_quiz') {
+      const mini = JSON.parse(sessionStorage.getItem('mini_quiz_data') ?? '{}')
+      return {
+        diagnosis_type: mini.diagnosis_type,
+        full_name: mini.full_name,
+        age: mini.age,
+      }
+    }
+    return JSON.parse(sessionStorage.getItem('quiz_data') ?? '{}')
   }
 
   async function handleCreateAccount(e: React.FormEvent) {
@@ -161,11 +156,6 @@ export default function CheckoutPage() {
       }
 
       await new Promise(resolve => setTimeout(resolve, 1000))
-
-      const newProtocolId = await submitQuizAndGetProtocolId(plan)
-      if (newProtocolId) {
-        setProtocolId(newProtocolId)
-      }
 
       setAccountSummary({ name: fullName, email })
       setStep(3)
@@ -199,10 +189,6 @@ export default function CheckoutPage() {
 
   async function handlePayment(e: React.FormEvent) {
     e.preventDefault()
-    if (!protocolId) {
-      toast.error('Protocolo não encontrado. Refaça o quiz.')
-      return
-    }
     setProcessingPayment(true)
 
     const [expMonth, expYearRaw] = cardExpiry.split('/')
@@ -211,13 +197,25 @@ export default function CheckoutPage() {
       : expYearRaw?.trim()
 
     try {
+      const quiz = buildQuizPayload()
+      if (!quiz?.diagnosis_type) {
+        toast.error(
+          source === 'mini_quiz'
+            ? 'Dados da triagem incompletos. Volte e preencha novamente.'
+            : 'Dados do questionário incompletos. Refaça o quiz.'
+        )
+        return
+      }
+
       const res = await fetch('/api/checkout/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          protocol_id: protocolId,
           plan_type: plan,
           total_amount: getTotal(),
+          source,
+          quiz,
+          protocol_items: getActiveItems(),
           address: {
             zip_code: cep.replace(/\D/g, ''),
             street,
@@ -248,6 +246,10 @@ export default function CheckoutPage() {
       sessionStorage.removeItem('protocol_items')
       sessionStorage.removeItem('selected_plan')
       sessionStorage.removeItem('protocol_id')
+      sessionStorage.removeItem('quiz_data')
+      sessionStorage.removeItem('mini_quiz_data')
+      sessionStorage.removeItem('checkout_source')
+      sessionStorage.removeItem('cart_locked_plan')
 
       router.push('/obrigado')
     } catch {
@@ -257,20 +259,14 @@ export default function CheckoutPage() {
     }
   }
 
-  const PLAN_LABELS: Record<string, string> = {
-    '1mes': '1 mês',
-    '3meses': '3 meses',
-    '1ano': '1 ano',
-  }
+  const planLabel = PLAN_LABELS[plan] ?? plan
 
   return (
     <div className="min-h-screen bg-[#f5f0eb]">
 
-      {/* Header */}
       <header className="bg-[#f5f0eb] px-6 py-5 border-b border-[#13244f]/10">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <img src="/logo-azul.png" alt="Desafio Diabetes" className="h-7 w-auto" />
-          {/* Breadcrumb */}
           <nav className="hidden sm:flex items-center gap-2 text-xs text-[#13244f]/50 font-medium">
             {['Conta', 'Entrega', 'Pagamento'].map((label, i) => {
               const stepNum = i + 2
@@ -291,10 +287,8 @@ export default function CheckoutPage() {
 
       <main className="max-w-6xl mx-auto px-4 py-8 flex flex-col lg:flex-row gap-8 items-start">
 
-        {/* ── COLUNA ESQUERDA — Formulário ── */}
         <div className="flex-1 space-y-3 w-full min-w-0">
 
-          {/* ── STEP 2: CONTA ── */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4">
               <div className="flex items-center gap-3">
@@ -361,7 +355,6 @@ export default function CheckoutPage() {
             )}
           </div>
 
-          {/* ── STEP 3: ENDEREÇO ── */}
           <div className={`bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden ${step < 3 ? 'opacity-50' : ''}`}>
             <div className="flex items-center justify-between px-6 py-4">
               <div className="flex items-center gap-3">
@@ -460,7 +453,6 @@ export default function CheckoutPage() {
             )}
           </div>
 
-          {/* ── STEP 4: PAGAMENTO ── */}
           <div className={`bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden ${step < 4 ? 'opacity-50' : ''}`}>
             <div className="px-6 py-4 flex items-center gap-3">
               <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${step === 4 ? 'bg-[#13244f] text-white' : 'border-2 border-gray-300 text-gray-400'}`}>
@@ -543,12 +535,11 @@ export default function CheckoutPage() {
 
         </div>
 
-        {/* ── COLUNA DIREITA — Sidebar resumo ── */}
         <div className="w-full lg:w-96 lg:sticky lg:top-8">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
             <div>
               <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-1">Resumo da compra</p>
-              <p className="text-sm md:text-base text-gray-400">{PLAN_LABELS[plan] ?? plan} de tratamento</p>
+              <p className="text-sm md:text-base text-gray-400">{planLabel} de tratamento</p>
             </div>
 
             <div className="space-y-3">
@@ -587,7 +578,7 @@ export default function CheckoutPage() {
                   R$ {getTotal().toFixed(2).replace('.', ',')}
                 </span>
               </div>
-              <p className="text-xs text-gray-400 text-right">por {PLAN_LABELS[plan] ?? plan}</p>
+              <p className="text-xs text-gray-400 text-right">por {planLabel}{plan === 'assinatura_mensal' ? '/mês' : ''}</p>
             </div>
 
             <div className="bg-[#13244f]/5 rounded-xl px-4 py-3 text-xs text-[#13244f] leading-relaxed">

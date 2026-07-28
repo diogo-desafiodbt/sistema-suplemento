@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import { PLAN_LABELS, isRecurringPlan } from '@/lib/plans'
 
 type Subscription = {
   id: string
@@ -21,12 +22,6 @@ type Payment = {
 type Props = {
   subscription: Subscription
   payments: Payment[]
-}
-
-const planLabels: Record<string, string> = {
-  '1mes': 'Mensal',
-  '3meses': 'Trimestral',
-  '1ano': 'Anual',
 }
 
 const statusLabels: Record<string, { label: string; className: string }> = {
@@ -52,6 +47,7 @@ export function AssinaturaClient({ subscription, payments }: Props) {
   const canCancel =
     !canceled &&
     subscription !== null &&
+    isRecurringPlan(subscription.plan_type) &&
     ['active', 'past_due', 'grace_period'].includes(subscription.status)
 
   const currentStatus = canceled ? 'canceled' : (subscription?.status ?? 'expired')
@@ -100,12 +96,14 @@ export function AssinaturaClient({ subscription, payments }: Props) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-lg font-bold text-[#13244f]">
-                {planLabels[subscription.plan_type] ?? subscription.plan_type}
+                {PLAN_LABELS[subscription.plan_type] ?? subscription.plan_type}
               </p>
               <p className="text-sm text-gray-400 mt-0.5">
                 {canceled
                   ? `Renovação cancelada — acesso até ${expiresAt}`
-                  : `Válido até ${expiresAt}`}
+                  : isRecurringPlan(subscription.plan_type)
+                    ? `Próximo ciclo até ${expiresAt}`
+                    : `Válido até ${expiresAt}`}
               </p>
             </div>
             <span className={`text-xs font-bold px-3 py-1 rounded-full ${statusInfo.className}`}>
