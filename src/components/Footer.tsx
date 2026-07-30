@@ -45,7 +45,11 @@ export default function Footer() {
             ))}
           </div>
           <div className="flex flex-col gap-3">
-            <img src="/logo-branca.png" alt="Desafio Diabetes" className="h-10 w-auto" />
+            <img
+              src="/logo-principal.png"
+              alt="Desafio Diabetes"
+              className="h-10 w-auto brightness-0 invert"
+            />
             <div className="flex gap-4">
               <a href="#" aria-label="Instagram" className="opacity-70 hover:opacity-100 transition">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">

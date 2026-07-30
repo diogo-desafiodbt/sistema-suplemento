@@ -83,6 +83,27 @@ export const supplements: SupplementContent[] = [
       'O Ômega-3 (EPA/DHA) tem evidência consistente na redução de triglicerídeos, um marcador cardiovascular frequentemente alterado em quem convive com diabetes.',
     gallery: ['/categorias/categoria-omega3.png'],
   },
+  {
+    slug: 'polivitaminico',
+    name: 'Polivitamínico',
+    headline: 'Suporte nutricional completo para o dia a dia',
+    description:
+      'Fórmula com Metilcobalamina (B12) 1000mcg, Metilfolato de cálcio (B9) 1mg, Zinco Bisglicinato Quelado 20mg, Magnésio Bisglicinato tamponado 200mg, Vitamina D3 microencapsulada 4000 UI e Vitamina K2 (MK-7) 150mcg.',
+    composition: [
+      { ativo: 'Metilcobalamina (B12)', dose: '1000 mcg' },
+      { ativo: 'Metilfolato de cálcio (B9)', dose: '1 mg' },
+      { ativo: 'Zinco Bisglicinato Quelado', dose: '20 mg' },
+      { ativo: 'Magnésio Bisglicinato tamponado', dose: '200 mg' },
+      { ativo: 'Vitamina D3 microencapsulada', dose: '4000 UI' },
+      { ativo: 'Vitamina K2 (MK-7)', dose: '150 mcg' },
+    ],
+    heroHorizontal: '/banners/banner-polivitaminico-horizontal.png',
+    heroVertical: '/banners/banner-polivitaminico-vertical.png',
+    usage: 'Tomar 1 dose ao dia, junto à principal refeição contendo gordura.',
+    scienceNote:
+      'Suporte nutricional complementar ao protocolo Desafio Diabetes.',
+    gallery: ['/categorias/categoria-polivitaminico.png'],
+  },
 ]
 
 export function getSupplementBySlug(slug: string) {

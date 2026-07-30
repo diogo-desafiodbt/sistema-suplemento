@@ -16,6 +16,7 @@ const banners: Banner[] = [
   { id: 'omega3', horizontal: '/banners/banner-omega3-horizontal.png', vertical: '/banners/banner-omega3-vertical.png', alt: 'Ômega 3 Desafio Diabetes' },
   { id: 'berberina', horizontal: '/banners/banner-berberina-horizontal.png', vertical: '/banners/banner-berberina-vertical.png', alt: 'Berberina Desafio Diabetes' },
   { id: 'resistencia-insulina', horizontal: '/banners/banner-resistencia-insulina-horizontal.png', vertical: '/banners/banner-resistencia-insulina-vertical.png', alt: 'Resistência à Insulina Desafio Diabetes' },
+  { id: 'polivitaminico', horizontal: '/banners/banner-polivitaminico-horizontal.png', vertical: '/banners/banner-polivitaminico-vertical.png', alt: 'Polivitamínico Desafio Diabetes' },
 ]
 
 export default function BannerCarousel() {

@@ -43,6 +43,12 @@ const checkoutSchema = z.object({
     full_name: z.string().optional(),
   }),
   protocol_items: z.array(protocolItemSchema).min(1),
+  shipping: z.object({
+    tipo: z.enum(['economica', 'expressa', 'padrao']),
+    valor: z.number().nonnegative(),
+    prazoDias: z.number().nonnegative(),
+    codigoServico: z.string(),
+  }),
   address: z.object({
     zip_code: z.string(),
     street: z.string(),
@@ -52,13 +58,16 @@ const checkoutSchema = z.object({
     city: z.string(),
     state: z.string().length(2),
   }),
-  card: z.object({
-    number: z.string(),
-    holder_name: z.string(),
-    exp_month: z.string(),
-    exp_year: z.string(),
-    cvv: z.string(),
-  }),
+  payment_method: z.enum(['credit_card', 'pix']),
+  card: z
+    .object({
+      number: z.string(),
+      holder_name: z.string(),
+      exp_month: z.string(),
+      exp_year: z.string(),
+      cvv: z.string(),
+    })
+    .optional(),
   cpf: z.string(),
 })
 
@@ -124,6 +133,21 @@ export async function POST(request: NextRequest) {
     }
 
     const data = parsed.data
+
+    if (data.payment_method === 'credit_card' && !data.card) {
+      return NextResponse.json(
+        { error: 'Dados do cartão são obrigatórios' },
+        { status: 400 }
+      )
+    }
+
+    if (data.payment_method === 'pix' && isRecurringPlan(data.plan_type)) {
+      return NextResponse.json(
+        { error: 'Pix disponível apenas para compra única' },
+        { status: 400 }
+      )
+    }
+
     const admin = createAdminClient()
 
     const { data: profile } = await admin
@@ -154,6 +178,7 @@ export async function POST(request: NextRequest) {
     const pendingCheckout: PendingCheckoutPayload = {
       source: data.source,
       plan_type: data.plan_type,
+      shipping: data.shipping,
       quiz: data.quiz,
       protocol_items: data.protocol_items,
     }
@@ -179,9 +204,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Erro ao criar assinatura' }, { status: 500 })
     }
 
-    const expYear = data.card.exp_year.length === 2
-      ? 2000 + parseInt(data.card.exp_year, 10)
-      : parseInt(data.card.exp_year, 10)
+    const expYear = data.card
+      ? data.card.exp_year.length === 2
+        ? 2000 + parseInt(data.card.exp_year, 10)
+        : parseInt(data.card.exp_year, 10)
+      : 0
 
     const pagarmeAuth = `Basic ${Buffer.from(process.env.PAGARME_API_KEY + ':').toString('base64')}`
     const pagarmeHeaders = {
@@ -211,24 +238,41 @@ export async function POST(request: NextRequest) {
       client_code: profile.client_code,
     }
 
-    const card = {
-      number: data.card.number.replace(/\s/g, ''),
-      holder_name: data.card.holder_name,
-      exp_month: parseInt(data.card.exp_month, 10),
-      exp_year: expYear,
-      cvv: data.card.cvv,
-      billing_address: {
-        zip_code: data.address.zip_code,
-        city: data.address.city,
-        state: data.address.state,
-        country: 'BR',
-        line_1: `${data.address.number}, ${data.address.street}, ${data.address.neighborhood}`,
-      },
-    }
+    const card = data.card
+      ? {
+          number: data.card.number.replace(/\s/g, ''),
+          holder_name: data.card.holder_name,
+          exp_month: parseInt(data.card.exp_month, 10),
+          exp_year: expYear,
+          cvv: data.card.cvv,
+          billing_address: {
+            zip_code: data.address.zip_code,
+            city: data.address.city,
+            state: data.address.state,
+            country: 'BR',
+            line_1: `${data.address.number}, ${data.address.street}, ${data.address.neighborhood}`,
+          },
+        }
+      : null
 
     let pagarmeRes: Response
 
     if (!isRecurringPlan(data.plan_type)) {
+      const payments =
+        data.payment_method === 'pix'
+          ? [{ payment_method: 'pix' as const, pix: { expires_in: 3600 } }]
+          : [
+              {
+                payment_method: 'credit_card' as const,
+                credit_card: {
+                  recurrence: false,
+                  installments: 1,
+                  statement_descriptor: 'DESAF DIABETS',
+                  card: card!,
+                },
+              },
+            ]
+
       const pagarmePayload = {
         items: [
           {
@@ -239,17 +283,7 @@ export async function POST(request: NextRequest) {
           },
         ],
         customer,
-        payments: [
-          {
-            payment_method: 'credit_card',
-            credit_card: {
-              recurrence: false,
-              installments: 1,
-              statement_descriptor: 'DESAF DIABETS',
-              card,
-            },
-          },
-        ],
+        payments,
         metadata,
       }
 
@@ -259,6 +293,13 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify(pagarmePayload),
       })
     } else {
+      if (!card) {
+        return NextResponse.json(
+          { error: 'Dados do cartão são obrigatórios' },
+          { status: 400 }
+        )
+      }
+
       const intervalCount =
         data.plan_type === 'assinatura_mensal'
           ? 1
@@ -350,6 +391,17 @@ export async function POST(request: NextRequest) {
         status: charge?.status ?? 'pending',
         subscription_id: subscription.id,
         protocol_id: protocolId,
+        ...(data.payment_method === 'pix'
+          ? {
+              pix: charge?.last_transaction
+                ? {
+                    qr_code: charge.last_transaction.qr_code,
+                    qr_code_url: charge.last_transaction.qr_code_url,
+                    expires_at: charge.last_transaction.expires_at,
+                  }
+                : null,
+            }
+          : {}),
       })
     }
 

@@ -14,6 +14,12 @@ export type PendingProtocolItem = {
 export type PendingCheckoutPayload = {
   source: CheckoutSource
   plan_type: '1mes' | 'assinatura_mensal' | '3meses' | '1ano'
+  shipping?: {
+    tipo: 'economica' | 'expressa' | 'padrao'
+    valor: number
+    prazoDias: number
+    codigoServico: string
+  }
   quiz: {
     diagnosis_type: 'type2' | 'prediabetes' | 'undiagnosed'
     years_diagnosed?: string

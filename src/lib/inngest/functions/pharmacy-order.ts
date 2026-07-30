@@ -1,12 +1,9 @@
 import { inngest } from '../client'
 import { createAdminClient } from '@/lib/supabase/admin'
-import {
-  buildPharmacyJson,
-  buildTransportadoraCodigo,
-  buildFormaPagamentoCodigo,
-} from '@/lib/pharmacy/json-builder'
-import type { PharmacyOrderItem } from '@/types/pharmacy'
+import { buildPharmacyJson, buildPharmacyItem } from '@/lib/pharmacy/json-builder'
 import { getPharmacySkuKey, getUnitPriceFromProduct } from '@/lib/plans'
+import { computePackageDimensions, type PackageItem } from '@/lib/shipping/package'
+import type { ShippingSelection } from '@/types/shipping'
 
 type ProtocolItemRow = {
   product_id: string
@@ -20,6 +17,7 @@ type ProtocolItemRow = {
     price_monthly: number | null
     price_quarterly: number | null
     price_yearly: number | null
+    box_type: string | null
   } | null
 }
 
@@ -48,9 +46,13 @@ export const pharmacyOrder = inngest.createFunction(
         plan_type,
         user_id,
         protocol_id,
+        pending_checkout,
         users!inner (
           id,
           full_name,
+          email,
+          cpf,
+          phone,
           client_code,
           addresses (
             zip_code,
@@ -76,7 +78,8 @@ export const pharmacyOrder = inngest.createFunction(
               pharmacy_code,
               price_monthly,
               price_quarterly,
-              price_yearly
+              price_yearly,
+              box_type
             )
           )
         )
@@ -92,6 +95,9 @@ export const pharmacyOrder = inngest.createFunction(
     const user = subscription.users as unknown as {
       id: string
       full_name: string
+      email: string
+      cpf: string | null
+      phone: string | null
       client_code: string
       addresses: Array<{
         zip_code: string
@@ -126,6 +132,11 @@ export const pharmacyOrder = inngest.createFunction(
       throw new Error(`Nenhum item ativo no protocolo da assinatura ${subscription_id}`)
     }
 
+    const pending = subscription.pending_checkout as {
+      shipping?: ShippingSelection
+    } | null
+    const shipping = pending?.shipping
+
     const { data: configs, error: configError } = await admin
       .from('system_config')
       .select('key, value')
@@ -143,40 +154,51 @@ export const pharmacyOrder = inngest.createFunction(
       (configs ?? []).map(c => [c.key, c.value])
     )
 
-    const pharmacyItems: PharmacyOrderItem[] = activeItems.map(item => ({
-      CodigoProduto: item.products?.pharmacy_code ?? 0,
-      Quantidade: 1,
-      CodigoBarras: item.products?.[skuKey] ?? '',
-    }))
+    const packageItems: PackageItem[] = activeItems
+      .map(item => {
+        const box = item.products?.box_type
+        if (box !== 'R80' && box !== 'R110') return null
+        return { box_type: box, quantity: 1 }
+      })
+      .filter((x): x is PackageItem => x !== null)
 
-    const pharmacyJson = buildPharmacyJson({
-      clienteCodigo: user.client_code,
-      fullName: user.full_name,
-      address,
-      planType,
-      items: pharmacyItems,
-      prescriptionPdfUrl: protocol.prescription_pdf_url ?? '',
-      pharmacyCarrierCode:
-        configMap.pharmacy_carrier_code ??
-        buildTransportadoraCodigo(address.zip_code, user.full_name),
-      pharmacyPaymentCode:
-        configMap.pharmacy_payment_code ?? buildFormaPagamentoCodigo(planType),
-      pharmacyCompanyId: parseInt(configMap.pharmacy_company_id ?? '2', 10),
-    })
+    const dimensions = await computePackageDimensions(packageItems)
 
-    const totalAmount = activeItems.reduce(
+    const productsSubtotal = activeItems.reduce(
       (sum, item) => sum + getUnitPriceFromProduct(item.products, planType),
       0
     )
 
+    const freteValor = shipping?.valor ?? 0
+    const prazoDias = shipping?.prazoDias ?? 0
+
+    const { data: priorOrder } = await admin
+      .from('orders')
+      .select('id')
+      .eq('user_id', user_id)
+      .not('pharmacy_sent_at', 'is', null)
+      .limit(1)
+      .maybeSingle()
+
+    const pharmacyItems = activeItems.map(item =>
+      buildPharmacyItem({
+        sku: item.products?.[skuKey] ?? '',
+        pharmacyCode: item.products?.pharmacy_code ?? 0,
+        name: item.products?.name ?? '',
+        unitPrice: getUnitPriceFromProduct(item.products, planType),
+      })
+    )
+
+    // Cria o pedido primeiro pra ter o id no CodigoPedidoExterno
     const { data: order, error: orderError } = await admin
       .from('orders')
       .insert({
         user_id,
         subscription_id,
         status: 'pending',
-        total_amount: totalAmount,
-        pharmacy_json: pharmacyJson,
+        total_amount: productsSubtotal + freteValor,
+        shipping_service_code: shipping?.codigoServico ?? '',
+        shipping_quote_json: shipping ?? null,
       })
       .select('id')
       .single()
@@ -184,6 +206,31 @@ export const pharmacyOrder = inngest.createFunction(
     if (orderError || !order) {
       throw new Error(`Erro ao criar pedido: ${orderError?.message ?? 'unknown'}`)
     }
+
+    const pharmacyJson = buildPharmacyJson({
+      orderId: order.id,
+      clientCode: user.client_code,
+      cpf: user.cpf,
+      fullName: user.full_name,
+      email: user.email,
+      phone: user.phone,
+      address,
+      items: pharmacyItems,
+      productsSubtotal,
+      freteValor,
+      prazoDias,
+      prescriptionPdfUrl: protocol.prescription_pdf_url ?? '',
+      pharmacyCarrierCode: parseInt(configMap.pharmacy_carrier_code ?? '24', 10),
+      pharmacyPaymentCode: parseInt(configMap.pharmacy_payment_code ?? '15', 10),
+      pharmacyCompanyId: parseInt(configMap.pharmacy_company_id ?? '2', 10),
+      pesoLiquido: dimensions.peso,
+      clienteExistente: !!priorOrder,
+    })
+
+    await admin
+      .from('orders')
+      .update({ pharmacy_json: pharmacyJson })
+      .eq('id', order.id)
 
     const { error: itemsError } = await admin.from('order_items').insert(
       activeItems.map(item => ({

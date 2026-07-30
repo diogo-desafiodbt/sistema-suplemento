@@ -76,7 +76,7 @@ export default function SupplementPage() {
   const params = useParams<{ slug: string }>()
   const slug = params.slug
   const content = getSupplementBySlug(slug)
-  const { addItem } = useCart()
+  const { items: cartItems, plan: cartPlan, addItem } = useCart()
   const router = useRouter()
 
   const [product, setProduct] = useState<Product | null>(null)
@@ -85,6 +85,14 @@ export default function SupplementPage() {
   const [plan, setPlan] = useState<PurchasePlanType>(DEFAULT_PURCHASE_PLAN)
   const [openSection, setOpenSection] = useState<string | null>('descricao')
   const [showCartDialog, setShowCartDialog] = useState(false)
+
+  const oneTimeLocked = cartItems.length > 0 && cartPlan === 'assinatura_mensal'
+
+  useEffect(() => {
+    if (oneTimeLocked && plan === '1mes') {
+      setPlan('assinatura_mensal')
+    }
+  }, [oneTimeLocked, plan])
 
   useEffect(() => {
     if (!content) return
@@ -276,16 +284,18 @@ export default function SupplementPage() {
                     {PURCHASE_PLAN_TYPES.map((p) => {
                       const isSelected = plan === p
                       const savings = product ? getSavings(product, p) : 0
+                      const isLocked = p === '1mes' && oneTimeLocked
                       return (
                         <button
                           key={p}
                           type="button"
-                          onClick={() => setPlan(p)}
+                          disabled={isLocked}
+                          onClick={() => !isLocked && setPlan(p)}
                           className={`relative rounded-2xl border p-2.5 sm:p-3 text-center transition-all ${
                             isSelected
                               ? 'border-[#13244f] bg-[#13244f] text-white shadow-md'
                               : 'border-gray-200 bg-white text-[#13244f] hover:border-[#13244f]/40'
-                          }`}
+                          }${isLocked ? ' opacity-40 cursor-not-allowed' : ''}`}
                         >
                           {PLAN_BADGE[p] && (
                             <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#f4001e] text-white">
@@ -306,7 +316,9 @@ export default function SupplementPage() {
                     })}
                   </div>
                   <p className="text-xs text-gray-400 mt-2 text-center">
-                    {PLAN_HINT[plan]}
+                    {oneTimeLocked
+                      ? 'Compra única indisponível — seu carrinho já tem um item em assinatura, e o pedido inteiro é cobrado no mesmo plano.'
+                      : PLAN_HINT[plan]}
                   </p>
                 </div>
 

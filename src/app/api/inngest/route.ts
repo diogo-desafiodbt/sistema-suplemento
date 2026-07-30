@@ -5,6 +5,7 @@ import { sundayDispatch } from '@/lib/inngest/functions/sunday-dispatch'
 import { pharmacyOrder } from '@/lib/inngest/functions/pharmacy-order'
 import { paymentRetry } from '@/lib/inngest/functions/payment-retry'
 import { avulsoRenewalReminder } from '@/lib/inngest/functions/avulso-renewal-reminder'
+import { createShippingLabel } from '@/lib/inngest/functions/create-shipping-label'
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -14,5 +15,6 @@ export const { GET, POST, PUT } = serve({
     pharmacyOrder,
     paymentRetry,
     avulsoRenewalReminder,
+    createShippingLabel,
   ],
 })
