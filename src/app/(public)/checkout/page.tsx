@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { PLAN_LABELS, getChargePrice } from '@/lib/plans'
 import type { ShippingOptionPublic, ShippingSelection } from '@/types/shipping'
+import { estimateCustomerDeliveryDays } from '@/lib/shipping/estimate'
 
 type Step = 2 | 3 | 4
 
@@ -265,7 +266,7 @@ export default function CheckoutPage() {
     }
   }
 
-  async function fetchShippingQuote(cepDigits: string) {
+  async function fetchShippingQuote(cepDigits: string, uf: string) {
     setLoadingShipping(true)
     setShippingError(false)
     try {
@@ -282,6 +283,7 @@ export default function CheckoutPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           cepdestino: cepDigits,
+          uf,
           valordeclarado: getProductsSubtotal(),
           protocol_items: active.map(i => ({
             product_id: i.product_id,
@@ -328,7 +330,7 @@ export default function CheckoutPage() {
         setNeighborhood(address.neighborhood)
         setCity(address.city)
         setState(address.state)
-        await fetchShippingQuote(cep.replace(/\D/g, ''))
+        await fetchShippingQuote(cep.replace(/\D/g, ''), address.state)
       } else {
         toast.error('CEP não encontrado')
       }
@@ -640,7 +642,10 @@ export default function CheckoutPage() {
                                   {opt.tipo === 'economica' ? 'Entrega econômica' : 'Entrega expressa'}
                                 </p>
                                 <p className="text-xs text-gray-500 mt-0.5">
-                                  chega em até {opt.prazoDias} {opt.prazoDias === 1 ? 'dia útil' : 'dias úteis'}
+                                  {(() => {
+                                    const dias = estimateCustomerDeliveryDays(opt.prazoDias)
+                                    return `chega em até ${dias} ${dias === 1 ? 'dia útil' : 'dias úteis'}`
+                                  })()}
                                 </p>
                               </div>
                               <p className="text-sm font-bold text-[#13244f] flex-shrink-0">

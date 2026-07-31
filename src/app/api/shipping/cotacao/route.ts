@@ -7,6 +7,7 @@ import type { ShippingOptionPublic } from '@/types/shipping'
 
 const bodySchema = z.object({
   cepdestino: z.string().min(8),
+  uf: z.string().length(2),
   valordeclarado: z.number().nonnegative(),
   protocol_items: z
     .array(
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { cepdestino, valordeclarado, protocol_items } = parsed.data
+    const { cepdestino, uf, valordeclarado, protocol_items } = parsed.data
     const admin = createAdminClient()
     const productIds = protocol_items.map(i => i.product_id)
 
@@ -50,6 +51,7 @@ export async function POST(request: NextRequest) {
     const dimensions = await computePackageDimensions(packageItems)
     const quotes = await getCotacao({
       cepdestino,
+      destinoUf: uf,
       valordeclarado,
       dimensions,
     })

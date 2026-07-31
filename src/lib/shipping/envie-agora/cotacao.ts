@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getSenderAddress } from '@/lib/shipping/sender-region'
 import { envieAgoraFetch } from './client'
 import type {
   CotacaoRequest,
@@ -9,17 +9,12 @@ import type {
 
 export async function getCotacao(params: {
   cepdestino: string
+  destinoUf: string
   valordeclarado: number
   dimensions: PackageDimensions
 }): Promise<PrecoPrazoItem[]> {
-  const admin = createAdminClient()
-  const { data: configs } = await admin
-    .from('system_config')
-    .select('key, value')
-    .eq('key', 'shipping_sender_cep')
-    .maybeSingle()
-
-  const ceporigem = (configs?.value ?? '80220030').replace(/\D/g, '')
+  const sender = await getSenderAddress(params.destinoUf)
+  const ceporigem = sender.cep
   const cepdestino = params.cepdestino.replace(/\D/g, '')
 
   const body: CotacaoRequest = {

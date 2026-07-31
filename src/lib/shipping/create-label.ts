@@ -96,7 +96,7 @@ export async function createShippingLabelForOrder(orderId: string): Promise<{
 
   if (!codigoServico) {
     const user = order.users as unknown as {
-      addresses: Array<{ zip_code: string; is_default: boolean }>
+      addresses: Array<{ zip_code: string; state: string; is_default: boolean }>
     }
     const address =
       user.addresses?.find(a => a.is_default) ?? user.addresses?.[0]
@@ -104,6 +104,7 @@ export async function createShippingLabelForOrder(orderId: string): Promise<{
 
     const quotes = await getCotacao({
       cepdestino: address.zip_code,
+      destinoUf: address.state,
       valordeclarado: valorDeclarado,
       dimensions,
     })

@@ -4,7 +4,6 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { generatePrescriptionPdf } from '@/lib/pdf/generator'
 import { sendToPharmacyWithPdf } from '@/lib/pharmacy/sender'
-import { inngest } from '@/lib/inngest/client'
 import type { PharmacyOrder } from '@/types/pharmacy'
 
 function escapeHtml(text: string): string {
@@ -191,11 +190,6 @@ export async function POST(request: NextRequest) {
               pharmacy_sent_at: new Date().toISOString(),
             })
             .eq('id', pendingOrder.id)
-
-          await inngest.send({
-            name: 'farmacia/pedido-enviado',
-            data: { order_id: pendingOrder.id },
-          })
         } catch (pharmError) {
           console.error('Erro ao enviar prescrição para farmácia:', pharmError)
         }

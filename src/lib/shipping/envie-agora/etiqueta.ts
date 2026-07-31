@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getSenderAddress } from '@/lib/shipping/sender-region'
 import { envieAgoraFetch } from './client'
 import type {
   AdicionarEtiquetaRequest,
@@ -47,22 +47,6 @@ export async function criarEtiqueta(params: {
   codigoServico: string
   valorDeclarado: number
 }): Promise<AdicionarEtiquetaResponse> {
-  const admin = createAdminClient()
-  const { data: configs } = await admin
-    .from('system_config')
-    .select('key, value')
-    .in('key', [
-      'shipping_sender_nome',
-      'shipping_sender_cep',
-      'shipping_sender_logradouro',
-      'shipping_sender_numero',
-      'shipping_sender_complemento',
-      'shipping_sender_bairro',
-      'shipping_sender_cidade',
-      'shipping_sender_uf',
-    ])
-
-  const map = Object.fromEntries((configs ?? []).map(c => [c.key, c.value]))
   const user = params.order.users
   const address =
     user.addresses?.find(a => a.is_default) ?? user.addresses?.[0]
@@ -70,6 +54,9 @@ export async function criarEtiqueta(params: {
   if (!address) {
     throw new Error(`Pedido ${params.order.id} sem endereço`)
   }
+
+  // Origem por região: Norte/Nordeste sai de Fortaleza, restante de Curitiba.
+  const sender = await getSenderAddress(address.state)
 
   const body: AdicionarEtiquetaRequest = {
     objeto: {
@@ -84,14 +71,14 @@ export async function criarEtiqueta(params: {
       codigoservico: params.codigoServico,
     },
     remetente: {
-      nome: map.shipping_sender_nome ?? 'Miligrama Farmácia de Manipulação',
-      cep: (map.shipping_sender_cep ?? '80220030').replace(/\D/g, ''),
-      logradouro: map.shipping_sender_logradouro ?? 'R. Des. Westphalen',
-      numero: map.shipping_sender_numero ?? '2201',
-      complemento: map.shipping_sender_complemento ?? '',
-      bairro: map.shipping_sender_bairro ?? 'Rebouças',
-      cidade: map.shipping_sender_cidade ?? 'Curitiba',
-      uf: map.shipping_sender_uf ?? 'PR',
+      nome: sender.nome,
+      cep: sender.cep,
+      logradouro: sender.logradouro,
+      numero: sender.numero,
+      complemento: sender.complemento,
+      bairro: sender.bairro,
+      cidade: sender.cidade,
+      uf: sender.uf,
     },
     destinatario: {
       nome: user.full_name,
