@@ -1,7 +1,7 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { AdminNav } from '@/components/admin/AdminNav'
 
 type UserRow = {
   id: string
@@ -41,25 +41,7 @@ export default async function AdminUsuariosPage() {
   const userList = (users ?? []) as unknown as UserRow[]
 
   return (
-    <div className="min-h-screen bg-[#f5f0eb]">
-
-      {/* Header */}
-      <header className="bg-[#13244f] px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-6">
-          <img src="/logo-branca.png" alt="Desafio Diabetes" className="h-7 w-auto" />
-          <span className="text-white/40 text-sm">Admin</span>
-        </div>
-        <form action="/api/auth/signout" method="POST">
-          <button type="submit" className="text-sm text-white/60 hover:text-white transition">Sair</button>
-        </form>
-      </header>
-
-      {/* Nav */}
-      <div className="bg-white border-b border-gray-100 px-6 py-3">
-        <AdminNav active="usuarios" />
-      </div>
-
-      <main className="max-w-6xl mx-auto px-6 py-8">
+    <main className="max-w-6xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
             <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-1">Gestão</p>
@@ -77,6 +59,7 @@ export default async function AdminUsuariosPage() {
                 <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">Role</th>
                 <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">Plano</th>
                 <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">Cadastro</th>
+                <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase"></th>
               </tr>
             </thead>
             <tbody>
@@ -111,6 +94,14 @@ export default async function AdminUsuariosPage() {
                     <td className="px-5 py-4 text-gray-400 text-xs">
                       {new Date(u.created_at).toLocaleDateString('pt-BR')}
                     </td>
+                    <td className="px-5 py-4 text-right">
+                      <Link
+                        href={`/admin/clientes/${u.id}`}
+                        className="inline-flex text-xs font-bold text-[#13244f] bg-[#13244f]/5 hover:bg-[#13244f]/10 px-3 py-1.5 rounded-lg transition"
+                      >
+                        Ver detalhes
+                      </Link>
+                    </td>
                   </tr>
                 )
               })}
@@ -118,6 +109,5 @@ export default async function AdminUsuariosPage() {
           </table>
         </div>
       </main>
-    </div>
   )
 }

@@ -82,6 +82,21 @@ export const pharmacyReconciliation = inngest.createFunction(
       }
     })
 
+    await step.run('registrar-background-job', async () => {
+      const admin = createAdminClient()
+      const { error } = await admin.from('background_jobs').insert({
+        job_type: 'pharmacy_reconciliation',
+        status: report.ok ? 'completed' : 'failed',
+        payload: report,
+        affected_rows: report.totalOrders,
+        completed_at: new Date().toISOString(),
+        started_at: new Date().toISOString(),
+      })
+      if (error) {
+        console.error('Erro ao gravar background_jobs da reconciliação:', error)
+      }
+    })
+
     await step.run('enviar-email-reconciliacao', async () => {
       const resendApiKey = process.env.RESEND_API_KEY
       if (!resendApiKey) {

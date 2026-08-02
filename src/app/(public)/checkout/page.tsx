@@ -88,6 +88,7 @@ export default function CheckoutPage() {
   const [cardExpiry, setCardExpiry] = useState('')
   const [cardCvv, setCardCvv] = useState('')
   const [cpf, setCpf] = useState('')
+  const [termsAccepted, setTermsAccepted] = useState(false)
   const [processingPayment, setProcessingPayment] = useState(false)
 
   const [pixInfo, setPixInfo] = useState<PixInfo | null>(null)
@@ -341,6 +342,10 @@ export default function CheckoutPage() {
 
   async function handlePayment(e?: React.FormEvent) {
     e?.preventDefault()
+    if (!termsAccepted) {
+      toast.error('É necessário aceitar os Termos de Uso para finalizar a compra.')
+      return
+    }
     setProcessingPayment(true)
     setPixExpired(false)
 
@@ -370,6 +375,7 @@ export default function CheckoutPage() {
         protocol_items: getActiveItems(),
         shipping,
         payment_method: method,
+        terms_accepted: true,
         address: {
           zip_code: cep.replace(/\D/g, ''),
           street,
@@ -884,9 +890,29 @@ export default function CheckoutPage() {
                     </p>
                   )}
 
+                  <label className="flex items-start gap-3 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={termsAccepted}
+                      onChange={e => setTermsAccepted(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 accent-[#13244f]"
+                    />
+                    <span className="text-xs text-gray-500 leading-relaxed">
+                      Li e concordo com os{' '}
+                      <a
+                        href="/termos-de-uso"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-[#13244f] underline hover:text-[#f4001e]"
+                      >
+                        Termos de Uso
+                      </a>
+                    </span>
+                  </label>
+
                   <button
                     type="submit"
-                    disabled={processingPayment}
+                    disabled={processingPayment || !termsAccepted}
                     className="w-full bg-[#f4001e] hover:bg-[#a30000] text-white py-4 rounded-full font-bold text-sm transition active:scale-95 disabled:opacity-50"
                   >
                     {processingPayment

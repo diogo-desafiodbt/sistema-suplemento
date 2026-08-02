@@ -109,3 +109,18 @@ export const supplements: SupplementContent[] = [
 export function getSupplementBySlug(slug: string) {
   return supplements.find((s) => s.slug === slug)
 }
+
+/**
+ * Casa um nome de produto (ex: vindo de order_items.products.name) com uma
+ * entrada de conteúdo, mesmo padrão do matchProduct do CategoryCarousel.
+ * Retorna a imagem principal (gallery[0]) ou null se não houver match.
+ */
+export function findSupplementImageByProductName(name: string): string | null {
+  const needle = name.toLowerCase()
+  const firstWord = needle.split(' ')[0]
+  const match =
+    supplements.find((s) => s.name.toLowerCase() === needle) ??
+    supplements.find((s) => needle.includes(s.name.toLowerCase())) ??
+    supplements.find((s) => s.name.toLowerCase().includes(firstWord))
+  return match?.gallery[0] ?? null
+}

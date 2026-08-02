@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createHash } from 'crypto'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { z } from 'zod'
 import { ensureProtocolAfterPayment } from '@/lib/protocol/create-from-checkout'
 import type { PendingCheckoutPayload } from '@/lib/protocol/create-from-checkout'
 import { addPlanPeriod, isRecurringPlan } from '@/lib/plans'
+import { TERMS_VERSION, TERMS_CONTENT } from '@/lib/terms/content'
 
 const protocolItemSchema = z.object({
   product_id: z.string().uuid().optional(),
@@ -59,6 +61,7 @@ const checkoutSchema = z.object({
     state: z.string().length(2),
   }),
   payment_method: z.enum(['credit_card', 'pix']),
+  terms_accepted: z.literal(true),
   card: z
     .object({
       number: z.string(),
@@ -123,6 +126,14 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
+
+    if (body?.terms_accepted !== true) {
+      return NextResponse.json(
+        { error: 'É necessário aceitar os Termos de Uso' },
+        { status: 400 }
+      )
+    }
+
     const parsed = checkoutSchema.safeParse(body)
 
     if (!parsed.success) {
@@ -202,6 +213,27 @@ export async function POST(request: NextRequest) {
     if (subError) {
       console.error('Subscription error:', subError)
       return NextResponse.json({ error: 'Erro ao criar assinatura' }, { status: 500 })
+    }
+
+    // Registro do aceite dos Termos de Uso (versão + hash do texto canônico).
+    const termsHash = createHash('sha256')
+      .update(TERMS_CONTENT + TERMS_VERSION)
+      .digest('hex')
+
+    const forwardedFor = request.headers.get('x-forwarded-for')
+    const ipAddress = forwardedFor?.split(',')[0]?.trim() || null
+
+    const { error: termsError } = await admin.from('terms_acceptances').insert({
+      user_id: user.id,
+      subscription_id: subscription.id,
+      terms_version: TERMS_VERSION,
+      terms_hash: termsHash,
+      ip_address: ipAddress,
+      accepted_at: new Date().toISOString(),
+    })
+
+    if (termsError) {
+      console.error('terms_acceptances insert error:', termsError)
     }
 
     const expYear = data.card
@@ -349,6 +381,12 @@ export async function POST(request: NextRequest) {
 
     if (!pagarmeRes.ok) {
       console.error('Pagar.me error:', pagarmeData)
+      // Mantém o registro de aceite (evidência de consentimento), mas desvincula
+      // da subscription para não violar a FK ao deletá-la.
+      await admin
+        .from('terms_acceptances')
+        .update({ subscription_id: null })
+        .eq('subscription_id', subscription.id)
       await admin.from('subscriptions').delete().eq('id', subscription.id)
       return NextResponse.json(
         { error: pagarmeData.message ?? 'Erro no pagamento' },

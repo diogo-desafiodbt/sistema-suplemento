@@ -69,7 +69,7 @@ export default function Footer() {
         <div className="border-t border-white/20 pt-5 flex flex-col md:flex-row justify-between gap-3">
           <div className="flex gap-3 md:gap-4">
             <a href="#" className="text-xs opacity-60 hover:opacity-100">Política de privacidade</a>
-            <a href="#" className="text-xs opacity-60 hover:opacity-100">Termos e condições</a>
+            <Link href="/termos-de-uso" className="text-xs opacity-60 hover:opacity-100">Termos de Uso</Link>
           </div>
           <p className="text-xs opacity-40 md:max-w-sm leading-relaxed">
             O Desafio Diabetes não é uma farmácia. Suplementos manipulados por farmácias credenciadas pela ANVISA.<br />

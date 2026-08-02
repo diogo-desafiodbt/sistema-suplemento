@@ -1,28 +1,34 @@
 'use client'
 
 import Link from 'next/link'
-
-type AdminNavProps = {
-  active: 'usuarios' | 'pedidos' | 'auditoria' | 'cupons' | 'config'
-}
+import { usePathname } from 'next/navigation'
 
 const tabs = [
-  { label: 'Usuários', href: '/admin/usuarios', key: 'usuarios' },
-  { label: 'Pedidos', href: '/admin/pedidos', key: 'pedidos' },
-  { label: 'Auditoria', href: '/admin/auditoria', key: 'auditoria' },
-  { label: 'Cupons', href: '/admin/cupons', key: 'cupons' },
-  { label: 'Configurações', href: '/admin/config', key: 'config' },
+  { label: 'Visão Geral', href: '/admin' },
+  { label: 'Clientes', href: '/admin/clientes' },
+  { label: 'Pedidos', href: '/admin/pedidos' },
+  { label: 'Usuários', href: '/admin/usuarios' },
+  { label: 'Cupons', href: '/admin/cupons' },
+  { label: 'Config', href: '/admin/config' },
+  { label: 'Auditoria', href: '/admin/auditoria' },
 ]
 
-export function AdminNav({ active }: AdminNavProps) {
+export function AdminNav() {
+  const pathname = usePathname()
+
+  function isActive(href: string): boolean {
+    if (href === '/admin') return pathname === '/admin'
+    return pathname === href || pathname.startsWith(`${href}/`)
+  }
+
   return (
-    <nav className="flex gap-1">
+    <nav className="flex gap-1 overflow-x-auto">
       {tabs.map(tab => (
         <Link
-          key={tab.key}
+          key={tab.href}
           href={tab.href}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            tab.key === active
+          className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+            isActive(tab.href)
               ? 'bg-[#13244f] text-white'
               : 'text-[#13244f]/60 hover:bg-[#13244f]/10 hover:text-[#13244f]'
           }`}

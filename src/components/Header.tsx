@@ -9,6 +9,7 @@ import { useCart } from '@/lib/use-cart'
 const menuItems = [
   { label: 'Suplementos', href: '/suplementos' },
   { label: 'Quem somos', href: '/institucional#quem-somos' },
+  { label: 'Termos de Uso', href: '/termos-de-uso' },
   { label: 'Entrar', href: '/login' },
 ] as const
 

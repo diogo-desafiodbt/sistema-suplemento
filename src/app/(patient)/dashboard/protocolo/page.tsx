@@ -47,7 +47,7 @@ export default async function ProtocoloPage() {
 
   const { data: latestOrder } = await admin
     .from('orders')
-    .select('status, tracking_code')
+    .select('status, tracking_code, pharmacy_sent_at')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(1)
@@ -60,7 +60,8 @@ export default async function ProtocoloPage() {
 
   const orderStatus = getPatientOrderStatus(
     latestOrder?.status ?? null,
-    latestOrder?.tracking_code ?? null
+    latestOrder?.tracking_code ?? null,
+    latestOrder?.pharmacy_sent_at ?? null
   )
 
   return (

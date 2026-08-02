@@ -2,7 +2,13 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import Link from 'next/link'
-import { Badge } from '@/components/ui/badge'
+import Image from 'next/image'
+import { DashboardNav } from '@/components/patient/DashboardNav'
+import { findSupplementImageByProductName } from '@/lib/supplements-content'
+import {
+  getPatientOrderStatus,
+  getPatientOrderStatusColor,
+} from '@/lib/order-status'
 
 type OrderItem = {
   quantity: number
@@ -15,20 +21,9 @@ type Order = {
   status: string
   created_at: string
   tracking_code: string | null
+  pharmacy_sent_at: string | null
   total_amount: number
   order_items: OrderItem[]
-}
-
-function getOrderMessage(status: string, trackingCode: string | null): string {
-  if (status === 'delivered') return 'Entregue'
-  if (status === 'dispatched' && trackingCode) return 'A caminho'
-  return 'Em preparação'
-}
-
-function getOrderMessageColor(message: string): string {
-  if (message === 'Entregue') return 'bg-green-100 text-green-800'
-  if (message === 'A caminho') return 'bg-amber-100 text-amber-800'
-  return 'bg-gray-100 text-gray-700'
 }
 
 export default async function PedidosPage() {
@@ -41,7 +36,7 @@ export default async function PedidosPage() {
   const { data: orders } = await admin
     .from('orders')
     .select(`
-      id, status, created_at, tracking_code, total_amount,
+      id, status, created_at, tracking_code, pharmacy_sent_at, total_amount,
       order_items (
         quantity, unit_price,
         products ( name )
@@ -53,46 +48,90 @@ export default async function PedidosPage() {
   const orderList = (orders ?? []) as unknown as Order[]
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-6 py-4 flex items-center gap-4">
-        <Link href="/dashboard" className="text-sm text-gray-500 hover:text-gray-700">← Dashboard</Link>
-        <h1 className="font-semibold">Meus pedidos</h1>
+    <div className="min-h-screen bg-[#f5f0eb]">
+      <header className="bg-white border-b border-gray-100 px-4 md:px-6 py-4 flex items-center justify-between">
+        <img src="/logo-azul.png" alt="Desafio Diabetes" className="h-7 w-auto" />
+        <form action="/api/auth/signout" method="POST">
+          <button type="submit" className="text-sm text-[#f4001e] font-medium hover:underline">Sair</button>
+        </form>
       </header>
 
-      <main className="max-w-2xl mx-auto p-6 space-y-4">
+      <DashboardNav />
+
+      <main className="max-w-3xl mx-auto px-4 py-8 space-y-5">
+        <div>
+          <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-1">Acompanhamento</p>
+          <h1 className="text-2xl font-bold text-[#13244f]">Meus pedidos</h1>
+        </div>
+
         {orderList.length === 0 ? (
-          <div className="bg-white rounded-lg border p-8 text-center text-gray-500">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center text-gray-500 text-sm">
             Nenhum pedido ainda. Seu primeiro pedido será gerado após a confirmação do pagamento.
           </div>
         ) : (
           orderList.map(order => {
-            const message = getOrderMessage(order.status, order.tracking_code)
+            const message = getPatientOrderStatus(
+              order.status,
+              order.tracking_code,
+              order.pharmacy_sent_at
+            )
 
             return (
-              <div key={order.id} className="bg-white rounded-lg border p-5 space-y-3">
-                <div className="flex items-center justify-between">
+              <Link
+                key={order.id}
+                href={`/dashboard/pedidos/${order.id}`}
+                className="block bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4 hover:border-[#13244f]/30 transition"
+              >
+                <div className="flex items-center justify-between gap-3">
                   <span className="text-sm text-gray-500">
-                    {new Date(order.created_at).toLocaleDateString('pt-BR')}
+                    Pedido de {new Date(order.created_at).toLocaleDateString('pt-BR')}
                   </span>
-                  <Badge className={`${getOrderMessageColor(message)} border-0 text-xs`}>
+                  <span className={`text-xs font-bold px-3 py-1 rounded-full ${getPatientOrderStatusColor(message)}`}>
                     {message}
-                  </Badge>
+                  </span>
                 </div>
 
-                {order.order_items?.map(item => (
-                  <div key={item.products?.name} className="flex justify-between text-sm">
-                    <span>{item.products?.name}</span>
-                    <span className="text-gray-500">R$ {item.unit_price?.toFixed(2).replace('.', ',')}</span>
-                  </div>
-                ))}
+                <div className="space-y-3">
+                  {order.order_items?.map((item, i) => {
+                    const name = item.products?.name ?? 'Produto'
+                    const image = findSupplementImageByProductName(name)
+                    return (
+                      <div key={`${name}-${i}`} className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-[#f5f0eb] overflow-hidden shrink-0 flex items-center justify-center">
+                          {image ? (
+                            <Image
+                              src={image}
+                              alt={name}
+                              width={48}
+                              height={48}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+                              <rect x="4" y="7" width="16" height="13" rx="2" stroke="#13244f" strokeOpacity="0.35" strokeWidth="1.5" />
+                              <path d="M8 7V5a4 4 0 018 0v2" stroke="#13244f" strokeOpacity="0.35" strokeWidth="1.5" />
+                            </svg>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-[#13244f] truncate">{name}</p>
+                          <p className="text-xs text-gray-400">
+                            {item.quantity > 1 ? `${item.quantity}× ` : ''}
+                            R$ {item.unit_price?.toFixed(2).replace('.', ',')}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
 
-                {message === 'A caminho' && order.tracking_code && (
-                  <div className="bg-blue-50 rounded p-3 text-sm">
-                    <p className="text-blue-700 font-medium">Código de rastreio</p>
-                    <p className="text-blue-600 font-mono mt-0.5">{order.tracking_code}</p>
-                  </div>
-                )}
-              </div>
+                <div className="flex items-center justify-between border-t border-gray-100 pt-3">
+                  <span className="text-sm font-bold text-[#13244f]">
+                    Total: R$ {order.total_amount?.toFixed(2).replace('.', ',')}
+                  </span>
+                  <span className="text-xs font-bold text-[#13244f]/60">Ver detalhes →</span>
+                </div>
+              </Link>
             )
           })
         )}
