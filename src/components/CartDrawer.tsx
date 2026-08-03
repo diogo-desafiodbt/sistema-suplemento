@@ -38,7 +38,7 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
 
   const handleFinish = () => {
     onOpenChange(false)
-    router.push('/checkout/triagem')
+    router.push('/quiz')
   }
 
   return (

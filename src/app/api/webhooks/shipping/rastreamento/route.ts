@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { mergeTrackingEvents } from '@/lib/shipping/create-label'
+import {
+  getNewTrackingEvents,
+  notifyNewTrackingEvents,
+} from '@/lib/shipping/notify'
 import type { WebhookRastreamentoPayload } from '@/types/shipping'
 
 export async function POST(request: NextRequest) {
@@ -44,6 +48,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
+    const newEvents = getNewTrackingEvents(order.shipping_json, eventos)
+
     const merged = mergeTrackingEvents(
       order.shipping_json,
       eventos as unknown as Array<Record<string, unknown>>
@@ -55,6 +61,8 @@ export async function POST(request: NextRequest) {
     }
 
     await admin.from('orders').update(updates).eq('id', order.id)
+
+    await notifyNewTrackingEvents(admin, order.id, newEvents)
 
     if (log?.id) {
       await admin.from('webhook_logs').update({ processed: true }).eq('id', log.id)

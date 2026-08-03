@@ -11,6 +11,7 @@ export default function ObrigadoPage() {
     sessionStorage.removeItem('selected_plan')
     sessionStorage.removeItem('quiz_data')
     sessionStorage.removeItem('mini_quiz_data')
+    sessionStorage.removeItem('triagem_data')
     sessionStorage.removeItem('checkout_source')
     sessionStorage.removeItem('protocol_id')
     sessionStorage.removeItem('cart_locked_plan')

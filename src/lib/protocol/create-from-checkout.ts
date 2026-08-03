@@ -7,6 +7,7 @@ export type PendingProtocolItem = {
   product_name: string
   is_required?: boolean
   removed?: boolean
+  blocked?: boolean
   activation_reason?: string
   quantity?: number
 }
@@ -21,22 +22,19 @@ export type PendingCheckoutPayload = {
     codigoServico: string
   }
   quiz: {
-    diagnosis_type: 'type2' | 'prediabetes' | 'undiagnosed'
-    years_diagnosed?: string
-    hba1c_range?: string | null
-    fasting_glucose?: string | null
-    medications?: string[]
-    family_history?: string[]
-    symptoms?: string[]
-    conditions_mild?: string[]
-    conditions_serious?: string[]
-    weight_status?: string | null
-    exercise_freq?: string | null
-    diet_quality?: string | null
-    allergies?: string | null
-    prior_treatment?: string[]
-    age?: number
-    full_name?: string
+    full_name: string
+    birth_date: string
+    sex: 'homem' | 'mulher'
+    is_pregnant_or_breastfeeding: boolean
+    renal_conditions: string[]
+    hepatic_conditions: string[]
+    diagnosis_type:
+      | 'type1'
+      | 'type2'
+      | 'prediabetes'
+      | 'lada_avancado'
+      | 'undiagnosed'
+    medications: string[]
   }
   protocol_items: PendingProtocolItem[]
 }
@@ -77,16 +75,12 @@ export async function ensureProtocolAfterPayment(
   const source: CheckoutSource = pending.source === 'mini_quiz' ? 'mini_quiz' : 'full_quiz'
   const quiz = pending.quiz
 
-  if (source === 'mini_quiz') {
-    const updates: Record<string, string | null> = {}
-    if (quiz.full_name?.trim()) updates.full_name = quiz.full_name.trim()
-    if (typeof quiz.age === 'number' && quiz.age > 0 && quiz.age < 120) {
-      const year = new Date().getFullYear() - Math.floor(quiz.age)
-      updates.birth_date = `${year}-01-01`
-    }
-    if (Object.keys(updates).length > 0) {
-      await admin.from('users').update(updates).eq('id', userId)
-    }
+  // Sempre atualiza perfil com nome e data de nascimento da triagem
+  const updates: Record<string, string | null> = {}
+  if (quiz.full_name?.trim()) updates.full_name = quiz.full_name.trim()
+  if (quiz.birth_date) updates.birth_date = quiz.birth_date
+  if (Object.keys(updates).length > 0) {
+    await admin.from('users').update(updates).eq('id', userId)
   }
 
   const { data: quizResponse, error: quizError } = await admin
@@ -94,25 +88,12 @@ export async function ensureProtocolAfterPayment(
     .insert({
       user_id: userId,
       diagnosis_type: quiz.diagnosis_type,
-      years_diagnosed:
-        source === 'mini_quiz'
-          ? '<1ano'
-          : (quiz.years_diagnosed ?? '<1ano'),
-      hba1c_range: quiz.hba1c_range ?? null,
-      fasting_glucose: quiz.fasting_glucose ?? null,
+      birth_date: quiz.birth_date,
+      sex: quiz.sex,
+      is_pregnant_or_breastfeeding: quiz.is_pregnant_or_breastfeeding,
+      renal_conditions: quiz.renal_conditions ?? [],
+      hepatic_conditions: quiz.hepatic_conditions ?? [],
       medications: quiz.medications ?? [],
-      family_history: quiz.family_history ?? [],
-      symptoms: quiz.symptoms ?? [],
-      conditions_mild: quiz.conditions_mild ?? [],
-      conditions_serious: quiz.conditions_serious ?? [],
-      weight_status: quiz.weight_status ?? null,
-      exercise_freq: quiz.exercise_freq ?? null,
-      diet_quality: quiz.diet_quality ?? null,
-      allergies:
-        source === 'mini_quiz'
-          ? (typeof quiz.age === 'number' ? `idade:${quiz.age}` : null)
-          : (quiz.allergies ?? null),
-      prior_treatment: quiz.prior_treatment ?? [],
       completed_at: new Date().toISOString(),
     })
     .select('id')
@@ -140,7 +121,9 @@ export async function ensureProtocolAfterPayment(
     return null
   }
 
-  const activeItems = pending.protocol_items.filter(item => !item.removed)
+  const activeItems = pending.protocol_items.filter(
+    item => !item.removed && !item.blocked
+  )
   if (activeItems.length > 0) {
     const withIds = activeItems.filter(item => item.product_id)
     const withoutIds = activeItems.filter(item => !item.product_id)
@@ -158,10 +141,7 @@ export async function ensureProtocolAfterPayment(
       is_required: item.is_required ?? false,
       removed_by_patient: false,
       activation_reason:
-        item.activation_reason ??
-        (source === 'mini_quiz'
-          ? 'Selecionado por você no carrinho'
-          : 'Recomendado pelo protocolo'),
+        item.activation_reason ?? 'Selecionado após triagem clínica',
       quantity: item.quantity ?? 1,
     }))
 
@@ -172,25 +152,32 @@ export async function ensureProtocolAfterPayment(
         .eq('is_active', true)
 
       for (const item of withoutIds) {
-        const product = products?.find(p =>
-          p.name.toLowerCase() === item.product_name.toLowerCase()
-        ) ?? products?.find(p =>
-          p.name.toLowerCase().includes(item.product_name.toLowerCase().split(' ')[0])
-        )
+        const product =
+          products?.find(
+            p => p.name.toLowerCase() === item.product_name.toLowerCase()
+          ) ??
+          products?.find(p =>
+            p.name
+              .toLowerCase()
+              .includes(item.product_name.toLowerCase().split(' ')[0])
+          )
         if (!product) continue
         itemsToInsert.push({
           protocol_id: protocol.id,
           product_id: product.id,
           is_required: item.is_required ?? false,
           removed_by_patient: false,
-          activation_reason: item.activation_reason ?? 'Recomendado pelo protocolo',
+          activation_reason:
+            item.activation_reason ?? 'Selecionado após triagem clínica',
           quantity: item.quantity ?? 1,
         })
       }
     }
 
     if (itemsToInsert.length > 0) {
-      const { error: itemsError } = await admin.from('protocol_items').insert(itemsToInsert)
+      const { error: itemsError } = await admin
+        .from('protocol_items')
+        .insert(itemsToInsert)
       if (itemsError) {
         console.error('ensureProtocolAfterPayment: items insert error', itemsError)
       }

@@ -1,123 +1,201 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { QuizFormData } from '@/lib/quiz/schema'
 import { useCart } from '@/lib/use-cart'
-import type { ProtocolItem } from '@/types/protocol'
+import {
+  ALL_PRODUCT_KEYS,
+  PRODUCT_NAME_BY_KEY,
+  blockReasonForProduct,
+  computeTriage,
+  defaultSuggestion,
+  productKeyFromName,
+  type DiagnosisType,
+  type HepaticCondition,
+  type ProductKey,
+  type RenalCondition,
+  type Sex,
+  type TriageAnswers,
+} from '@/lib/protocol/triage'
+import { findSupplementImageByProductName } from '@/lib/supplements-content'
 
-const TOTAL_STEPS = 13
-
-const initialState: Partial<QuizFormData> = {
-  medications: [],
-  family_history: [],
-  symptoms: [],
-  conditions_mild: [],
-  conditions_serious: [],
-  prior_treatment: [],
-  plan_type: '1mes',
+type TriageForm = {
+  full_name: string
+  birth_date: string
+  sex: Sex | null
+  is_pregnant_or_breastfeeding: boolean | null
+  renal_conditions: RenalCondition[]
+  renal_none: boolean
+  hepatic_conditions: HepaticCondition[]
+  hepatic_none: boolean
+  diagnosis_type: DiagnosisType | null
+  medications: string[]
 }
+
+type ProtocolItemBuilt = {
+  product_id: string
+  product_name: string
+  pharmacy_sku: string
+  is_required: boolean
+  activation_reason: string
+  quantity: number
+  removed?: boolean
+  blocked?: boolean
+  price_monthly?: number
+  price_quarterly?: number
+  price_yearly?: number
+  image?: string
+}
+
+type ProductRow = {
+  id: string
+  name: string
+  price_monthly: number
+  price_quarterly: number
+  price_yearly: number
+  is_active: boolean
+}
+
+const RENAL_OPTIONS: Array<{ value: RenalCondition; label: string }> = [
+  { value: 'hemodialise', label: 'Faço hemodiálise' },
+  { value: 'insuficiencia_renal_aguda', label: 'Tenho Insuficiência Renal Aguda' },
+  { value: 'tfg_menor_30', label: 'Minha Taxa de Filtração Glomerular (TFG) é menor que 30' },
+]
+
+const HEPATIC_OPTIONS: Array<{ value: HepaticCondition; label: string }> = [
+  { value: 'cirrose', label: 'Cirrose' },
+  { value: 'hepatite_ativa', label: 'Hepatite ativa' },
+  { value: 'ictericia', label: 'Icterícia' },
+  { value: 'esteatose', label: 'Esteatose' },
+]
+
+const DIAGNOSIS_OPTIONS: Array<{ value: DiagnosisType; label: string }> = [
+  { value: 'type1', label: 'Diabetes Tipo 1 (autoimune da infância)' },
+  { value: 'type2', label: 'Diabetes Tipo 2' },
+  { value: 'prediabetes', label: 'Pré-diabetes / Resistência à insulina' },
+  {
+    value: 'lada_avancado',
+    label: 'Diabetes LADA avançado (já usa insulina lenta e insulina rápida)',
+  },
+  { value: 'undiagnosed', label: 'Nenhum dos anteriores' },
+]
+
+const MEDICATION_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'nenhum', label: 'Não utilizo nenhum medicamento.' },
+  {
+    value: 'insulina',
+    label:
+      'Insulina (Lantus®, Basaglar®, Toujeo®, Tresiba®, Humulin®, Novolin®, Fiasp®, NovoRapid®, Humalog®).',
+  },
+  {
+    value: 'metformina',
+    label: 'Metformina (Glifage®, Dimefor®, Glucoformin®).',
+  },
+  {
+    value: 'sulfonilureias',
+    label: 'Sulfonilureias (Diamicron®, Glicazida®, Amaryl®, Daonil®).',
+  },
+  {
+    value: 'sglt2',
+    label: 'Inibidores da SGLT-2 (Forxiga®, Jardiance®, Invokana®).',
+  },
+  {
+    value: 'gliptinas',
+    label: 'Gliptinas (Januvia®, Galvus®, Onglyza®, Nesina®, Trayenta®).',
+  },
+  { value: 'pioglitazona', label: 'Pioglitazona (Actos®).' },
+  {
+    value: 'glp1',
+    label:
+      'Agonistas do GLP-1 (Ozempic®, Wegovy®, Mounjaro®, Trulicity®, Victoza®).',
+  },
+  {
+    value: 'anticoagulantes',
+    label:
+      'Anticoagulantes e antiagregantes plaquetários (Marevan®, Xarelto®, Eliquis®, Pradaxa®, Plavix®, AAS®).',
+  },
+  { value: 'pressao', label: 'Medicamentos para pressão arterial.' },
+  { value: 'colesterol', label: 'Medicamentos para colesterol.' },
+]
+
+const initialForm: TriageForm = {
+  full_name: '',
+  birth_date: '',
+  sex: null,
+  is_pregnant_or_breastfeeding: null,
+  renal_conditions: [],
+  renal_none: false,
+  hepatic_conditions: [],
+  hepatic_none: false,
+  diagnosis_type: null,
+  medications: [],
+}
+
+type StepId =
+  | 'nome'
+  | 'nascimento'
+  | 'sexo'
+  | 'gestacao'
+  | 'renal'
+  | 'hepatica'
+  | 'diabetes'
+  | 'medicamentos'
 
 export default function QuizPage() {
   const router = useRouter()
-  const [step, setStep] = useState(1)
-  const [form, setForm] = useState<Partial<QuizFormData>>(initialState)
+  const { items: cartItems, plan: cartPlan, clearCart } = useCart()
+  const [stepIndex, setStepIndex] = useState(0)
+  const [form, setForm] = useState<TriageForm>(initialForm)
   const [loading, setLoading] = useState(false)
-  const { items: cartItems, plan: cartPlan } = useCart()
-  const [introSeen, setIntroSeen] = useState(true)
+  const [blockReason, setBlockReason] = useState<string | null>(null)
+  const [hadCartOnEntry, setHadCartOnEntry] = useState(false)
+  const [cartSnapshot, setCartSnapshot] = useState<
+    Array<{ product_id: string; name: string; quantity: number }>
+  >([])
 
   useEffect(() => {
+    // Captura o estado do carrinho uma vez após a hidratação do useCart
     if (cartItems.length > 0) {
-      setIntroSeen(false)
+      setHadCartOnEntry(true)
+      setCartSnapshot(
+        cartItems.map(i => ({
+          product_id: i.product_id,
+          name: i.name,
+          quantity: i.quantity,
+        }))
+      )
     }
-    // Evaluate cart once on mount (after client hydration of useCart)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const progress = (step / TOTAL_STEPS) * 100
+  const steps: StepId[] = useMemo(() => {
+    const base: StepId[] = ['nome', 'nascimento', 'sexo']
+    if (form.sex === 'mulher') base.push('gestacao')
+    base.push('renal', 'hepatica', 'diabetes', 'medicamentos')
+    return base
+  }, [form.sex])
+
+  const step = steps[Math.min(stepIndex, steps.length - 1)]
+  const progress = ((stepIndex + 1) / steps.length) * 100
 
   function goNext() {
-    setStep(s => Math.min(s + 1, TOTAL_STEPS))
+    setStepIndex(s => Math.min(s + 1, steps.length - 1))
   }
 
-  function setSingle<K extends keyof QuizFormData>(key: K, value: QuizFormData[K]) {
-    setForm(prev => ({ ...prev, [key]: value }))
+  function goBack() {
+    setStepIndex(s => Math.max(s - 1, 0))
   }
 
-  function isSelected(key: keyof QuizFormData, value: string) {
-    return ((form[key] as string[]) ?? []).includes(value)
-  }
-
-  async function submit(dataOverride?: Partial<QuizFormData>) {
-    const data = dataOverride ?? form
-    setLoading(true)
-    try {
-      sessionStorage.setItem('quiz_data', JSON.stringify(data))
-      sessionStorage.setItem('checkout_source', 'full_quiz')
-      sessionStorage.removeItem('mini_quiz_data')
-      sessionStorage.removeItem('protocol_id')
-
-      let items: ProtocolItem[]
-
-      if (cartItems.length > 0) {
-        items = cartItems.map((cartItem) => ({
-          product_id: cartItem.product_id,
-          product_name: cartItem.name,
-          pharmacy_sku: '',
-          is_required: false,
-          activation_reason: 'Selecionado por você no carrinho',
-          quantity: cartItem.quantity,
-        }))
-        sessionStorage.setItem('cart_locked_plan', cartPlan)
-      } else {
-        const { generateProtocol } = await import('@/lib/protocol/generator')
-        items = generateProtocol(data as QuizFormData, data.plan_type ?? '1mes')
-        sessionStorage.removeItem('cart_locked_plan')
-      }
-
-      sessionStorage.setItem('protocol_items', JSON.stringify(items))
-
-      router.push('/recomendacoes')
-    } catch {
-      toast.error('Erro ao processar. Tente novamente.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  function finishStep(nextForm: Partial<QuizFormData>, isLast = false) {
-    setTimeout(() => {
-      if (isLast) submit(nextForm)
-      else goNext()
-    }, 120)
-  }
-
-  function selectSingleAndAdvance<K extends keyof QuizFormData>(key: K, value: QuizFormData[K]) {
-    const nextForm = { ...form, [key]: value }
-    setForm(nextForm)
-    finishStep(nextForm)
-  }
-
-  function selectMultipleAndAdvance(key: keyof QuizFormData, value: string, isLast = false) {
-    const current = (form[key] as string[]) ?? []
-    if (current.includes(value)) return
-
-    let updated: string[]
-    if (value === 'nenhum' && (key === 'medications' || key === 'symptoms')) {
-      updated = ['nenhum']
-    } else if (key === 'family_history' && (value === 'nao' || value === 'nao_sei')) {
-      updated = [value]
-    } else {
-      updated = [...current.filter(v => v !== 'nenhum'), value]
-    }
-
-    const nextForm = { ...form, [key]: updated }
-    setForm(nextForm)
-    finishStep(nextForm, isLast)
-  }
-
-  function OptionButton({ label, selected, onClick }: { label: string; selected: boolean; onClick: () => void }) {
+  function OptionButton({
+    label,
+    selected,
+    onClick,
+  }: {
+    label: string
+    selected: boolean
+    onClick: () => void
+  }) {
     return (
       <button
         type="button"
@@ -128,9 +206,11 @@ export default function QuizPage() {
             : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
         }`}
       >
-        <span className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${
-          selected ? 'border-[#13244f]' : 'border-gray-300'
-        }`}>
+        <span
+          className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${
+            selected ? 'border-[#13244f]' : 'border-gray-300'
+          }`}
+        >
           {selected && <span className="w-2 h-2 rounded-full bg-[#13244f]" />}
         </span>
         {label}
@@ -138,42 +218,101 @@ export default function QuizPage() {
     )
   }
 
-  function QuestionWrapper({
-    title, subtitle, category, children, showContinue = false,
+  function CheckOption({
+    label,
+    selected,
+    onClick,
   }: {
-    title: string; subtitle?: string; category?: string; children: React.ReactNode; showContinue?: boolean
+    label: string
+    selected: boolean
+    onClick: () => void
   }) {
-    const showAllergyContinue = showContinue && form.allergies !== 'nao' && form.allergies !== 'nao_sei'
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`w-full flex items-start gap-3 px-4 py-3.5 rounded-xl border text-sm md:text-base text-left transition-all ${
+          selected
+            ? 'border-[#13244f] bg-[#13244f]/5 text-[#13244f] font-medium'
+            : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+        }`}
+      >
+        <span
+          className={`mt-0.5 w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center transition-all ${
+            selected ? 'border-[#13244f] bg-[#13244f]' : 'border-gray-300'
+          }`}
+        >
+          {selected && (
+            <svg width="10" height="8" viewBox="0 0 10 8" fill="none" aria-hidden>
+              <path
+                d="M1 4l2.5 2.5L9 1"
+                stroke="white"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
+        </span>
+        <span className="leading-snug">{label}</span>
+      </button>
+    )
+  }
 
+  function QuestionWrapper({
+    title,
+    subtitle,
+    category,
+    children,
+    showContinue = false,
+    continueDisabled = false,
+    onContinue,
+  }: {
+    title: string
+    subtitle?: string
+    category?: string
+    children: React.ReactNode
+    showContinue?: boolean
+    continueDisabled?: boolean
+    onContinue?: () => void
+  }) {
     return (
       <div className="space-y-5">
         <div>
           {category && (
-            <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-2">{category}</p>
+            <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-2">
+              {category}
+            </p>
           )}
-          <h2 className="font-display text-2xl md:text-3xl lg:text-4xl text-[#13244f] leading-snug">{title}</h2>
-          {subtitle && <p className="text-sm md:text-base text-gray-500 mt-1.5 leading-relaxed">{subtitle}</p>}
+          <h2 className="font-display text-2xl md:text-3xl lg:text-4xl text-[#13244f] leading-snug">
+            {title}
+          </h2>
+          {subtitle && (
+            <p className="text-sm md:text-base text-gray-500 mt-1.5 leading-relaxed">
+              {subtitle}
+            </p>
+          )}
         </div>
         <div className="space-y-3">{children}</div>
-        {(step > 1 || showAllergyContinue) && (
+        {(stepIndex > 0 || showContinue) && (
           <div className="flex gap-3 pt-2">
-            {step > 1 && (
+            {stepIndex > 0 && (
               <button
                 type="button"
-                onClick={() => setStep(s => s - 1)}
+                onClick={goBack}
                 className="flex-1 border border-[#13244f] text-[#13244f] py-3 rounded-full text-sm font-semibold hover:bg-[#13244f]/5 transition"
               >
                 Voltar
               </button>
             )}
-            {showAllergyContinue && (
+            {showContinue && (
               <button
                 type="button"
-                onClick={goNext}
-                disabled={!form.allergies?.trim()}
+                onClick={onContinue ?? goNext}
+                disabled={continueDisabled || loading}
                 className="flex-1 bg-[#f4001e] text-white py-3 rounded-full text-sm font-semibold hover:bg-[#a30000] transition disabled:opacity-40"
               >
-                Continuar
+                {loading ? 'Processando…' : 'Continuar'}
               </button>
             )}
           </div>
@@ -182,274 +321,439 @@ export default function QuizPage() {
     )
   }
 
-  function selectConditionAndAdvance(type: 'mild' | 'serious', value: string) {
-    const key = type === 'mild' ? 'conditions_mild' : 'conditions_serious'
-    const nextForm = { ...form, [key]: [value] }
-    setForm(nextForm)
-    finishStep(nextForm)
+  function toggleRenal(value: RenalCondition) {
+    setForm(prev => {
+      const has = prev.renal_conditions.includes(value)
+      return {
+        ...prev,
+        renal_none: false,
+        renal_conditions: has
+          ? prev.renal_conditions.filter(v => v !== value)
+          : [...prev.renal_conditions, value],
+      }
+    })
   }
 
-  function clearConditionsAndAdvance() {
-    const nextForm = { ...form, conditions_mild: [], conditions_serious: [] }
-    setForm(nextForm)
-    finishStep(nextForm)
+  function toggleHepatic(value: HepaticCondition) {
+    setForm(prev => {
+      const has = prev.hepatic_conditions.includes(value)
+      return {
+        ...prev,
+        hepatic_none: false,
+        hepatic_conditions: has
+          ? prev.hepatic_conditions.filter(v => v !== value)
+          : [...prev.hepatic_conditions, value],
+      }
+    })
+  }
+
+  function toggleMedication(value: string) {
+    setForm(prev => {
+      if (value === 'nenhum') {
+        return { ...prev, medications: ['nenhum'] }
+      }
+      const withoutNone = prev.medications.filter(v => v !== 'nenhum')
+      const has = withoutNone.includes(value)
+      return {
+        ...prev,
+        medications: has
+          ? withoutNone.filter(v => v !== value)
+          : [...withoutNone, value],
+      }
+    })
+  }
+
+  async function finishTriage() {
+    if (!form.sex || !form.diagnosis_type || !form.birth_date) {
+      toast.error('Preencha todas as perguntas antes de continuar.')
+      return
+    }
+
+    const answers: TriageAnswers = {
+      birth_date: form.birth_date,
+      sex: form.sex,
+      is_pregnant_or_breastfeeding:
+        form.sex === 'mulher' ? !!form.is_pregnant_or_breastfeeding : false,
+      renal_conditions: form.renal_none ? [] : form.renal_conditions,
+      hepatic_conditions: form.hepatic_none ? [] : form.hepatic_conditions,
+      diagnosis_type: form.diagnosis_type,
+      medications: form.medications.filter(m => m !== 'nenhum'),
+    }
+
+    const result = computeTriage(answers)
+    if (result.blocked) {
+      setBlockReason(result.blockReason)
+      return
+    }
+
+    setLoading(true)
+    try {
+      const res = await fetch('/api/products')
+      if (!res.ok) throw new Error('products')
+      const data = await res.json()
+      const products: ProductRow[] = (data.products ?? []).filter(
+        (p: ProductRow) => p.is_active !== false
+      )
+
+      const productByKey = new Map<ProductKey, ProductRow>()
+      for (const key of ALL_PRODUCT_KEYS) {
+        const name = PRODUCT_NAME_BY_KEY[key]
+        const product =
+          products.find(p => p.name.toLowerCase() === name.toLowerCase()) ??
+          products.find(p =>
+            p.name.toLowerCase().includes(name.toLowerCase().split(' ')[0])
+          )
+        if (product) productByKey.set(key, product)
+      }
+
+      const cartKeys = new Set<ProductKey>()
+      const cartQtyByKey = new Map<ProductKey, number>()
+      for (const item of cartSnapshot) {
+        const key = productKeyFromName(item.name)
+        if (!key) continue
+        cartKeys.add(key)
+        cartQtyByKey.set(key, (cartQtyByKey.get(key) ?? 0) + (item.quantity ?? 1))
+      }
+
+      const suggestion = hadCartOnEntry
+        ? []
+        : defaultSuggestion(result.allowed)
+      const suggestionSet = new Set(suggestion)
+
+      const protocolItems: ProtocolItemBuilt[] = []
+
+      for (const key of ALL_PRODUCT_KEYS) {
+        const product = productByKey.get(key)
+        if (!product) continue
+
+        const name = PRODUCT_NAME_BY_KEY[key]
+        const image = findSupplementImageByProductName(name) ?? undefined
+        const base = {
+          product_id: product.id,
+          product_name: name,
+          pharmacy_sku: '',
+          quantity: cartQtyByKey.get(key) ?? 1,
+          price_monthly: product.price_monthly,
+          price_quarterly: product.price_quarterly,
+          price_yearly: product.price_yearly,
+          image,
+        }
+
+        if (!result.allowed.includes(key)) {
+          protocolItems.push({
+            ...base,
+            is_required: false,
+            removed: true,
+            blocked: true,
+            activation_reason: blockReasonForProduct(
+              key,
+              result.triggeredReasons,
+              result.allowed
+            ),
+          })
+          continue
+        }
+
+        if (hadCartOnEntry) {
+          if (cartKeys.has(key)) {
+            protocolItems.push({
+              ...base,
+              is_required: false,
+              removed: false,
+              activation_reason: 'Selecionado por você no carrinho',
+            })
+          } else {
+            protocolItems.push({
+              ...base,
+              is_required: false,
+              removed: true,
+              activation_reason: 'Disponível — adicione se quiser',
+            })
+          }
+          continue
+        }
+
+        // Carrinho vazio — sugestão automática
+        if (suggestionSet.has(key)) {
+          const isPrimary = suggestion[0] === key
+          protocolItems.push({
+            ...base,
+            is_required: isPrimary,
+            removed: false,
+            activation_reason: isPrimary
+              ? 'Sugestão principal para o seu perfil'
+              : 'Sugerido para o seu perfil',
+          })
+        } else {
+          protocolItems.push({
+            ...base,
+            is_required: false,
+            removed: true,
+            activation_reason: 'Disponível — adicione se quiser',
+          })
+        }
+      }
+
+      const triagemData = {
+        ...answers,
+        full_name: form.full_name.trim(),
+      }
+
+      sessionStorage.setItem('protocol_items', JSON.stringify(protocolItems))
+      sessionStorage.setItem('triagem_data', JSON.stringify(triagemData))
+      sessionStorage.setItem(
+        'checkout_source',
+        hadCartOnEntry ? 'mini_quiz' : 'full_quiz'
+      )
+      sessionStorage.removeItem('quiz_data')
+      sessionStorage.removeItem('mini_quiz_data')
+      sessionStorage.removeItem('protocol_id')
+      sessionStorage.removeItem('cart_locked_plan')
+
+      if (hadCartOnEntry && cartPlan) {
+        sessionStorage.setItem('cart_locked_plan', cartPlan)
+      }
+
+      // Carrinho já foi convertido em protocol_items; limpa pra não misturar depois
+      try {
+        clearCart()
+      } catch {
+        /* useCart pode não expor clearCart em alguns builds — ignore */
+      }
+
+      router.push('/recomendacoes')
+    } catch {
+      toast.error('Erro ao processar. Tente novamente.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Tela de bloqueio (menor de 18)
+  if (blockReason) {
+    return (
+      <div className="min-h-screen bg-[#f5f0eb] flex flex-col">
+        <header className="px-6 pt-5 pb-4">
+          <div className="max-w-lg mx-auto">
+            <img src="/logo-azul.png" alt="Desafio Diabetes" className="h-7 w-auto" />
+          </div>
+        </header>
+        <main className="flex-1 flex items-center justify-center px-4 py-10">
+          <div className="w-full max-w-lg bg-white rounded-2xl border border-amber-200 shadow-sm p-8 text-center space-y-4">
+            <div className="mx-auto w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path
+                  d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                  stroke="#b45309"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            <h1 className="font-display text-2xl text-[#13244f]">Não foi possível continuar</h1>
+            <p className="text-gray-600 text-sm leading-relaxed">{blockReason}</p>
+            <a
+              href="/"
+              className="inline-flex mt-2 bg-[#13244f] text-white px-6 py-3 rounded-full text-sm font-semibold hover:bg-[#0d1a3a] transition"
+            >
+              Voltar ao início
+            </a>
+          </div>
+        </main>
+      </div>
+    )
   }
 
   function renderStep() {
     switch (step) {
-      case 1:
+      case 'nome':
         return (
-          <QuestionWrapper category="DIABETES" title="Qual é o seu diagnóstico?">
+          <QuestionWrapper
+            category="DADOS BÁSICOS"
+            title="Qual é o seu nome completo?"
+            showContinue
+            continueDisabled={form.full_name.trim().length < 3}
+          >
+            <input
+              type="text"
+              value={form.full_name}
+              onChange={e => setForm(prev => ({ ...prev, full_name: e.target.value }))}
+              placeholder="Seu nome completo"
+              className="w-full border border-gray-200 rounded-xl px-4 py-3.5 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+              autoFocus
+            />
+          </QuestionWrapper>
+        )
+
+      case 'nascimento':
+        return (
+          <QuestionWrapper
+            category="DADOS BÁSICOS"
+            title="Qual é a sua data de nascimento?"
+            showContinue
+            continueDisabled={!form.birth_date}
+          >
+            <input
+              type="date"
+              value={form.birth_date}
+              onChange={e => setForm(prev => ({ ...prev, birth_date: e.target.value }))}
+              max={new Date().toISOString().slice(0, 10)}
+              className="w-full border border-gray-200 rounded-xl px-4 py-3.5 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f]"
+            />
+          </QuestionWrapper>
+        )
+
+      case 'sexo':
+        return (
+          <QuestionWrapper category="DADOS BÁSICOS" title="Qual é o seu sexo?">
+            {(
+              [
+                { value: 'homem' as Sex, label: 'Homem' },
+                { value: 'mulher' as Sex, label: 'Mulher' },
+              ] as const
+            ).map(opt => (
+              <OptionButton
+                key={opt.value}
+                label={opt.label}
+                selected={form.sex === opt.value}
+                onClick={() => {
+                  setForm(prev => ({
+                    ...prev,
+                    sex: opt.value,
+                    is_pregnant_or_breastfeeding:
+                      opt.value === 'homem' ? false : prev.is_pregnant_or_breastfeeding,
+                  }))
+                  setTimeout(goNext, 120)
+                }}
+              />
+            ))}
+          </QuestionWrapper>
+        )
+
+      case 'gestacao':
+        return (
+          <QuestionWrapper
+            category="DADOS BÁSICOS"
+            title="Está grávida ou amamentando?"
+          >
             {[
-              { value: 'type2', label: 'Diabetes tipo 2' },
-              { value: 'prediabetes', label: 'Pré-diabetes' },
-              { value: 'undiagnosed', label: 'Ainda não fui diagnosticado, mas tenho histórico familiar' },
+              { value: true, label: 'Sim' },
+              { value: false, label: 'Não' },
             ].map(opt => (
-              <OptionButton key={opt.value} label={opt.label}
+              <OptionButton
+                key={String(opt.value)}
+                label={opt.label}
+                selected={form.is_pregnant_or_breastfeeding === opt.value}
+                onClick={() => {
+                  setForm(prev => ({
+                    ...prev,
+                    is_pregnant_or_breastfeeding: opt.value,
+                  }))
+                  setTimeout(goNext, 120)
+                }}
+              />
+            ))}
+          </QuestionWrapper>
+        )
+
+      case 'renal':
+        return (
+          <QuestionWrapper
+            category="SAÚDE"
+            title="Você tem alguma condição renal?"
+            subtitle="Pode marcar mais de uma, ou nenhuma"
+            showContinue
+            continueDisabled={!form.renal_none && form.renal_conditions.length === 0}
+          >
+            {RENAL_OPTIONS.map(opt => (
+              <CheckOption
+                key={opt.value}
+                label={opt.label}
+                selected={form.renal_conditions.includes(opt.value)}
+                onClick={() => toggleRenal(opt.value)}
+              />
+            ))}
+            <CheckOption
+              label="Nenhuma das anteriores"
+              selected={form.renal_none}
+              onClick={() =>
+                setForm(prev => ({
+                  ...prev,
+                  renal_none: true,
+                  renal_conditions: [],
+                }))
+              }
+            />
+          </QuestionWrapper>
+        )
+
+      case 'hepatica':
+        return (
+          <QuestionWrapper
+            category="SAÚDE"
+            title="Você tem alguma condição hepática?"
+            subtitle="Pode marcar mais de uma, ou nenhuma"
+            showContinue
+            continueDisabled={!form.hepatic_none && form.hepatic_conditions.length === 0}
+          >
+            {HEPATIC_OPTIONS.map(opt => (
+              <CheckOption
+                key={opt.value}
+                label={opt.label}
+                selected={form.hepatic_conditions.includes(opt.value)}
+                onClick={() => toggleHepatic(opt.value)}
+              />
+            ))}
+            <CheckOption
+              label="Nenhuma das anteriores"
+              selected={form.hepatic_none}
+              onClick={() =>
+                setForm(prev => ({
+                  ...prev,
+                  hepatic_none: true,
+                  hepatic_conditions: [],
+                }))
+              }
+            />
+          </QuestionWrapper>
+        )
+
+      case 'diabetes':
+        return (
+          <QuestionWrapper category="DIABETES" title="Qual é o seu tipo de diabetes?">
+            {DIAGNOSIS_OPTIONS.map(opt => (
+              <OptionButton
+                key={opt.value}
+                label={opt.label}
                 selected={form.diagnosis_type === opt.value}
-                onClick={() => selectSingleAndAdvance('diagnosis_type', opt.value as QuizFormData['diagnosis_type'])} />
+                onClick={() => {
+                  setForm(prev => ({ ...prev, diagnosis_type: opt.value }))
+                  setTimeout(goNext, 120)
+                }}
+              />
             ))}
           </QuestionWrapper>
         )
 
-      case 2:
+      case 'medicamentos':
         return (
-          <QuestionWrapper title="Há quanto tempo você convive com isso?">
-            {[
-              { value: '<1ano', label: 'Menos de 1 ano' },
-              { value: '1-5anos', label: 'Entre 1 e 5 anos' },
-              { value: '5-10anos', label: 'Entre 5 e 10 anos' },
-              { value: '>10anos', label: 'Mais de 10 anos' },
-            ].map(opt => (
-              <OptionButton key={opt.value} label={opt.label}
-                selected={form.years_diagnosed === opt.value}
-                onClick={() => selectSingleAndAdvance('years_diagnosed', opt.value as QuizFormData['years_diagnosed'])} />
+          <QuestionWrapper
+            category="MEDICAMENTOS"
+            title="Você utiliza algum destes medicamentos?"
+            subtitle="Selecione todos que se aplicam — a resposta é só informativa"
+            showContinue
+            continueDisabled={form.medications.length === 0}
+            onContinue={finishTriage}
+          >
+            {MEDICATION_OPTIONS.map(opt => (
+              <CheckOption
+                key={opt.value}
+                label={opt.label}
+                selected={form.medications.includes(opt.value)}
+                onClick={() => toggleMedication(opt.value)}
+              />
             ))}
-          </QuestionWrapper>
-        )
-
-      case 3:
-        return (
-          <QuestionWrapper title="Você sabe qual foi sua última hemoglobina glicada (HbA1c)?"
-            subtitle="Esse exame mede o controle do diabetes nos últimos 3 meses">
-            {[
-              { value: '<7', label: 'Abaixo de 7% — bem controlado' },
-              { value: '7-9', label: 'Entre 7% e 9% — controle moderado' },
-              { value: '>9', label: 'Acima de 9% — controle difícil' },
-              { value: 'nao_sei', label: 'Não sei / não fiz o exame' },
-            ].map(opt => (
-              <OptionButton key={opt.value} label={opt.label}
-                selected={form.hba1c_range === opt.value}
-                onClick={() => selectSingleAndAdvance('hba1c_range', opt.value as QuizFormData['hba1c_range'])} />
-            ))}
-          </QuestionWrapper>
-        )
-
-      case 4:
-        return (
-          <QuestionWrapper title="Qual costuma ser sua glicemia em jejum?">
-            {[
-              { value: '<100', label: 'Abaixo de 100 mg/dL' },
-              { value: '100-125', label: 'Entre 100 e 125 mg/dL' },
-              { value: '126-199', label: 'Entre 126 e 199 mg/dL' },
-              { value: '>200', label: 'Acima de 200 mg/dL' },
-              { value: 'nao_sei', label: 'Não monitoro / não sei' },
-            ].map(opt => (
-              <OptionButton key={opt.value} label={opt.label}
-                selected={form.fasting_glucose === opt.value}
-                onClick={() => selectSingleAndAdvance('fasting_glucose', opt.value as QuizFormData['fasting_glucose'])} />
-            ))}
-          </QuestionWrapper>
-        )
-
-      case 5:
-        return (
-          <QuestionWrapper title="Você faz uso de algum medicamento para diabetes?"
-            subtitle="Selecione todos que se aplicam">
-            {[
-              { value: 'metformina', label: 'Metformina' },
-              { value: 'insulina', label: 'Insulina' },
-              { value: 'outro', label: 'Outro (Ozempic, Jardiance, etc.)' },
-              { value: 'nenhum', label: 'Não uso nenhum' },
-            ].map(opt => (
-              <OptionButton key={opt.value} label={opt.label}
-                selected={isSelected('medications', opt.value)}
-                onClick={() => selectMultipleAndAdvance('medications', opt.value)} />
-            ))}
-          </QuestionWrapper>
-        )
-
-      case 6:
-        return (
-          <QuestionWrapper title="Existe histórico de diabetes na sua família?"
-            subtitle="Selecione todos que se aplicam">
-            {[
-              { value: 'pai_mae', label: 'Sim, pai ou mãe' },
-              { value: 'avos', label: 'Sim, avós' },
-              { value: 'irmaos', label: 'Sim, irmãos' },
-              { value: 'nao', label: 'Não' },
-              { value: 'nao_sei', label: 'Não sei' },
-            ].map(opt => (
-              <OptionButton key={opt.value} label={opt.label}
-                selected={isSelected('family_history', opt.value)}
-                onClick={() => selectMultipleAndAdvance('family_history', opt.value)} />
-            ))}
-          </QuestionWrapper>
-        )
-
-      case 7:
-        return (
-          <QuestionWrapper title="Você sente algum desses sintomas com frequência?"
-            subtitle="Selecione todos que se aplicam">
-            {[
-              { value: 'formigamento', label: 'Formigamento ou dormência nas mãos/pés' },
-              { value: 'fadiga', label: 'Cansaço e fadiga excessivos' },
-              { value: 'visao', label: 'Visão embaçada' },
-              { value: 'cicatrizacao', label: 'Dificuldade de cicatrização' },
-              { value: 'sede', label: 'Sede excessiva / urinação frequente' },
-              { value: 'nenhum', label: 'Não tenho nenhum desses sintomas' },
-            ].map(opt => (
-              <OptionButton key={opt.value} label={opt.label}
-                selected={isSelected('symptoms', opt.value)}
-                onClick={() => selectMultipleAndAdvance('symptoms', opt.value)} />
-            ))}
-          </QuestionWrapper>
-        )
-
-      case 8:
-        return (
-          <QuestionWrapper title="Você tem ou já teve alguma dessas condições de saúde?"
-            subtitle="Selecione todas que se aplicam">
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Condições gerais</p>
-            {[
-              { value: 'hipertensao', label: 'Pressão alta (hipertensão)' },
-              { value: 'colesterol', label: 'Colesterol ou triglicerídeos elevados' },
-              { value: 'figado_gorduroso', label: 'Fígado gorduroso (esteatose leve)' },
-            ].map(opt => (
-              <OptionButton key={opt.value} label={opt.label}
-                selected={isSelected('conditions_mild', opt.value)}
-                onClick={() => selectConditionAndAdvance('mild', opt.value)} />
-            ))}
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide pt-2">Condições sérias</p>
-            {[
-              { value: 'doenca_renal', label: 'Doença renal crônica' },
-              { value: 'doenca_cardiaca', label: 'Doença cardíaca (insuficiência, infarto ou arritmia)' },
-              { value: 'cirrose', label: 'Cirrose ou doença hepática grave' },
-            ].map(opt => (
-              <OptionButton key={opt.value} label={opt.label}
-                selected={isSelected('conditions_serious', opt.value)}
-                onClick={() => selectConditionAndAdvance('serious', opt.value)} />
-            ))}
-            <OptionButton label="Nenhuma dessas condições"
-              selected={form.conditions_mild?.length === 0 && form.conditions_serious?.length === 0}
-              onClick={clearConditionsAndAdvance} />
-          </QuestionWrapper>
-        )
-
-      case 9:
-        return (
-          <QuestionWrapper title="Como você descreveria seu peso atual?">
-            {[
-              { value: 'saudavel', label: 'Peso saudável' },
-              { value: 'sobrepeso', label: 'Sobrepeso leve' },
-              { value: 'obesidade', label: 'Obesidade' },
-              { value: 'abaixo', label: 'Abaixo do peso' },
-            ].map(opt => (
-              <OptionButton key={opt.value} label={opt.label}
-                selected={form.weight_status === opt.value}
-                onClick={() => selectSingleAndAdvance('weight_status', opt.value as QuizFormData['weight_status'])} />
-            ))}
-          </QuestionWrapper>
-        )
-
-      case 10:
-        return (
-          <QuestionWrapper title="Com que frequência você pratica atividade física?">
-            {[
-              { value: 'nenhum', label: 'Não pratico' },
-              { value: '1-2x', label: '1 a 2 vezes por semana' },
-              { value: '3-4x', label: '3 a 4 vezes por semana' },
-              { value: '5x+', label: '5 ou mais vezes por semana' },
-            ].map(opt => (
-              <OptionButton key={opt.value} label={opt.label}
-                selected={form.exercise_freq === opt.value}
-                onClick={() => selectSingleAndAdvance('exercise_freq', opt.value as QuizFormData['exercise_freq'])} />
-            ))}
-          </QuestionWrapper>
-        )
-
-      case 11:
-        return (
-          <QuestionWrapper title="Como você avalia sua alimentação hoje?">
-            {[
-              { value: 'low_carb', label: 'Sigo dieta com restrição de carboidratos' },
-              { value: 'tenta', label: 'Tento me alimentar bem, sem dieta específica' },
-              { value: 'sem_restricao', label: 'Como de tudo sem restrições' },
-              { value: 'dificuldade', label: 'Tenho dificuldade de manter alimentação saudável' },
-            ].map(opt => (
-              <OptionButton key={opt.value} label={opt.label}
-                selected={form.diet_quality === opt.value}
-                onClick={() => selectSingleAndAdvance('diet_quality', opt.value as QuizFormData['diet_quality'])} />
-            ))}
-          </QuestionWrapper>
-        )
-
-      case 12:
-        return (
-          <QuestionWrapper title="Você tem alergia a algum componente?"
-            subtitle="Ex: berberina, ômega-3, vitamina B12"
-            showContinue>
-            {[
-              { value: 'nao', label: 'Não tenho alergias conhecidas' },
-              { value: 'nao_sei', label: 'Não sei' },
-            ].map(opt => (
-              <OptionButton key={opt.value} label={opt.label}
-                selected={form.allergies === opt.value}
-                onClick={() => selectSingleAndAdvance('allergies', opt.value)} />
-            ))}
-            <button type="button"
-              onClick={() => setSingle('allergies', '')}
-              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border text-sm text-left transition-all ${
-                form.allergies !== null && form.allergies !== 'nao' && form.allergies !== 'nao_sei'
-                  ? 'border-[#13244f] bg-[#13244f]/5 text-[#13244f] font-medium'
-                  : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
-              }`}>
-              <span className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
-                form.allergies !== null && form.allergies !== 'nao' && form.allergies !== 'nao_sei'
-                  ? 'border-[#13244f]' : 'border-gray-300'
-              }`}>
-                {form.allergies !== null && form.allergies !== 'nao' && form.allergies !== 'nao_sei' && (
-                  <span className="w-2 h-2 rounded-full bg-[#13244f]" />
-                )}
-              </span>
-              Sim, tenho alergia
-            </button>
-            {form.allergies !== null && form.allergies !== 'nao' && form.allergies !== 'nao_sei' && (
-              <input type="text" placeholder="Descreva sua alergia..."
-                value={form.allergies ?? ''}
-                onChange={e => setSingle('allergies', e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f]" />
-            )}
-          </QuestionWrapper>
-        )
-
-      case 13:
-        return (
-          <QuestionWrapper title="Você já fez algum tratamento contínuo para diabetes por mais de 6 meses?"
-            subtitle="Selecione todos que se aplicam">
-            {[
-              { value: 'medicamentos', label: 'Sim, apenas com medicamentos' },
-              { value: 'suplementos', label: 'Sim, com suplementos naturais' },
-              { value: 'dieta', label: 'Sim, com mudança de dieta' },
-              { value: 'comecando', label: 'Não, estou começando agora' },
-            ].map(opt => (
-              <OptionButton key={opt.value} label={opt.label}
-                selected={isSelected('prior_treatment', opt.value)}
-                onClick={() => !loading && selectMultipleAndAdvance('prior_treatment', opt.value, true)} />
-            ))}
-            {loading && (
-              <p className="text-sm text-[#13244f]/60 text-center pt-2 font-medium">Gerando protocolo...</p>
-            )}
           </QuestionWrapper>
         )
 
@@ -460,83 +764,23 @@ export default function QuizPage() {
 
   return (
     <div className="min-h-screen bg-[#f5f0eb] flex flex-col">
-      <header className="bg-[#f5f0eb] px-6 pt-5 pb-3">
-        <div className="max-w-lg md:max-w-5xl mx-auto">
-          <div className="flex items-center justify-between mb-4 gap-3">
-            <img src="/logo-azul.png" alt="Desafio Diabetes" className="h-7 w-auto" />
-            <div className="flex items-center gap-2">
-              {cartItems.length > 0 && (
-                <span className="text-xs font-medium text-[#13244f] bg-white border border-[#ececec] rounded-full px-2.5 py-1">
-                  🛒 {cartItems.length} {cartItems.length === 1 ? 'item' : 'itens'} no carrinho
-                </span>
-              )}
-              <span className="text-xs text-gray-400 font-medium">{step} de {TOTAL_STEPS}</span>
-            </div>
-          </div>
-          <div className="w-full h-0.5 bg-gray-200 rounded-full">
-            <div
-              className="h-0.5 bg-[#13244f] rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
+      <header className="px-6 pt-5 pb-2">
+        <div className="max-w-lg mx-auto flex items-center justify-between">
+          <img src="/logo-azul.png" alt="Desafio Diabetes" className="h-7 w-auto" />
+          <span className="text-xs text-[#13244f]/50 font-medium">
+            {stepIndex + 1} / {steps.length}
+          </span>
+        </div>
+        <div className="max-w-lg mx-auto mt-4 h-1.5 bg-[#13244f]/10 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-[#f4001e] transition-all duration-300"
+            style={{ width: `${progress}%` }}
+          />
         </div>
       </header>
-      <main className="flex-1 flex items-start md:items-center justify-center px-6 pt-10 pb-10">
-        <div className="w-full max-w-lg md:max-w-5xl md:grid md:grid-cols-[1fr_1.3fr] md:gap-12 md:items-center">
-          {/* Painel lateral — só desktop */}
-          <div className="hidden md:flex flex-col gap-5 bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
-            <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase">SUA SEGURANÇA EM PRIMEIRO LUGAR</p>
-            <h3 className="font-display text-2xl text-[#13244f] leading-snug">Desenvolvido pelo Dr. Turí Souza</h3>
-            <p className="text-base text-gray-600 leading-relaxed">
-              Cada resposta ajuda a gente a montar a recomendação mais adequada pro seu perfil — alergias, medicações e histórico entram no protocolo personalizado.
-            </p>
-            <div className="border-t border-gray-100 pt-5 flex flex-col gap-3">
-              <div className="flex items-center gap-3 text-sm text-gray-600">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
-                </svg>
-                Farmácia credenciada ANVISA
-              </div>
-              <div className="flex items-center gap-3 text-sm text-gray-600">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="2"/>
-                  <path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                </svg>
-                Pagamento seguro
-              </div>
-              <div className="flex items-center gap-3 text-sm text-gray-600">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                Cancele quando quiser
-              </div>
-            </div>
-          </div>
 
-          {/* Conteúdo da pergunta */}
-          <div className="w-full">
-            {!introSeen ? (
-              <div className="space-y-5">
-                <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-2">SUA SEGURANÇA PRIMEIRO</p>
-                <h2 className="font-display text-2xl md:text-3xl text-[#13244f] leading-snug">
-                  Antes de liberar sua compra, vamos confirmar que é seguro pra você
-                </h2>
-                <p className="text-sm md:text-base text-gray-500 leading-relaxed">
-                  Esse questionário existe pra validar que seu corpo está preparado para receber o suplemento que você escolheu. A gente se preocupa com a sua saúde — por isso analisamos alergias, predisposições e histórico antes de aprovar sua compra. Desenvolvido pelo Dr. Turí Souza, pra te dar mais segurança na sua suplementação.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setIntroSeen(true)}
-                  className="w-full bg-[#f4001e] text-white py-3 rounded-full text-sm font-semibold hover:bg-[#a30000] transition"
-                >
-                  Começar
-                </button>
-              </div>
-            ) : (
-              renderStep()
-            )}
-          </div>
-        </div>
+      <main className="flex-1 px-4 py-8">
+        <div className="max-w-lg mx-auto">{renderStep()}</div>
       </main>
     </div>
   )

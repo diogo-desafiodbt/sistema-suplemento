@@ -9,6 +9,7 @@ export type SupplementContent = {
   usage: string
   scienceNote: string
   gallery: string[]
+  warningNote?: string
 }
 
 export const supplements: SupplementContent[] = [
@@ -82,6 +83,8 @@ export const supplements: SupplementContent[] = [
     scienceNote:
       'O Ômega-3 (EPA/DHA) tem evidência consistente na redução de triglicerídeos, um marcador cardiovascular frequentemente alterado em quem convive com diabetes.',
     gallery: ['/categorias/categoria-omega3.png'],
+    warningNote:
+      'Caso utilize medicamentos anticoagulantes ou antiagregantes plaquetários, consulte o seu médico antes de iniciar a suplementação.',
   },
   {
     slug: 'polivitaminico',

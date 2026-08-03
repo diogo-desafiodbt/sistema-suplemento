@@ -156,6 +156,13 @@ export function useCart() {
     emit()
   }, [])
 
+  const clearCart = useCallback(() => {
+    ensureHydrated()
+    store = { items: [], plan: DEFAULT_PURCHASE_PLAN }
+    persist()
+    emit()
+  }, [])
+
   const chargeTotal = snapshot.items.reduce(
     (sum, item) => sum + getChargePrice(item.price_monthly, snapshot.plan) * item.quantity,
     0
@@ -168,5 +175,6 @@ export function useCart() {
     addItem,
     removeItem,
     setPlan,
+    clearCart,
   }
 }

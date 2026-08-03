@@ -15,6 +15,7 @@ type LocalProtocolItem = {
   product_name: string
   is_required: boolean
   removed?: boolean
+  blocked?: boolean
   price_monthly?: number
   price_quarterly?: number
   price_yearly?: number
@@ -44,6 +45,7 @@ function clearCheckoutSession() {
   sessionStorage.removeItem('protocol_items')
   sessionStorage.removeItem('selected_plan')
   sessionStorage.removeItem('protocol_id')
+  sessionStorage.removeItem('triagem_data')
   sessionStorage.removeItem('quiz_data')
   sessionStorage.removeItem('mini_quiz_data')
   sessionStorage.removeItem('checkout_source')
@@ -153,27 +155,19 @@ export default function CheckoutPage() {
     const itemsRaw = sessionStorage.getItem('protocol_items')
     const savedPlan = sessionStorage.getItem('selected_plan')
     const savedSource = sessionStorage.getItem('checkout_source') as CheckoutSource | null
-    const miniRaw = sessionStorage.getItem('mini_quiz_data')
-    const quizRaw = sessionStorage.getItem('quiz_data')
+    const triagemRaw = sessionStorage.getItem('triagem_data')
 
     if (!itemsRaw) {
       router.push('/suplementos')
       return
     }
 
-    if (savedSource === 'mini_quiz') {
-      if (!miniRaw) {
-        router.push('/checkout/triagem')
-        return
-      }
-      setSource('mini_quiz')
-    } else if (!quizRaw) {
+    if (!triagemRaw) {
       router.push('/quiz')
       return
-    } else {
-      setSource('full_quiz')
     }
 
+    setSource(savedSource === 'mini_quiz' ? 'mini_quiz' : 'full_quiz')
     setItems(JSON.parse(itemsRaw))
     if (savedPlan) setPlan(savedPlan)
 
@@ -201,7 +195,14 @@ export default function CheckoutPage() {
   }
 
   function getActiveItems() {
-    return items.filter(item => !item.removed)
+    return items.filter(item => !item.removed && !item.blocked)
+  }
+
+  function hasOmega3(): boolean {
+    return getActiveItems().some(item =>
+      item.product_name.toLowerCase().includes('ômega') ||
+      item.product_name.toLowerCase().includes('omega')
+    )
   }
 
   function getPrice(item: LocalProtocolItem): number {
@@ -217,15 +218,7 @@ export default function CheckoutPage() {
   }
 
   function buildQuizPayload() {
-    if (source === 'mini_quiz') {
-      const mini = JSON.parse(sessionStorage.getItem('mini_quiz_data') ?? '{}')
-      return {
-        diagnosis_type: mini.diagnosis_type,
-        full_name: mini.full_name,
-        age: mini.age,
-      }
-    }
-    return JSON.parse(sessionStorage.getItem('quiz_data') ?? '{}')
+    return JSON.parse(sessionStorage.getItem('triagem_data') ?? '{}')
   }
 
   async function handleCreateAccount(e: React.FormEvent) {
@@ -357,11 +350,7 @@ export default function CheckoutPage() {
     try {
       const quiz = buildQuizPayload()
       if (!quiz?.diagnosis_type) {
-        toast.error(
-          source === 'mini_quiz'
-            ? 'Dados da triagem incompletos. Volte e preencha novamente.'
-            : 'Dados do questionário incompletos. Refaça o quiz.'
-        )
+        toast.error('Dados da triagem incompletos. Volte e preencha novamente.')
         return
       }
 
@@ -976,6 +965,30 @@ export default function CheckoutPage() {
                 </div>
               ))}
             </div>
+
+            {hasOmega3() && (
+              <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-3 flex gap-2.5">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="shrink-0 mt-0.5"
+                  aria-hidden
+                >
+                  <path
+                    d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                    stroke="#b45309"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  Caso utilize medicamentos anticoagulantes ou antiagregantes plaquetários, consulte o seu médico antes de iniciar a suplementação.
+                </p>
+              </div>
+            )}
 
             <div className="border-t border-gray-100 pt-3 space-y-2">
               <div className="flex items-center justify-between text-sm md:text-base">

@@ -3,6 +3,10 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getRastreamento } from '@/lib/shipping/envie-agora/rastreamento'
 import { mergeTrackingEvents } from '@/lib/shipping/create-label'
+import {
+  getNewTrackingEvents,
+  notifyNewTrackingEvents,
+} from '@/lib/shipping/notify'
 
 async function requireAdmin() {
   const supabase = await createClient()
@@ -44,6 +48,8 @@ export async function POST(
 
     const tracking = await getRastreamento(order.shipping_request_id)
     const eventos = tracking.eventos ?? []
+    const newEvents = getNewTrackingEvents(order.shipping_json, eventos)
+
     const merged = mergeTrackingEvents(
       order.shipping_json,
       eventos as unknown as Array<Record<string, unknown>>
@@ -55,6 +61,8 @@ export async function POST(
     }
 
     await admin.from('orders').update(updates).eq('id', id)
+
+    await notifyNewTrackingEvents(admin, order.id, newEvents)
 
     return NextResponse.json({ ok: true, eventos: eventos.length })
   } catch (error) {

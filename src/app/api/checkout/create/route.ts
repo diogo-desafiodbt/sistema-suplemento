@@ -7,12 +7,14 @@ import { ensureProtocolAfterPayment } from '@/lib/protocol/create-from-checkout'
 import type { PendingCheckoutPayload } from '@/lib/protocol/create-from-checkout'
 import { addPlanPeriod, isRecurringPlan } from '@/lib/plans'
 import { TERMS_VERSION, TERMS_CONTENT } from '@/lib/terms/content'
+import { inngest } from '@/lib/inngest/client'
 
 const protocolItemSchema = z.object({
   product_id: z.string().uuid().optional(),
   product_name: z.string(),
   is_required: z.boolean().optional(),
   removed: z.boolean().optional(),
+  blocked: z.boolean().optional(),
   activation_reason: z.string().optional(),
   quantity: z.number().optional(),
   price_monthly: z.number().optional(),
@@ -27,22 +29,20 @@ const checkoutSchema = z.object({
   total_amount: z.number().positive(),
   source: z.enum(['full_quiz', 'mini_quiz']),
   quiz: z.object({
-    diagnosis_type: z.enum(['type2', 'prediabetes', 'undiagnosed']),
-    years_diagnosed: z.string().optional(),
-    hba1c_range: z.string().nullable().optional(),
-    fasting_glucose: z.string().nullable().optional(),
-    medications: z.array(z.string()).optional(),
-    family_history: z.array(z.string()).optional(),
-    symptoms: z.array(z.string()).optional(),
-    conditions_mild: z.array(z.string()).optional(),
-    conditions_serious: z.array(z.string()).optional(),
-    weight_status: z.string().nullable().optional(),
-    exercise_freq: z.string().nullable().optional(),
-    diet_quality: z.string().nullable().optional(),
-    allergies: z.string().nullable().optional(),
-    prior_treatment: z.array(z.string()).optional(),
-    age: z.number().int().positive().optional(),
-    full_name: z.string().optional(),
+    full_name: z.string(),
+    birth_date: z.string(),
+    sex: z.enum(['homem', 'mulher']),
+    is_pregnant_or_breastfeeding: z.boolean(),
+    renal_conditions: z.array(z.string()),
+    hepatic_conditions: z.array(z.string()),
+    diagnosis_type: z.enum([
+      'type1',
+      'type2',
+      'prediabetes',
+      'lada_avancado',
+      'undiagnosed',
+    ]),
+    medications: z.array(z.string()),
   }),
   protocol_items: z.array(protocolItemSchema).min(1),
   shipping: z.object({
@@ -414,6 +414,14 @@ export async function POST(request: NextRequest) {
           userId: user.id,
           expiresAt,
         })
+        try {
+          await inngest.send({
+            name: 'pagamento/confirmado',
+            data: { subscription_id: subscription.id, user_id: user.id },
+          })
+        } catch (inngestError) {
+          console.error('Erro ao disparar pagamento/confirmado:', inngestError)
+        }
       }
 
       await admin.from('webhook_logs').insert({
@@ -470,6 +478,14 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         expiresAt,
       })
+      try {
+        await inngest.send({
+          name: 'pagamento/confirmado',
+          data: { subscription_id: subscription.id, user_id: user.id },
+        })
+      } catch (inngestError) {
+        console.error('Erro ao disparar pagamento/confirmado:', inngestError)
+      }
     }
 
     await admin.from('webhook_logs').insert({

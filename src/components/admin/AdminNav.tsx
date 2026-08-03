@@ -7,6 +7,7 @@ const tabs = [
   { label: 'Visão Geral', href: '/admin' },
   { label: 'Clientes', href: '/admin/clientes' },
   { label: 'Pedidos', href: '/admin/pedidos' },
+  { label: 'Suporte', href: '/admin/suporte' },
   { label: 'Usuários', href: '/admin/usuarios' },
   { label: 'Cupons', href: '/admin/cupons' },
   { label: 'Config', href: '/admin/config' },

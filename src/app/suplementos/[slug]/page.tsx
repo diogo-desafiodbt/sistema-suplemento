@@ -258,6 +258,27 @@ export default function SupplementPage() {
                     Ativo principal: {primary.ativo} — {primary.dose}
                   </p>
                 )}
+                {content.warningNote && (
+                  <div className="mt-4 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex gap-3">
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      className="shrink-0 mt-0.5"
+                      aria-hidden
+                    >
+                      <path
+                        d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                        stroke="#b45309"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    <p className="text-sm text-amber-800 leading-relaxed">{content.warningNote}</p>
+                  </div>
+                )}
               </div>
 
               <div className="border-t border-[#ececec] pt-5 flex flex-col gap-4">
@@ -495,7 +516,7 @@ export default function SupplementPage() {
         productName={content.name}
         productImage={content.gallery[0]}
         productPrice={product?.price_monthly}
-        onFinish={() => router.push('/checkout/triagem')}
+        onFinish={() => router.push('/quiz')}
         onContinue={() => {
           setShowCartDialog(false)
           router.push('/suplementos')

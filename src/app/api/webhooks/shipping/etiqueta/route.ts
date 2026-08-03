@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { notifyShippingUpdate } from '@/lib/shipping/notify'
 import type { WebhookEtiquetaPayload } from '@/types/shipping'
 
 export async function POST(request: NextRequest) {
@@ -54,6 +55,13 @@ export async function POST(request: NextRequest) {
         shipping_json: { ...prev, ...payload, etiqueta_webhook: payload },
       })
       .eq('id', order.id)
+
+    await notifyShippingUpdate(admin, {
+      orderId: order.id,
+      eventId: 'etiqueta',
+      kind: 'dispatched',
+      trackingCode: payload.numero_etiqueta,
+    })
 
     if (log?.id) {
       await admin.from('webhook_logs').update({ processed: true }).eq('id', log.id)

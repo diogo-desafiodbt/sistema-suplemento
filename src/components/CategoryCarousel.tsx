@@ -174,7 +174,7 @@ export default function CategoryCarousel() {
         productName={dialogItem?.name ?? ''}
         productImage={dialogItem?.image ?? ''}
         productPrice={dialogItem?.price_monthly}
-        onFinish={() => router.push('/checkout/triagem')}
+        onFinish={() => router.push('/quiz')}
         onContinue={() => setShowCartDialog(false)}
       />
     </div>

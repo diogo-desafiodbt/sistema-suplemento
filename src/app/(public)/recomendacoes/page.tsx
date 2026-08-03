@@ -24,6 +24,7 @@ type LocalProtocolItem = {
   activation_reason: string
   quantity: number
   removed?: boolean
+  blocked?: boolean
   price_monthly?: number
   price_quarterly?: number
   price_yearly?: number
@@ -113,7 +114,7 @@ export default function RecomendacoesPage() {
   function toggleItem(productId: string) {
     setItems(prev =>
       prev.map(item =>
-        item.product_id === productId && !item.is_required
+        item.product_id === productId && !item.is_required && !item.blocked
           ? { ...item, removed: !item.removed }
           : item
       )
@@ -221,13 +222,14 @@ export default function RecomendacoesPage() {
             <div className="space-y-3">
               {items.map(item => {
                 const isRemoved = item.removed
+                const isBlocked = !!item.blocked
                 const price = getPrice(item)
 
                 return (
                   <div
                     key={item.product_id}
                     className={`bg-white rounded-2xl border border-gray-100 p-4 transition-opacity shadow-sm ${
-                      isRemoved ? 'opacity-40' : ''
+                      isRemoved || isBlocked ? 'opacity-40' : ''
                     }`}
                   >
                     <div className="flex items-start justify-between gap-4">
@@ -244,20 +246,26 @@ export default function RecomendacoesPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-1">
                             <span className="font-semibold text-[#13244f] md:text-base">{item.product_name}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                              item.is_required
-                                ? 'bg-[#13244f]/10 text-[#13244f]'
-                                : 'bg-gray-100 text-gray-500'
-                            }`}>
-                              {item.is_required ? 'Tratamento principal' : 'Complementar'}
-                            </span>
+                            {isBlocked ? (
+                              <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-50 text-amber-700">
+                                Bloqueado por segurança
+                              </span>
+                            ) : (
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                                item.is_required
+                                  ? 'bg-[#13244f]/10 text-[#13244f]'
+                                  : 'bg-gray-100 text-gray-500'
+                              }`}>
+                                {item.is_required ? 'Tratamento principal' : 'Complementar'}
+                              </span>
+                            )}
                           </div>
                           <p className="text-sm md:text-base text-gray-500 leading-relaxed">{item.activation_reason}</p>
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0">
                         <p className="font-bold text-[#13244f]">R$ {price.toFixed(2).replace('.', ',')}</p>
-                        {!item.is_required && (
+                        {!item.is_required && !isBlocked && (
                           <button
                             onClick={() => toggleItem(item.product_id)}
                             className="text-xs text-gray-400 hover:text-gray-600 mt-1 underline"
