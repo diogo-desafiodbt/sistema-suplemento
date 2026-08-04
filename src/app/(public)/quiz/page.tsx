@@ -20,6 +20,8 @@ import {
 } from '@/lib/protocol/triage'
 import { findSupplementImageByProductName } from '@/lib/supplements-content'
 import { trackFunnelEvent } from '@/lib/funnel/track'
+import { Calendar } from '@/components/ui/calendar'
+import { ptBR } from 'date-fns/locale'
 
 type TriageForm = {
   full_name: string
@@ -586,62 +588,24 @@ export default function QuizPage() {
         )
 
       case 'nascimento': {
-        const [selYear, selMonth, selDay] = form.birth_date
-          ? form.birth_date.split('-')
-          : ['', '', '']
-
-        const currentYear = new Date().getFullYear()
-        const years = Array.from({ length: 100 }, (_, i) => String(currentYear - i))
-        const months = [
-          { value: '01', label: 'Janeiro' },
-          { value: '02', label: 'Fevereiro' },
-          { value: '03', label: 'Março' },
-          { value: '04', label: 'Abril' },
-          { value: '05', label: 'Maio' },
-          { value: '06', label: 'Junho' },
-          { value: '07', label: 'Julho' },
-          { value: '08', label: 'Agosto' },
-          { value: '09', label: 'Setembro' },
-          { value: '10', label: 'Outubro' },
-          { value: '11', label: 'Novembro' },
-          { value: '12', label: 'Dezembro' },
-        ]
-        const daysInMonth =
-          selYear && selMonth
-            ? new Date(Number(selYear), Number(selMonth), 0).getDate()
-            : 31
-        const days = Array.from({ length: daysInMonth }, (_, i) =>
-          String(i + 1).padStart(2, '0')
-        )
-
-        function updateBirthDate(part: 'day' | 'month' | 'year', value: string) {
-          const next = {
-            day: part === 'day' ? value : selDay,
-            month: part === 'month' ? value : selMonth,
-            year: part === 'year' ? value : selYear,
-          }
-          if (next.day && next.month && next.year) {
-            const maxDay = new Date(
-              Number(next.year),
-              Number(next.month),
-              0
-            ).getDate()
-            const dayNum = Number(next.day)
-            const clampedDay =
-              dayNum > maxDay
-                ? String(maxDay).padStart(2, '0')
-                : next.day
-            setForm((prev) => ({
-              ...prev,
-              birth_date: `${next.year}-${next.month}-${clampedDay}`,
-            }))
-          } else {
-            setForm((prev) => ({ ...prev, birth_date: '' }))
-          }
+        // Trabalha com Y/M/D locais (não Date→toISOString) pra nunca sofrer
+        // desvio de fuso horário na conversão ISO ↔ Date.
+        function parseIsoDateLocal(value: string): Date | undefined {
+          if (!value) return undefined
+          const [y, m, d] = value.split('-').map(Number)
+          if (!y || !m || !d) return undefined
+          return new Date(y, m - 1, d)
         }
 
-        const selectClass =
-          'w-full border border-gray-200 rounded-xl px-3 py-3.5 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f]'
+        function toIsoDateLocal(date: Date): string {
+          const y = date.getFullYear()
+          const m = String(date.getMonth() + 1).padStart(2, '0')
+          const d = String(date.getDate()).padStart(2, '0')
+          return `${y}-${m}-${d}`
+        }
+
+        const today = new Date()
+        const hundredYearsAgo = new Date(today.getFullYear() - 100, 0, 1)
 
         return (
           <QuestionWrapper
@@ -650,43 +614,24 @@ export default function QuizPage() {
             showContinue
             continueDisabled={!form.birth_date}
           >
-            <div className="grid grid-cols-3 gap-2">
-              <select
-                value={selDay}
-                onChange={(e) => updateBirthDate('day', e.target.value)}
-                className={selectClass}
-              >
-                <option value="">Dia</option>
-                {days.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={selMonth}
-                onChange={(e) => updateBirthDate('month', e.target.value)}
-                className={selectClass}
-              >
-                <option value="">Mês</option>
-                {months.map((m) => (
-                  <option key={m.value} value={m.value}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={selYear}
-                onChange={(e) => updateBirthDate('year', e.target.value)}
-                className={selectClass}
-              >
-                <option value="">Ano</option>
-                {years.map((y) => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
-                ))}
-              </select>
+            <div className="flex justify-center">
+              <Calendar
+                mode="single"
+                locale={ptBR}
+                selected={parseIsoDateLocal(form.birth_date)}
+                onSelect={(date) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    birth_date: date ? toIsoDateLocal(date) : '',
+                  }))
+                }
+                captionLayout="dropdown"
+                startMonth={hundredYearsAgo}
+                endMonth={today}
+                disabled={{ after: today }}
+                defaultMonth={parseIsoDateLocal(form.birth_date) ?? new Date(today.getFullYear() - 30, today.getMonth())}
+                className="rounded-2xl border border-gray-200 bg-white shadow-sm"
+              />
             </div>
           </QuestionWrapper>
         )
