@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
 
     const { data: signedUrl } = await admin.storage
       .from('prescricoes')
-      .createSignedUrl(fileName, 60 * 60 * 24 * 365)
+      .createSignedUrl(fileName, 60 * 60 * 24 * 30)
 
     const pdfUrl = signedUrl?.signedUrl ?? ''
 

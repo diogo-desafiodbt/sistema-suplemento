@@ -3,6 +3,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { inngest } from '@/lib/inngest/client'
 import { ensureProtocolAfterPayment } from '@/lib/protocol/create-from-checkout'
 import { addPlanPeriod } from '@/lib/plans'
+import { isBearerOrQueryTokenAuthorized } from '@/lib/security/token'
+import { summarizePagarmePayload } from '@/lib/security/pagarme'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 type PagarmePayload = {
@@ -410,8 +412,12 @@ async function handleSubscriptionPaymentFailed(
 }
 
 export async function POST(request: NextRequest) {
-  const token = request.nextUrl.searchParams.get('token')
-  if (!token || token !== process.env.PAGARME_WEBHOOK_TOKEN) {
+  if (
+    !isBearerOrQueryTokenAuthorized(
+      request,
+      process.env.PAGARME_WEBHOOK_TOKEN
+    )
+  ) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -423,7 +429,7 @@ export async function POST(request: NextRequest) {
     const { data: webhookLog } = await admin.from('webhook_logs').insert({
       source: 'pagarme',
       event_type: payload.type ?? 'unknown',
-      payload,
+      payload: summarizePagarmePayload(payload),
       processed: false,
     }).select('id').single()
 

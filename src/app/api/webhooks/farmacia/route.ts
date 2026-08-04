@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { isBearerTokenAuthorized } from '@/lib/security/token'
 
 export async function POST(request: NextRequest) {
+  if (
+    !isBearerTokenAuthorized(
+      request,
+      process.env.FARMACIA_WEBHOOK_TOKEN ?? process.env.FARMACIA_API_TOKEN
+    )
+  ) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   try {
     const payload = await request.json()
     const admin = createAdminClient()

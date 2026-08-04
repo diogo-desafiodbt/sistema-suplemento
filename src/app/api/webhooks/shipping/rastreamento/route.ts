@@ -5,9 +5,16 @@ import {
   getNewTrackingEvents,
   notifyNewTrackingEvents,
 } from '@/lib/shipping/notify'
+import { isBearerTokenAuthorized } from '@/lib/security/token'
 import type { WebhookRastreamentoPayload } from '@/types/shipping'
 
 export async function POST(request: NextRequest) {
+  if (
+    !isBearerTokenAuthorized(request, process.env.SHIPPING_WEBHOOK_TOKEN)
+  ) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const admin = createAdminClient()
   let payload: WebhookRastreamentoPayload
 

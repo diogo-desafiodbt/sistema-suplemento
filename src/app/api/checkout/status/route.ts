@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,7 +21,19 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const { data: payment, error } = await supabase
+    const admin = createAdminClient()
+    const { data: subscription } = await admin
+      .from('subscriptions')
+      .select('id')
+      .eq('id', subscriptionId)
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (!subscription) {
+      return NextResponse.json({ error: 'Não encontrado' }, { status: 404 })
+    }
+
+    const { data: payment, error } = await admin
       .from('payments')
       .select('status')
       .eq('subscription_id', subscriptionId)

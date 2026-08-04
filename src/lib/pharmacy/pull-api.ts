@@ -1,13 +1,12 @@
 import type { NextRequest } from 'next/server'
+import { isBearerOrQueryTokenAuthorized } from '@/lib/security/token'
 
 /** Valida o header Authorization: Bearer <token> contra FARMACIA_API_TOKEN. */
 export function isFarmaciaAuthorized(request: NextRequest): boolean {
-  const expected = process.env.FARMACIA_API_TOKEN
-  if (!expected) return false
-
-  const header = request.headers.get('authorization') ?? ''
-  const match = header.match(/^Bearer\s+(.+)$/i)
-  return match?.[1] === expected
+  return isBearerOrQueryTokenAuthorized(
+    request,
+    process.env.FARMACIA_API_TOKEN
+  )
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/

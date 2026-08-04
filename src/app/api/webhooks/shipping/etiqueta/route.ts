@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { notifyShippingUpdate } from '@/lib/shipping/notify'
+import { isBearerTokenAuthorized } from '@/lib/security/token'
 import type { WebhookEtiquetaPayload } from '@/types/shipping'
 
 export async function POST(request: NextRequest) {
+  if (
+    !isBearerTokenAuthorized(request, process.env.SHIPPING_WEBHOOK_TOKEN)
+  ) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const admin = createAdminClient()
   let payload: WebhookEtiquetaPayload
 

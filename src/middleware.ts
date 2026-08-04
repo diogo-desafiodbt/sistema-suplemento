@@ -25,13 +25,15 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  // Rotas protegidas — apenas estas exigem autenticação
-  const protectedPaths = ['/dashboard', '/profissional', '/admin']
-  const isProtected = protectedPaths.some(path =>
-    request.nextUrl.pathname.startsWith(path)
-  )
+  const path = request.nextUrl.pathname
+  const isAdmin = path.startsWith('/admin')
+  const isProfessional = path.startsWith('/profissional')
+  const isDashboard = path.startsWith('/dashboard')
+  const isProtected = isAdmin || isProfessional || isDashboard
 
   if (isProtected && !user) {
     const url = request.nextUrl.clone()
@@ -39,7 +41,31 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (user && request.nextUrl.pathname === '/login') {
+  if (user && (isAdmin || isProfessional)) {
+    const { data: profile } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (isAdmin && profile?.role !== 'admin') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/dashboard'
+      return NextResponse.redirect(url)
+    }
+
+    if (
+      isProfessional &&
+      profile?.role !== 'professional' &&
+      profile?.role !== 'admin'
+    ) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/dashboard'
+      return NextResponse.redirect(url)
+    }
+  }
+
+  if (user && path === '/login') {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)

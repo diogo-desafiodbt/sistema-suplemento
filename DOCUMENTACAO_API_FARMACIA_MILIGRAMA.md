@@ -13,10 +13,12 @@ https://sistema-suplemento-desaf.vercel.app
 
 ## Autenticação
 
-Toda chamada precisa do cabeçalho `Authorization` com o token abaixo:
+Toda chamada precisa do cabeçalho `Authorization` com o token configurado
+em `FARMACIA_API_TOKEN` (variável de ambiente no servidor — **nunca**
+commitar o valor real):
 
 ```
-Authorization: Bearer 023bfed494bffbcff0ce1a31bf14ed129cffab7b591f5b056cbbb9b65e10849f
+Authorization: Bearer <FARMACIA_API_TOKEN>
 ```
 
 Sem esse cabeçalho (ou com token errado), a API responde `401 Não autorizado`.
@@ -35,7 +37,7 @@ rápida, sem baixar o JSON completo.
 **Exemplo de chamada (curl):**
 
 ```bash
-curl -H "Authorization: Bearer 023bfed494bffbcff0ce1a31bf14ed129cffab7b591f5b056cbbb9b65e10849f" \
+curl -H "Authorization: Bearer <FARMACIA_API_TOKEN>" \
   "https://sistema-suplemento-desaf.vercel.app/api/farmacia/pedidos?data=2026-07-30"
 ```
 
@@ -69,7 +71,7 @@ anexado nos e-mails). **Só aparecem aqui os pedidos que já têm o JSON pronto.
 **Exemplo de chamada (curl):**
 
 ```bash
-curl -H "Authorization: Bearer 023bfed494bffbcff0ce1a31bf14ed129cffab7b591f5b056cbbb9b65e10849f" \
+curl -H "Authorization: Bearer <FARMACIA_API_TOKEN>" \
   "https://sistema-suplemento-desaf.vercel.app/api/farmacia/pedidos/json?data=2026-07-30"
 ```
 
@@ -126,7 +128,7 @@ Os dois endpoints aceitam os mesmos parâmetros, sempre no formato
 Chamar uma vez por dia, de manhã, buscando os pedidos do dia anterior:
 
 ```bash
-curl -H "Authorization: Bearer 023bfed494bffbcff0ce1a31bf14ed129cffab7b591f5b056cbbb9b65e10849f" \
+curl -H "Authorization: Bearer <FARMACIA_API_TOKEN>" \
   "https://sistema-suplemento-desaf.vercel.app/api/farmacia/pedidos/json?data=<data-de-ontem>"
 ```
 

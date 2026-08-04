@@ -8,6 +8,8 @@ import type { PendingCheckoutPayload } from '@/lib/protocol/create-from-checkout
 import { addPlanPeriod, isRecurringPlan } from '@/lib/plans'
 import { TERMS_VERSION, TERMS_CONTENT } from '@/lib/terms/content'
 import { inngest } from '@/lib/inngest/client'
+import { computeServerCheckoutTotal } from '@/lib/checkout/price'
+import { summarizePagarmePayload } from '@/lib/security/pagarme'
 
 const protocolItemSchema = z.object({
   product_id: z.string().uuid().optional(),
@@ -16,7 +18,7 @@ const protocolItemSchema = z.object({
   removed: z.boolean().optional(),
   blocked: z.boolean().optional(),
   activation_reason: z.string().optional(),
-  quantity: z.number().optional(),
+  quantity: z.number().int().min(1).max(20).optional(),
   price_monthly: z.number().optional(),
   price_quarterly: z.number().optional(),
   price_yearly: z.number().optional(),
@@ -110,7 +112,12 @@ async function insertPaymentWithRetry(
     console.error(
       'CRÍTICO — payments.insert falhou 2x; cobrança pode ter sido aprovada sem registro interno:',
       error,
-      { row }
+      {
+        subscription_id: row.subscription_id,
+        pagarme_charge_id: row.pagarme_charge_id,
+        amount: row.amount,
+        status: row.status,
+      }
     )
     throw new Error(
       `Checkout: falha ao registrar payment após cobrança (${error.message})`
@@ -130,6 +137,15 @@ async function finalizePaidSubscription(
     expiresAt: Date
   }
 ) {
+  await admin
+    .from('subscriptions')
+    .update({
+      status: 'active',
+      expires_at: opts.expiresAt.toISOString(),
+      next_billing_at: opts.expiresAt.toISOString(),
+    })
+    .eq('id', opts.subscriptionId)
+
   const protocolId = await ensureProtocolAfterPayment(
     admin,
     opts.subscriptionId,
@@ -209,6 +225,27 @@ export async function POST(request: NextRequest) {
 
     const admin = createAdminClient()
 
+    const priced = await computeServerCheckoutTotal(admin, {
+      planType: data.plan_type,
+      protocolItems: data.protocol_items,
+      shipping: data.shipping,
+      address: data.address,
+    })
+    if (!priced.ok) {
+      return NextResponse.json({ error: priced.error }, { status: 400 })
+    }
+    if (Math.abs(data.total_amount - priced.priced.serverTotal) > 0.01) {
+      return NextResponse.json(
+        {
+          error: 'Valor do pedido desatualizado. Recarregue o frete e tente de novo.',
+          server_total: priced.priced.serverTotal,
+        },
+        { status: 400 }
+      )
+    }
+    const serverTotal = priced.priced.serverTotal
+    const shipping = priced.priced.shipping
+
     const { data: profile } = await admin
       .from('users')
       .select('full_name, email, client_code')
@@ -237,7 +274,7 @@ export async function POST(request: NextRequest) {
     const pendingCheckout: PendingCheckoutPayload = {
       source: data.source,
       plan_type: data.plan_type,
-      shipping: data.shipping,
+      shipping,
       quiz: data.quiz,
       protocol_items: data.protocol_items,
     }
@@ -249,7 +286,7 @@ export async function POST(request: NextRequest) {
         protocol_id: null,
         pending_checkout: pendingCheckout,
         plan_type: data.plan_type,
-        status: 'active',
+        status: 'pending',
         started_at: new Date().toISOString(),
         expires_at: expiresAt.toISOString(),
         next_billing_at: expiresAt.toISOString(),
@@ -356,7 +393,7 @@ export async function POST(request: NextRequest) {
       const pagarmePayload = {
         items: [
           {
-            amount: Math.round(data.total_amount * 100),
+            amount: Math.round(serverTotal * 100),
             description: 'Desafio Diabetes — Compra única',
             quantity: 1,
             code: 'DD-1MES',
@@ -407,7 +444,7 @@ export async function POST(request: NextRequest) {
             quantity: 1,
             pricing_scheme: {
               scheme_type: 'unit',
-              price: Math.round(data.total_amount * 100),
+              price: Math.round(serverTotal * 100),
             },
           },
         ],
@@ -425,10 +462,19 @@ export async function POST(request: NextRequest) {
 
     const pagarmeData = await pagarmeRes.json()
     console.log('PAGARME STATUS:', pagarmeRes.status)
-    console.log('PAGARME RESPONSE:', JSON.stringify(pagarmeData, null, 2))
+    // Não logar response completo (pode conter dados sensíveis de pagamento).
+    console.log(
+      'PAGARME RESPONSE id/status:',
+      pagarmeData?.id,
+      pagarmeData?.status,
+      pagarmeData?.message
+    )
 
     if (!pagarmeRes.ok) {
-      console.error('Pagar.me error:', pagarmeData)
+      console.error(
+        'Pagar.me error:',
+        summarizePagarmePayload(pagarmeData)
+      )
       // Mantém o registro de aceite (evidência de consentimento), mas desvincula
       // da subscription para não violar a FK ao deletá-la.
       await admin
@@ -444,15 +490,15 @@ export async function POST(request: NextRequest) {
 
     if (!isRecurringPlan(data.plan_type)) {
       const charge = pagarmeData.charges?.[0]
-      console.log('CHARGE:', JSON.stringify(charge, null, 2))
+      console.log('CHARGE id/status:', charge?.id, charge?.status)
 
       const payment = await insertPaymentWithRetry(admin, {
         subscription_id: subscription.id,
-        amount: data.total_amount,
+        amount: serverTotal,
         status: charge?.status === 'paid' ? 'paid' : 'pending',
         pagarme_charge_id: charge?.id ?? pagarmeData.id,
         paid_at: charge?.status === 'paid' ? new Date().toISOString() : null,
-        webhook_payload: pagarmeData,
+        webhook_payload: summarizePagarmePayload(pagarmeData),
       })
 
       let protocolId: string | null = null
@@ -479,7 +525,7 @@ export async function POST(request: NextRequest) {
       await admin.from('webhook_logs').insert({
         source: 'pagarme',
         event_type: 'order.created',
-        payload: pagarmeData,
+        payload: summarizePagarmePayload(pagarmeData),
         processed: true,
       })
 
@@ -515,15 +561,15 @@ export async function POST(request: NextRequest) {
       (pagarmeData.current_cycle?.id as string | undefined) ??
       pagarmeData.id
 
-    console.log('CURRENT_CYCLE:', JSON.stringify(pagarmeData.current_cycle, null, 2))
+    console.log('CURRENT_CYCLE id/status:', pagarmeData.current_cycle?.id, cycleStatus)
 
     const payment = await insertPaymentWithRetry(admin, {
       subscription_id: subscription.id,
-      amount: data.total_amount,
+      amount: serverTotal,
       status: cycleStatus === 'paid' ? 'paid' : 'pending',
       pagarme_charge_id: cycleChargeId,
       paid_at: cycleStatus === 'paid' ? new Date().toISOString() : null,
-      webhook_payload: pagarmeData,
+      webhook_payload: summarizePagarmePayload(pagarmeData),
     })
 
     let protocolId: string | null = null
@@ -550,7 +596,7 @@ export async function POST(request: NextRequest) {
     await admin.from('webhook_logs').insert({
       source: 'pagarme',
       event_type: 'subscription.created',
-      payload: pagarmeData,
+      payload: summarizePagarmePayload(pagarmeData),
       processed: true,
     })
 

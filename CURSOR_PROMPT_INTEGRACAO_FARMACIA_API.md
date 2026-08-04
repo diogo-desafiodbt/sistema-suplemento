@@ -160,7 +160,7 @@ Criar `DOCUMENTACAO_API_FARMACIA_MILIGRAMA.md` na raiz do projeto, em
 linguagem simples pra time não-técnico de TI de farmácia, contendo:
 - URL base de produção
 - Como autenticar (header `Authorization: Bearer <token>`, com o token real
-  — usar o valor `023bfed494bffbcff0ce1a31bf14ed129cffab7b591f5b056cbbb9b65e10849f`)
+  — usar o valor `<FARMACIA_API_TOKEN>`)
 - Os dois endpoints (`/api/farmacia/pedidos` e `/api/farmacia/pedidos/json`),
   com exemplo de request (curl) e exemplo de resposta JSON de cada um
 - Explicação dos parâmetros `data`/`desde`/`ate` e o comportamento default
@@ -174,5 +174,5 @@ NOTA PARA MIM (não é pro Cursor):
 ============================================================
 - Depois de aplicado, adicionar `FARMACIA_API_TOKEN` no `.env.local` e na
   Vercel (produção) com o valor
-  `023bfed494bffbcff0ce1a31bf14ed129cffab7b591f5b056cbbb9b65e10849f`
+  `<FARMACIA_API_TOKEN>`
 - Mandar o documento gerado (Parte 5) pra Miligrama

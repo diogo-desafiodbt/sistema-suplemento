@@ -8,12 +8,15 @@ const VALID_TYPES = [
   'checkout_started',
 ]
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
 export async function POST(request: NextRequest) {
   try {
     const { session_id, event_type } = await request.json()
     if (
       typeof session_id !== 'string' ||
-      !session_id ||
+      !UUID_RE.test(session_id) ||
       !VALID_TYPES.includes(event_type)
     ) {
       return NextResponse.json({ error: 'payload inválido' }, { status: 400 })
