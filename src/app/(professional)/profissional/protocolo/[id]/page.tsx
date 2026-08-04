@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { calcAge, DIAGNOSIS_LABELS, RENAL_LABELS, HEPATIC_LABELS } from '@/lib/protocol/triage'
 import { AssinarButton } from './AssinarButton'
 
 type ProtocolItem = {
@@ -13,25 +14,25 @@ type ProtocolItem = {
 }
 
 type QuizResponse = {
+  birth_date: string | null
+  sex: string | null
+  is_pregnant_or_breastfeeding: boolean | null
+  renal_conditions: string[] | null
+  hepatic_conditions: string[] | null
   diagnosis_type: string
-  years_diagnosed: string
-  hba1c_range: string
-  fasting_glucose: string
-  medications: string[]
-  symptoms: string[]
-  conditions_mild: string[]
-  conditions_serious: string[]
-  weight_status: string
-  exercise_freq: string
-  diet_quality: string
+  medications: string[] | null
+  years_diagnosed: string | null
   allergies: string | null
+  conditions_serious: string[] | null
+  hba1c_range: string | null
+  fasting_glucose: string | null
+  symptoms: string[] | null
 }
 
 type Patient = {
   full_name: string
   email: string
   client_code: string
-  birth_date: string | null
 }
 
 type ProtocolDetail = {
@@ -77,22 +78,22 @@ export default async function ProtocoloPage({
       users (
         full_name,
         email,
-        client_code,
-        birth_date
+        client_code
       ),
       quiz_responses (
+        birth_date,
+        sex,
+        is_pregnant_or_breastfeeding,
+        renal_conditions,
+        hepatic_conditions,
         diagnosis_type,
+        medications,
         years_diagnosed,
+        allergies,
+        conditions_serious,
         hba1c_range,
         fasting_glucose,
-        medications,
-        symptoms,
-        conditions_mild,
-        conditions_serious,
-        weight_status,
-        exercise_freq,
-        diet_quality,
-        allergies
+        symptoms
       ),
       protocol_items (
         id,
@@ -116,11 +117,26 @@ export default async function ProtocoloPage({
 
   const quiz = protocolData.quiz_responses
   const patient = protocolData.users
+  const isLegacyQuiz = !quiz?.birth_date
 
-  const diagnosisLabel: Record<string, string> = {
-    type2: 'Diabetes tipo 2',
-    prediabetes: 'Pré-diabetes',
-    undiagnosed: 'Não diagnosticado / histórico familiar',
+  const age =
+    quiz?.birth_date && !Number.isNaN(new Date(quiz.birth_date).getTime())
+      ? calcAge(quiz.birth_date)
+      : null
+
+  const renal = quiz?.renal_conditions ?? []
+  const hepatic = quiz?.hepatic_conditions ?? []
+  const pregnant = Boolean(quiz?.is_pregnant_or_breastfeeding)
+  const showClinicalAlert =
+    !isLegacyQuiz && (renal.length > 0 || hepatic.length > 0 || pregnant)
+
+  const alertItems: string[] = []
+  if (pregnant) alertItems.push('Gravidez ou amamentação')
+  for (const c of renal) {
+    alertItems.push(`Renal: ${RENAL_LABELS[c] ?? c}`)
+  }
+  for (const c of hepatic) {
+    alertItems.push(`Hepática: ${HEPATIC_LABELS[c] ?? c}`)
   }
 
   const statusBadge = protocolData.status === 'signed'
@@ -189,56 +205,124 @@ export default async function ProtocoloPage({
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
-          <h2 className="font-bold text-[#13244f]">Perfil clínico</h2>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Diagnóstico</p>
-              <p className="font-semibold text-[#13244f]">{diagnosisLabel[quiz?.diagnosis_type ?? ''] ?? '-'}</p>
-            </div>
-            <div>
-              <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Tempo de diagnóstico</p>
-              <p className="font-semibold text-[#13244f]">
-                {protocolData.source === 'mini_quiz'
-                  ? (quiz?.allergies?.startsWith('idade:')
-                    ? `Não informado — idade ${quiz.allergies.replace('idade:', '')} anos`
-                    : 'Não informado (compra direta)')
-                  : (quiz?.years_diagnosed ?? '-')}
-              </p>
-            </div>
-            <div>
-              <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">HbA1c</p>
-              <p className="font-semibold text-[#13244f]">{quiz?.hba1c_range ?? 'Não informado'}</p>
-            </div>
-            <div>
-              <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Glicemia em jejum</p>
-              <p className="font-semibold text-[#13244f]">{quiz?.fasting_glucose ?? 'Não informado'}</p>
-            </div>
-            <div>
-              <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Medicamentos</p>
-              <p className="font-semibold text-[#13244f]">
-                {quiz?.medications && quiz.medications.length > 0 ? quiz.medications.join(', ') : 'Nenhum'}
-              </p>
-            </div>
-            <div>
-              <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Sintomas</p>
-              <p className="font-semibold text-[#13244f]">
-                {quiz?.symptoms && quiz.symptoms.length > 0 ? quiz.symptoms.join(', ') : 'Nenhum'}
-              </p>
-            </div>
-            {quiz?.conditions_serious && quiz.conditions_serious.length > 0 && (
-              <div className="col-span-2">
-                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Condições sérias</p>
-                <p className="font-semibold text-red-600">{quiz.conditions_serious.join(', ')}</p>
-              </div>
-            )}
-            {quiz?.allergies && quiz.allergies !== 'nao' && quiz.allergies !== 'nao_sei' && (
-              <div className="col-span-2">
-                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Alergias</p>
-                <p className="font-semibold text-amber-600">{quiz.allergies}</p>
-              </div>
-            )}
+        {showClinicalAlert && (
+          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-5 space-y-2">
+            <p className="text-sm font-bold text-amber-900">Atenção clínica — condições que restringem produtos</p>
+            <ul className="text-sm text-amber-900/90 list-disc pl-5 space-y-1">
+              {alertItems.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
           </div>
+        )}
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+          <h2 className="font-bold text-[#13244f]">
+            {isLegacyQuiz ? 'Perfil clínico' : 'Perfil clínico (triagem)'}
+          </h2>
+          {isLegacyQuiz ? (
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Diagnóstico</p>
+                <p className="font-semibold text-[#13244f]">{DIAGNOSIS_LABELS[quiz?.diagnosis_type ?? ''] ?? '-'}</p>
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Tempo de diagnóstico</p>
+                <p className="font-semibold text-[#13244f]">
+                  {protocolData.source === 'mini_quiz'
+                    ? (quiz?.allergies?.startsWith('idade:')
+                      ? `Não informado — idade ${quiz.allergies.replace('idade:', '')} anos`
+                      : 'Não informado (compra direta)')
+                    : (quiz?.years_diagnosed ?? '-')}
+                </p>
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">HbA1c</p>
+                <p className="font-semibold text-[#13244f]">{quiz?.hba1c_range ?? 'Não informado'}</p>
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Glicemia em jejum</p>
+                <p className="font-semibold text-[#13244f]">{quiz?.fasting_glucose ?? 'Não informado'}</p>
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Medicamentos</p>
+                <p className="font-semibold text-[#13244f]">
+                  {quiz?.medications && quiz.medications.length > 0
+                    ? quiz.medications.join(', ')
+                    : 'Nenhum'}
+                </p>
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Sintomas</p>
+                <p className="font-semibold text-[#13244f]">
+                  {quiz?.symptoms && quiz.symptoms.length > 0
+                    ? quiz.symptoms.join(', ')
+                    : 'Nenhum'}
+                </p>
+              </div>
+              {quiz?.conditions_serious && quiz.conditions_serious.length > 0 && (
+                <div className="col-span-2">
+                  <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Condições sérias</p>
+                  <p className="font-semibold text-red-600">{quiz.conditions_serious.join(', ')}</p>
+                </div>
+              )}
+              {quiz?.allergies && quiz.allergies !== 'nao' && quiz.allergies !== 'nao_sei' && !quiz.allergies.startsWith('idade:') && (
+                <div className="col-span-2">
+                  <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Alergias</p>
+                  <p className="font-semibold text-amber-600">{quiz.allergies}</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Diagnóstico</p>
+                <p className="font-semibold text-[#13244f]">{DIAGNOSIS_LABELS[quiz?.diagnosis_type ?? ''] ?? '-'}</p>
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Idade</p>
+                <p className="font-semibold text-[#13244f]">
+                  {age != null ? `${age} anos` : '—'}
+                </p>
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Sexo</p>
+                <p className="font-semibold text-[#13244f]">
+                  {quiz?.sex === 'mulher' ? 'Mulher' : quiz?.sex === 'homem' ? 'Homem' : '—'}
+                </p>
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Gravidez / amamentação</p>
+                <p className="font-semibold text-[#13244f]">
+                  {quiz?.sex === 'mulher' ? (pregnant ? 'Sim' : 'Não') : '—'}
+                </p>
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Condições renais</p>
+                <p className="font-semibold text-[#13244f]">
+                  {renal.length > 0
+                    ? renal.map((c) => RENAL_LABELS[c] ?? c).join(', ')
+                    : 'Nenhuma'}
+                </p>
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Condições hepáticas</p>
+                <p className="font-semibold text-[#13244f]">
+                  {hepatic.length > 0
+                    ? hepatic.map((c) => HEPATIC_LABELS[c] ?? c).join(', ')
+                    : 'Nenhuma'}
+                </p>
+              </div>
+              <div className="col-span-2">
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Medicamentos</p>
+                <p className="font-semibold text-[#13244f]">
+                  {quiz?.medications && quiz.medications.length > 0
+                    ? quiz.medications.join(', ')
+                    : 'Nenhum'}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">

@@ -5,8 +5,13 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { PLAN_LABELS, getChargePrice } from '@/lib/plans'
-import type { ShippingOptionPublic, ShippingSelection } from '@/types/shipping'
+import {
+  shippingQuoteKey,
+  type ShippingOptionPublic,
+  type ShippingSelection,
+} from '@/types/shipping'
 import { estimateCustomerDeliveryDays } from '@/lib/shipping/estimate'
+import { trackFunnelEvent } from '@/lib/funnel/track'
 
 type Step = 2 | 3 | 4
 
@@ -100,6 +105,10 @@ export default function CheckoutPage() {
 
   const [accountSummary, setAccountSummary] = useState<{ name: string; email: string } | null>(null)
   const [addressSummary, setAddressSummary] = useState<string | null>(null)
+
+  useEffect(() => {
+    trackFunnelEvent('checkout_started')
+  }, [])
 
   useEffect(() => {
     if (plan !== '1mes' && paymentMethod === 'pix') {
@@ -302,6 +311,8 @@ export default function CheckoutPage() {
         valor: preferred.valor,
         prazoDias: preferred.prazoDias,
         codigoServico: preferred.codigoServico,
+        transportadora: preferred.transportadora,
+        nomeServico: preferred.nomeServico,
       })
       setShippingError(false)
     } catch {
@@ -610,12 +621,19 @@ export default function CheckoutPage() {
                     <p className="text-xs text-gray-400">Calculando frete…</p>
                   )}
                   {!loadingShipping && shippingOptions.length > 0 && (
-                    <div className="grid gap-2">
+                    <div className="grid gap-2 max-h-80 overflow-y-auto pr-1">
                       {shippingOptions.map(opt => {
-                        const selected = shipping.codigoServico === opt.codigoServico
+                        const selected =
+                          shippingQuoteKey(shipping) === shippingQuoteKey(opt)
+                        const tipoLabel =
+                          opt.tipo === 'economica'
+                            ? 'Mais barata'
+                            : opt.tipo === 'expressa'
+                              ? 'Mais rápida'
+                              : null
                         return (
                           <button
-                            key={opt.codigoServico}
+                            key={shippingQuoteKey(opt)}
                             type="button"
                             onClick={() =>
                               setShipping({
@@ -623,6 +641,8 @@ export default function CheckoutPage() {
                                 valor: opt.valor,
                                 prazoDias: opt.prazoDias,
                                 codigoServico: opt.codigoServico,
+                                transportadora: opt.transportadora,
+                                nomeServico: opt.nomeServico,
                               })
                             }
                             className={`w-full text-left rounded-xl border px-4 py-3 transition ${
@@ -631,15 +651,25 @@ export default function CheckoutPage() {
                                 : 'border-gray-200 hover:border-[#13244f]/40'
                             }`}
                           >
-                            <div className="flex items-center justify-between gap-3">
-                              <div>
-                                <p className="text-sm font-bold text-[#13244f]">
-                                  {opt.tipo === 'economica' ? 'Entrega econômica' : 'Entrega expressa'}
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="text-sm font-bold text-[#13244f] truncate">
+                                    {opt.transportadora || 'Transportadora'}
+                                  </p>
+                                  {tipoLabel && (
+                                    <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#13244f]/10 text-[#13244f]">
+                                      {tipoLabel}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-600 mt-0.5 truncate">
+                                  {opt.nomeServico || opt.codigoServico}
                                 </p>
                                 <p className="text-xs text-gray-500 mt-0.5">
                                   {(() => {
                                     const dias = estimateCustomerDeliveryDays(opt.prazoDias)
-                                    return `chega em até ${dias} ${dias === 1 ? 'dia útil' : 'dias úteis'}`
+                                    return `chega em até ${dias} ${dias === 1 ? 'dia útil' : 'dias úteis'} · serviço ${opt.codigoServico}`
                                   })()}
                                 </p>
                               </div>

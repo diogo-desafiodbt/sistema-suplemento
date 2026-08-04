@@ -50,6 +50,8 @@ const checkoutSchema = z.object({
     valor: z.number().nonnegative(),
     prazoDias: z.number().nonnegative(),
     codigoServico: z.string(),
+    transportadora: z.string().optional(),
+    nomeServico: z.string().optional(),
   }),
   address: z.object({
     zip_code: z.string(),
@@ -73,6 +75,52 @@ const checkoutSchema = z.object({
     .optional(),
   cpf: z.string(),
 })
+
+type AdminClient = ReturnType<typeof createAdminClient>
+
+async function insertPaymentWithRetry(
+  admin: AdminClient,
+  row: Record<string, unknown>
+) {
+  let { data, error } = await admin
+    .from('payments')
+    .insert(row)
+    .select('id')
+    .single()
+  if (error) {
+    console.error('Checkout payments.insert error (tentativa 1):', error)
+    ;({ data, error } = await admin
+      .from('payments')
+      .insert(row)
+      .select('id')
+      .single())
+  }
+  if (error?.code === '23505') {
+    const chargeId = row.pagarme_charge_id
+    if (typeof chargeId === 'string' && chargeId) {
+      const { data: existing } = await admin
+        .from('payments')
+        .select('id')
+        .eq('pagarme_charge_id', chargeId)
+        .maybeSingle()
+      if (existing) return existing
+    }
+  }
+  if (error) {
+    console.error(
+      'CRÍTICO — payments.insert falhou 2x; cobrança pode ter sido aprovada sem registro interno:',
+      error,
+      { row }
+    )
+    throw new Error(
+      `Checkout: falha ao registrar payment após cobrança (${error.message})`
+    )
+  }
+  if (!data?.id) {
+    throw new Error('Checkout: payments.insert não retornou id')
+  }
+  return data
+}
 
 async function finalizePaidSubscription(
   admin: ReturnType<typeof createAdminClient>,
@@ -398,7 +446,7 @@ export async function POST(request: NextRequest) {
       const charge = pagarmeData.charges?.[0]
       console.log('CHARGE:', JSON.stringify(charge, null, 2))
 
-      await admin.from('payments').insert({
+      const payment = await insertPaymentWithRetry(admin, {
         subscription_id: subscription.id,
         amount: data.total_amount,
         status: charge?.status === 'paid' ? 'paid' : 'pending',
@@ -417,7 +465,11 @@ export async function POST(request: NextRequest) {
         try {
           await inngest.send({
             name: 'pagamento/confirmado',
-            data: { subscription_id: subscription.id, user_id: user.id },
+            data: {
+              subscription_id: subscription.id,
+              user_id: user.id,
+              payment_id: payment.id,
+            },
           })
         } catch (inngestError) {
           console.error('Erro ao disparar pagamento/confirmado:', inngestError)
@@ -457,12 +509,15 @@ export async function POST(request: NextRequest) {
       .eq('id', subscription.id)
 
     const cycleStatus = pagarmeData.current_cycle?.status as string | undefined
+    // Preferir charge id real — current_cycle.id costuma divergir do id do webhook.
     const cycleChargeId =
-      (pagarmeData.current_cycle?.id as string | undefined) ?? pagarmeData.id
+      (pagarmeData.charges?.[0]?.id as string | undefined) ??
+      (pagarmeData.current_cycle?.id as string | undefined) ??
+      pagarmeData.id
 
     console.log('CURRENT_CYCLE:', JSON.stringify(pagarmeData.current_cycle, null, 2))
 
-    await admin.from('payments').insert({
+    const payment = await insertPaymentWithRetry(admin, {
       subscription_id: subscription.id,
       amount: data.total_amount,
       status: cycleStatus === 'paid' ? 'paid' : 'pending',
@@ -481,7 +536,11 @@ export async function POST(request: NextRequest) {
       try {
         await inngest.send({
           name: 'pagamento/confirmado',
-          data: { subscription_id: subscription.id, user_id: user.id },
+          data: {
+            subscription_id: subscription.id,
+            user_id: user.id,
+            payment_id: payment.id,
+          },
         })
       } catch (inngestError) {
         console.error('Erro ao disparar pagamento/confirmado:', inngestError)

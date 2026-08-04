@@ -10,9 +10,27 @@ type PagarmePayload = {
   id?: string
   data?: {
     id?: string
+    amount?: number
+    paid_amount?: number
     metadata?: Record<string, string>
     subscription?: {
       metadata?: Record<string, string>
+    }
+    current_cycle?: {
+      id?: string
+      amount?: number
+    }
+    last_transaction?: {
+      amount?: number
+    }
+    charges?: Array<{
+      id?: string
+      amount?: number
+      paid_amount?: number
+    }>
+    invoice?: {
+      amount?: number
+      charge?: { id?: string }
     }
   }
   metadata?: Record<string, string>
@@ -28,7 +46,55 @@ function extractMetadata(payload: PagarmePayload): Record<string, string> {
 }
 
 function getChargeId(payload: PagarmePayload): string | undefined {
-  return payload.data?.id ?? payload.id
+  return getChargeIdCandidates(payload)[0]
+}
+
+/** IDs possíveis da cobrança — checkout grava charge.id; subscription events
+ *  costumam trazer data.id = subscription/invoice. Preferir charge real. */
+function getChargeIdCandidates(payload: PagarmePayload): string[] {
+  const raw = [
+    payload.data?.charges?.[0]?.id,
+    payload.data?.invoice?.charge?.id,
+    payload.data?.id,
+    payload.id,
+    payload.data?.current_cycle?.id,
+  ]
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const id of raw) {
+    if (typeof id === 'string' && id && !seen.has(id)) {
+      seen.add(id)
+      out.push(id)
+    }
+  }
+  return out
+}
+
+/** Valor em reais (mesma unidade de `payments.amount` no checkout). Pagar.me manda centavos. */
+export function extractAmountFromPayload(payload: PagarmePayload): number {
+  const data = payload.data
+  if (!data) return 0
+
+  const candidates = [
+    data.amount,
+    data.paid_amount,
+    data.last_transaction?.amount,
+    data.current_cycle?.amount,
+    data.invoice?.amount,
+    data.charges?.[0]?.amount,
+    data.charges?.[0]?.paid_amount,
+  ]
+
+  for (const raw of candidates) {
+    if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) {
+      return raw / 100
+    }
+  }
+  console.error(
+    'extractAmountFromPayload: nenhum valor encontrado no payload',
+    payload
+  )
+  return 0
 }
 
 async function shouldDispatchPharmacy(
@@ -70,7 +136,8 @@ async function handlePaymentSucceeded(
   metadata: Record<string, string>,
   chargeId: string | undefined,
   webhookLogId: string | undefined,
-  dispatchPharmacy: boolean
+  dispatchPharmacy: boolean,
+  payload: PagarmePayload
 ): Promise<void> {
   const subscriptionId = metadata.subscription_id
   const userId = metadata.user_id
@@ -93,14 +160,141 @@ async function handlePaymentSucceeded(
     })
     .eq('id', subscriptionId)
 
+  let paymentId: string | undefined
+
   if (chargeId) {
-    await admin
-      .from('payments')
-      .update({
-        status: 'paid',
-        paid_at: new Date().toISOString(),
-      })
-      .eq('pagarme_charge_id', chargeId)
+    const paidAt = new Date().toISOString()
+    const chargeIds = getChargeIdCandidates(payload)
+
+    // Tenta marcar como pago por qualquer ID conhecido da cobrança.
+    for (const candidateId of chargeIds) {
+      const { data: updated, error: updateError } = await admin
+        .from('payments')
+        .update({
+          status: 'paid',
+          paid_at: paidAt,
+        })
+        .eq('pagarme_charge_id', candidateId)
+        .select('id')
+
+      if (updateError) {
+        console.error(
+          'Webhook payments.update error:',
+          updateError,
+          { candidateId }
+        )
+        continue
+      }
+      if (updated && updated.length > 0) {
+        paymentId = updated[0].id
+        // Não sobrescrever pagarme_charge_id com getChargeId() — em
+        // subscription.payment_succeeded o 1º candidato antigo (data.id) pode
+        // ser subscription/invoice, não o charge que o checkout gravou.
+        // Próximas entregas já batem em todos os candidates.
+        break
+      }
+    }
+
+    if (!paymentId) {
+      // Checkout pode ter gravado cycle.id ≠ charge.id do webhook.
+      // Só reaproveita pending se houver correlação com esta cobrança.
+      const since = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+      const chargeIdSet = new Set(chargeIds)
+
+      const { data: pendingPayments } = await admin
+        .from('payments')
+        .select('id, pagarme_charge_id, amount, webhook_payload')
+        .eq('subscription_id', subscriptionId)
+        .eq('status', 'pending')
+        .gte('created_at', since)
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+      const payloadMentionsCharge = (webhookPayload: unknown): boolean => {
+        if (!webhookPayload || typeof webhookPayload !== 'object') return false
+        const raw = JSON.stringify(webhookPayload)
+        return chargeIds.some((id) => raw.includes(id))
+      }
+
+      // Só por correlação de charge id / payload — nunca só por valor.
+      const matchedPending =
+        pendingPayments?.find(
+          (p) =>
+            typeof p.pagarme_charge_id === 'string' &&
+            chargeIdSet.has(p.pagarme_charge_id)
+        ) ??
+        pendingPayments?.find((p) => payloadMentionsCharge(p.webhook_payload))
+
+      if (matchedPending?.id) {
+        const { data: updatedPending, error: pendingErr } = await admin
+          .from('payments')
+          .update({
+            status: 'paid',
+            paid_at: paidAt,
+            // chargeId já prioriza charges[0]/invoice.charge (não data.id de subscription).
+            pagarme_charge_id: chargeId,
+          })
+          .eq('id', matchedPending.id)
+          .eq('status', 'pending')
+          .select('id')
+          .maybeSingle()
+
+        if (pendingErr) {
+          if (pendingErr.code === '23505') {
+            const { data: existingPayment } = await admin
+              .from('payments')
+              .select('id')
+              .eq('pagarme_charge_id', chargeId)
+              .maybeSingle()
+            paymentId = existingPayment?.id
+          } else {
+            console.error('Webhook payments.pending update error:', pendingErr)
+          }
+        } else if (updatedPending?.id) {
+          paymentId = updatedPending.id
+        }
+      } else if ((pendingPayments?.length ?? 0) > 0) {
+        console.warn(
+          'Webhook: pending payments existem mas nenhum correlaciona com chargeIds',
+          { subscriptionId, chargeIds, pendingIds: pendingPayments?.map((p) => p.id) }
+        )
+      }
+    }
+
+    if (!paymentId) {
+      // Cobrança nova (renovação) — charge_id ainda não existia na tabela.
+      const { data: inserted, error: insertError } = await admin
+        .from('payments')
+        .insert({
+          subscription_id: subscriptionId,
+          pagarme_charge_id: chargeId,
+          amount: extractAmountFromPayload(payload),
+          status: 'paid',
+          paid_at: paidAt,
+        })
+        .select('id')
+        .single()
+
+      if (insertError) {
+        if (insertError.code === '23505') {
+          const { data: existingPayment } = await admin
+            .from('payments')
+            .select('id')
+            .eq('pagarme_charge_id', chargeId)
+            .maybeSingle()
+          paymentId = existingPayment?.id
+        } else {
+          console.error('Webhook payments.insert error:', insertError)
+        }
+      } else {
+        paymentId = inserted?.id
+      }
+    }
+  } else {
+    console.warn(
+      'handlePaymentSucceeded: payload sem chargeId, payments não atualizado',
+      payload
+    )
   }
 
   const { data: existing } = await admin
@@ -145,16 +339,21 @@ async function handlePaymentSucceeded(
       .maybeSingle()
 
     if (!sub?.protocol_id) {
-      console.error(
+      // Faz o webhook falhar pra o Pagar.me retentar — criação pode ainda estar
+      // em andamento (outro worker) ou ter demorado mais que o wait local.
+      throw new Error(
         `Farmácia não disparada — protocolo ainda ausente para subscription ${subscriptionId}`
       )
-      return
     }
 
     try {
       await inngest.send({
         name: 'pagamento/confirmado',
-        data: { subscription_id: subscriptionId, user_id: userId },
+        data: {
+          subscription_id: subscriptionId,
+          user_id: userId,
+          ...(paymentId ? { payment_id: paymentId } : {}),
+        },
       })
     } catch (inngestError) {
       console.error('Erro ao disparar pagamento/confirmado:', inngestError)
@@ -246,7 +445,8 @@ export async function POST(request: NextRequest) {
         metadata,
         chargeId,
         webhookLog?.id,
-        dispatchPharmacy
+        dispatchPharmacy,
+        payload
       )
     }
 
@@ -262,6 +462,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('Webhook error:', error)
-    return NextResponse.json({ ok: true })
+    // 500 pra o Pagar.me retentar (ex.: protocolo ainda em criação).
+    return NextResponse.json(
+      { error: 'Webhook processing failed' },
+      { status: 500 }
+    )
   }
 }

@@ -1,5 +1,7 @@
 import { Resend } from 'resend'
 import type { createAdminClient } from '@/lib/supabase/admin'
+import { trackingEventKey } from '@/lib/shipping/create-label'
+import { claimOnce, releaseClaim, markClaimCompleted } from '@/lib/idempotency'
 import type { RastreamentoEvento } from '@/types/shipping'
 
 type AdminClient = ReturnType<typeof createAdminClient>
@@ -38,15 +40,13 @@ export function getNewTrackingEvents(
     ? (base.eventos as Array<Record<string, unknown>>)
     : []
 
-  const existingIds = new Set(
-    prev.map((ev) => {
-      const id = ev.id
-      return id == null ? null : String(id)
-    }).filter((id): id is string => id != null)
-  )
+  const existingKeys = new Set(prev.map((ev) => trackingEventKey(ev)))
 
   return incoming
-    .filter((ev) => ev.id != null && !existingIds.has(String(ev.id)))
+    .filter((ev) => {
+      const key = trackingEventKey(ev as unknown as Record<string, unknown>)
+      return !existingKeys.has(key)
+    })
     .slice()
     .sort(
       (a, b) =>
@@ -59,16 +59,57 @@ async function logNotification(
   userId: string,
   status: 'sent' | 'failed'
 ): Promise<void> {
-  try {
-    await admin.from('notification_logs').insert({
-      user_id: userId,
-      type: 'tracking_update',
-      channel: 'email',
-      status,
-    })
-  } catch (error) {
+  const { error } = await admin.from('notification_logs').insert({
+    user_id: userId,
+    type: 'tracking_update',
+    channel: 'email',
+    status,
+  })
+  if (error) {
     console.error('Erro ao registrar notification_logs (tracking_update):', error)
   }
+}
+
+async function markShippingEmailSent(
+  admin: AdminClient,
+  claimKeys: { order_id: string; event_id: string }
+): Promise<void> {
+  const { error } = await admin
+    .from('shipping_notification_logs')
+    .update({ email_sent_at: new Date().toISOString() })
+    .eq('order_id', claimKeys.order_id)
+    .eq('event_id', claimKeys.event_id)
+  if (error) {
+    throw new Error(
+      `notifyShippingUpdate: falha ao gravar email_sent_at: ${error.message}`
+    )
+  }
+}
+
+/** Se o e-mail já saiu (email_sent_at na claim) ou completed_at, completa e retorna true. */
+async function healShippingClaimIfSent(
+  admin: AdminClient,
+  claimKeys: { order_id: string; event_id: string }
+): Promise<boolean> {
+  const { data: existingClaim } = await admin
+    .from('shipping_notification_logs')
+    .select('completed_at, email_sent_at')
+    .eq('order_id', claimKeys.order_id)
+    .eq('event_id', claimKeys.event_id)
+    .maybeSingle()
+
+  if (existingClaim?.completed_at) return true
+
+  if (!existingClaim?.email_sent_at) return false
+
+  await markClaimCompleted(
+    admin,
+    'shipping_notification_logs',
+    claimKeys,
+    undefined,
+    'completed_at'
+  )
+  return true
 }
 
 function buildShippingEmailHtml(params: {
@@ -211,26 +252,61 @@ export async function notifyShippingUpdate(
       return
     }
 
-    const { error: insertError } = await admin
-      .from('shipping_notification_logs')
-      .insert({
-        order_id: params.orderId,
-        event_id: params.eventId,
-      })
-
-    if (insertError) {
-      if (insertError.code === '23505') {
-        return
-      }
-      console.error('notifyShippingUpdate: erro ao inserir log', insertError)
-      return
+    const claimKeys = {
+      order_id: params.orderId,
+      event_id: params.eventId,
     }
+
+    const shippingClaimOpts = {
+      timestampColumn: 'sent_at' as const,
+      completedColumn: 'completed_at' as const,
+      protectColumns: ['email_sent_at'],
+      // Crash antes do send: reclaim após 2 min. Após o send gravamos
+      // email_sent_at na claim — heal correlacionado, sem notification_logs.
+      staleAfterMs: 2 * 60 * 1000,
+    }
+
+    const { won } = await claimOnce(
+      admin,
+      'shipping_notification_logs',
+      claimKeys,
+      shippingClaimOpts
+    )
+
+    let claimed = won
+    if (!won) {
+      if (await healShippingClaimIfSent(admin, claimKeys)) return
+
+      // Espera breve o outro worker (~15s), sem releaseClaim manual.
+      for (let i = 0; i < 30; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 500))
+        if (await healShippingClaimIfSent(admin, claimKeys)) return
+      }
+
+      const retry = await claimOnce(
+        admin,
+        'shipping_notification_logs',
+        claimKeys,
+        shippingClaimOpts
+      )
+      if (!retry.won) {
+        if (await healShippingClaimIfSent(admin, claimKeys)) return
+        throw new Error(
+          `notifyShippingUpdate: claim incompleta após espera para order ${params.orderId} event ${params.eventId}`
+        )
+      }
+      // Reclaim só acontece sem email_sent_at (protectColumns).
+      claimed = true
+    }
+
+    if (!claimed) return
 
     const resendApiKey = process.env.RESEND_API_KEY
     if (!resendApiKey) {
       console.warn('RESEND_API_KEY ausente — e-mail de frete não enviado')
+      await releaseClaim(admin, 'shipping_notification_logs', claimKeys)
       await logNotification(admin, order.user_id, 'failed')
-      return
+      throw new Error('RESEND_API_KEY ausente — e-mail de frete não enviado')
     }
 
     const firstName = user.full_name?.split(' ')[0] ?? 'Olá'
@@ -253,13 +329,44 @@ export async function notifyShippingUpdate(
         subject,
         html,
       })
-      await logNotification(admin, order.user_id, 'sent')
     } catch (error) {
+      await releaseClaim(admin, 'shipping_notification_logs', claimKeys)
       console.error('Erro ao enviar e-mail de frete:', error)
       await logNotification(admin, order.user_id, 'failed')
+      throw error
     }
+
+    // Evidência na própria claim (order_id+event_id) — nunca releaseClaim pós-send.
+    try {
+      await markShippingEmailSent(admin, claimKeys)
+    } catch (emailSentError) {
+      try {
+        await markClaimCompleted(
+          admin,
+          'shipping_notification_logs',
+          claimKeys,
+          undefined,
+          'completed_at'
+        )
+      } catch (stampError) {
+        console.error(
+          'notifyShippingUpdate: falha ao stamp após e-mail (email_sent_at também falhou):',
+          stampError
+        )
+      }
+      throw emailSentError
+    }
+    await markClaimCompleted(
+      admin,
+      'shipping_notification_logs',
+      claimKeys,
+      undefined,
+      'completed_at'
+    )
+    await logNotification(admin, order.user_id, 'sent')
   } catch (error) {
     console.error('notifyShippingUpdate error:', error)
+    throw error
   }
 }
 
@@ -279,7 +386,7 @@ export async function notifyNewTrackingEvents(
     } else {
       await notifyShippingUpdate(admin, {
         orderId,
-        eventId: String(evento.id),
+        eventId: trackingEventKey(evento as unknown as Record<string, unknown>),
         kind: 'tracking',
         descricao: evento.descricao,
         local: evento.local,

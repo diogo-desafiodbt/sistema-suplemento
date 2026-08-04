@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { computePackageDimensions, type PackageItem } from '@/lib/shipping/package'
 import { getCotacao } from '@/lib/shipping/envie-agora/cotacao'
-import type { ShippingOptionPublic } from '@/types/shipping'
+import { shippingQuoteKey, type ShippingOptionPublic } from '@/types/shipping'
 
 const bodySchema = z.object({
   cepdestino: z.string().min(8),
@@ -67,22 +67,30 @@ export async function POST(request: NextRequest) {
       return a.valor <= b.valor ? a : b
     })
 
-    const options: ShippingOptionPublic[] = []
-    options.push({
-      tipo: 'economica',
-      valor: economica.valor,
-      prazoDias: economica.prazoDias,
-      codigoServico: economica.codigoServico,
+    // Todas as cotações da Envie Agora — transportadora/serviço visíveis pra validação.
+    const sorted = [...quotes].sort((a, b) => {
+      if (a.valor !== b.valor) return a.valor - b.valor
+      return a.prazoDias - b.prazoDias
     })
 
-    if (economica.codigoServico !== expressa.codigoServico) {
-      options.push({
-        tipo: 'expressa',
-        valor: expressa.valor,
-        prazoDias: expressa.prazoDias,
-        codigoServico: expressa.codigoServico,
-      })
-    }
+    const economicaKey = shippingQuoteKey(economica)
+    const expressaKey = shippingQuoteKey(expressa)
+
+    const options: ShippingOptionPublic[] = sorted.map((q) => {
+      const key = shippingQuoteKey(q)
+      let tipo: ShippingOptionPublic['tipo'] = 'padrao'
+      if (key === economicaKey) tipo = 'economica'
+      else if (key === expressaKey) tipo = 'expressa'
+
+      return {
+        tipo,
+        valor: q.valor,
+        prazoDias: q.prazoDias,
+        codigoServico: q.codigoServico,
+        transportadora: q.transportadora,
+        nomeServico: q.nomeServico,
+      }
+    })
 
     return NextResponse.json({ options, erro: false })
   } catch (error) {

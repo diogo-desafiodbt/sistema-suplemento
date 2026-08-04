@@ -48,8 +48,8 @@ export async function POST(
 
     const tracking = await getRastreamento(order.shipping_request_id)
     const eventos = tracking.eventos ?? []
-    const newEvents = getNewTrackingEvents(order.shipping_json, eventos)
 
+    // Persiste antes de notificar (mesmo padrão do webhook de rastreamento).
     const merged = mergeTrackingEvents(
       order.shipping_json,
       eventos as unknown as Array<Record<string, unknown>>
@@ -60,9 +60,23 @@ export async function POST(
       updates.status = 'delivered'
     }
 
-    await admin.from('orders').update(updates).eq('id', id)
+    const { error: updateError } = await admin
+      .from('orders')
+      .update(updates)
+      .eq('id', id)
 
-    await notifyNewTrackingEvents(admin, order.id, newEvents)
+    if (updateError) {
+      throw new Error(
+        `atualizar-rastreio: falha ao persistir shipping_json: ${updateError.message}`
+      )
+    }
+
+    const newEvents = getNewTrackingEvents(order.shipping_json, eventos)
+    await notifyNewTrackingEvents(
+      admin,
+      order.id,
+      newEvents.length > 0 ? newEvents : eventos
+    )
 
     return NextResponse.json({ ok: true, eventos: eventos.length })
   } catch (error) {

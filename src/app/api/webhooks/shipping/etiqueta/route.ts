@@ -66,9 +66,13 @@ export async function POST(request: NextRequest) {
     if (log?.id) {
       await admin.from('webhook_logs').update({ processed: true }).eq('id', log.id)
     }
+
+    return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('webhook shipping/etiqueta error:', error)
+    return NextResponse.json(
+      { error: 'Webhook processing failed' },
+      { status: 500 }
+    )
   }
-
-  return NextResponse.json({ ok: true })
 }

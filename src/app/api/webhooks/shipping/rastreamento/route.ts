@@ -48,8 +48,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    const newEvents = getNewTrackingEvents(order.shipping_json, eventos)
-
+    // Persiste antes de notificar — o painel não pode ficar sem o evento se o
+    // e-mail/claim já tiverem sido concluídos. notifyShippingUpdate é
+    // idempotente por (order_id, event_id); no retry reenviamos só o que ainda
+    // não tem completed_at (passamos o payload inteiro, não só "novos" vs JSON).
     const merged = mergeTrackingEvents(
       order.shipping_json,
       eventos as unknown as Array<Record<string, unknown>>
@@ -60,16 +62,36 @@ export async function POST(request: NextRequest) {
       updates.status = 'delivered'
     }
 
-    await admin.from('orders').update(updates).eq('id', order.id)
+    const { error: updateError } = await admin
+      .from('orders')
+      .update(updates)
+      .eq('id', order.id)
 
-    await notifyNewTrackingEvents(admin, order.id, newEvents)
+    if (updateError) {
+      throw new Error(
+        `webhook rastreamento: falha ao persistir shipping_json: ${updateError.message}`
+      )
+    }
+
+    // Preferir eventos ainda ausentes no JSON; se o merge já rodou num retry
+    // anterior, notifica pelo payload (claims pulam o que já foi enviado).
+    const newEvents = getNewTrackingEvents(order.shipping_json, eventos)
+    await notifyNewTrackingEvents(
+      admin,
+      order.id,
+      newEvents.length > 0 ? newEvents : eventos
+    )
 
     if (log?.id) {
       await admin.from('webhook_logs').update({ processed: true }).eq('id', log.id)
     }
+
+    return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('webhook shipping/rastreamento error:', error)
+    return NextResponse.json(
+      { error: 'Webhook processing failed' },
+      { status: 500 }
+    )
   }
-
-  return NextResponse.json({ ok: true })
 }

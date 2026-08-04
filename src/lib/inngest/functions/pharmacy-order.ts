@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { buildPharmacyJson, buildPharmacyItem } from '@/lib/pharmacy/json-builder'
 import { getPharmacySkuKey, getUnitPriceFromProduct } from '@/lib/plans'
 import { computePackageDimensions, type PackageItem } from '@/lib/shipping/package'
+import { claimOnce, releaseClaim, markClaimCompleted } from '@/lib/idempotency'
 import type { ShippingSelection } from '@/types/shipping'
 
 type ProtocolItemRow = {
@@ -21,6 +22,28 @@ type ProtocolItemRow = {
   } | null
 }
 
+type AdminClient = ReturnType<typeof createAdminClient>
+
+/** Pedido pronto pra farmácia: tem pharmacy_json e pelo menos 1 item. */
+async function isOrderFullyBuilt(
+  admin: AdminClient,
+  orderId: string
+): Promise<boolean> {
+  const { data: order } = await admin
+    .from('orders')
+    .select('id, pharmacy_json')
+    .eq('id', orderId)
+    .maybeSingle()
+  if (!order?.pharmacy_json) return false
+
+  const { count } = await admin
+    .from('order_items')
+    .select('id', { count: 'exact', head: true })
+    .eq('order_id', orderId)
+
+  return (count ?? 0) > 0
+}
+
 export const pharmacyOrder = inngest.createFunction(
   {
     id: 'pharmacy-order',
@@ -28,9 +51,10 @@ export const pharmacyOrder = inngest.createFunction(
     triggers: [{ event: 'pagamento/confirmado' }],
   },
   async ({ event }) => {
-    const { subscription_id, user_id } = event.data as {
+    const { subscription_id, user_id, payment_id: eventPaymentId } = event.data as {
       subscription_id: string
       user_id: string
+      payment_id?: string
     }
 
     if (!subscription_id || !user_id) {
@@ -38,6 +62,40 @@ export const pharmacyOrder = inngest.createFunction(
     }
 
     const admin = createAdminClient()
+
+    let payment: { id: string } | null = null
+
+    if (eventPaymentId) {
+      const { data } = await admin
+        .from('payments')
+        .select('id')
+        .eq('id', eventPaymentId)
+        .eq('subscription_id', subscription_id)
+        .maybeSingle()
+      payment = data
+    } else {
+      // Sem payment_id: pega o pago mais recente que ainda NÃO tem despacho completo.
+      // Evita tratar renovação como already_dispatched do ciclo anterior.
+      const { data: candidates } = await admin
+        .from('payments')
+        .select('id')
+        .eq('subscription_id', subscription_id)
+        .eq('status', 'paid')
+        .order('created_at', { ascending: false })
+        .limit(20)
+
+      for (const candidate of candidates ?? []) {
+        const { data: dispatchLog } = await admin
+          .from('pharmacy_order_dispatch_logs')
+          .select('completed_at')
+          .eq('payment_id', candidate.id)
+          .maybeSingle()
+        if (!dispatchLog?.completed_at) {
+          payment = candidate
+          break
+        }
+      }
+    }
 
     const { data: subscription, error: subError } = await admin
       .from('subscriptions')
@@ -90,6 +148,14 @@ export const pharmacyOrder = inngest.createFunction(
 
     if (subError || !subscription) {
       throw new Error(`Assinatura não encontrada: ${subError?.message ?? subscription_id}`)
+    }
+
+    if (!payment?.id) {
+      throw new Error(
+        eventPaymentId
+          ? `pharmacy-order: payment ${eventPaymentId} não pertence à subscription ${subscription_id}`
+          : `pharmacy-order: nenhum payment pago pendente de despacho para subscription ${subscription_id}`
+      )
     }
 
     const user = subscription.users as unknown as {
@@ -189,6 +255,84 @@ export const pharmacyOrder = inngest.createFunction(
       })
     )
 
+    // Claim só depois das leituras — se falhar depois, apaga pra o retry do Inngest funcionar.
+    const { won, reclaimedStale } = await claimOnce(
+      admin,
+      'pharmacy_order_dispatch_logs',
+      { payment_id: payment.id },
+      { completedColumn: 'completed_at' }
+    )
+
+    if (!won) {
+      const { data: existingClaim } = await admin
+        .from('pharmacy_order_dispatch_logs')
+        .select('order_id, completed_at')
+        .eq('payment_id', payment.id)
+        .maybeSingle()
+
+      if (existingClaim?.completed_at) {
+        return {
+          ok: true,
+          skipped: 'already_dispatched',
+          payment_id: payment.id,
+          orderId: existingClaim.order_id,
+        }
+      }
+
+      // Pedido completo mas markClaimCompleted nunca rodou (crash entre o fim e o stamp).
+      const linkedOrderId = existingClaim?.order_id
+      if (
+        typeof linkedOrderId === 'string' &&
+        linkedOrderId &&
+        (await isOrderFullyBuilt(admin, linkedOrderId))
+      ) {
+        await markClaimCompleted(
+          admin,
+          'pharmacy_order_dispatch_logs',
+          'payment_id',
+          payment.id,
+          'completed_at'
+        )
+        return {
+          ok: true,
+          skipped: 'already_dispatched',
+          payment_id: payment.id,
+          orderId: linkedOrderId,
+        }
+      }
+
+      // Outra execução ainda no meio, ou claim morta sem pedido utilizável.
+      throw new Error(
+        `pharmacy-order: claim em andamento sem pedido completo para payment ${payment.id}`
+      )
+    }
+
+    // Pedido incompleto de execução anterior que morreu no meio — limpa antes de recriar.
+    // Se o reclaim pegou um pedido já completo (completed_at nunca marcado), não apaga.
+    const orphanOrderId = reclaimedStale?.order_id
+    if (typeof orphanOrderId === 'string' && orphanOrderId) {
+      if (await isOrderFullyBuilt(admin, orphanOrderId)) {
+        await admin
+          .from('pharmacy_order_dispatch_logs')
+          .update({ order_id: orphanOrderId })
+          .eq('payment_id', payment.id)
+        await markClaimCompleted(
+          admin,
+          'pharmacy_order_dispatch_logs',
+          'payment_id',
+          payment.id,
+          'completed_at'
+        )
+        return {
+          ok: true,
+          skipped: 'reclaimed_complete_order',
+          orderId: orphanOrderId,
+        }
+      }
+      await admin.from('order_items').delete().eq('order_id', orphanOrderId)
+      await admin.from('orders').delete().eq('id', orphanOrderId)
+    }
+
     // Cria o pedido primeiro pra ter o id no CodigoPedidoExterno
     const { data: order, error: orderError } = await admin
       .from('orders')
@@ -204,47 +348,87 @@ export const pharmacyOrder = inngest.createFunction(
       .single()
 
     if (orderError || !order) {
+      await releaseClaim(
+        admin,
+        'pharmacy_order_dispatch_logs',
+        'payment_id',
+        payment.id
+      )
       throw new Error(`Erro ao criar pedido: ${orderError?.message ?? 'unknown'}`)
     }
 
-    const pharmacyJson = buildPharmacyJson({
-      orderId: order.id,
-      clientCode: user.client_code,
-      cpf: user.cpf,
-      fullName: user.full_name,
-      email: user.email,
-      phone: user.phone,
-      address,
-      items: pharmacyItems,
-      productsSubtotal,
-      freteValor,
-      prazoDias,
-      prescriptionPdfUrl: protocol.prescription_pdf_url ?? '',
-      pharmacyCarrierCode: parseInt(configMap.pharmacy_carrier_code ?? '24', 10),
-      pharmacyPaymentCode: parseInt(configMap.pharmacy_payment_code ?? '15', 10),
-      pharmacyCompanyId: parseInt(configMap.pharmacy_company_id ?? '2', 10),
-      pesoLiquido: dimensions.peso,
-      clienteExistente: !!priorOrder,
-    })
+    try {
+      const { error: claimOrderLinkError } = await admin
+        .from('pharmacy_order_dispatch_logs')
+        .update({ order_id: order.id })
+        .eq('payment_id', payment.id)
+      if (claimOrderLinkError) {
+        throw new Error(
+          `pharmacy-order: falha ao gravar order_id na claim: ${claimOrderLinkError.message}`
+        )
+      }
 
-    await admin
-      .from('orders')
-      .update({ pharmacy_json: pharmacyJson })
-      .eq('id', order.id)
+      const pharmacyJson = buildPharmacyJson({
+        orderId: order.id,
+        clientCode: user.client_code,
+        cpf: user.cpf,
+        fullName: user.full_name,
+        email: user.email,
+        phone: user.phone,
+        address,
+        items: pharmacyItems,
+        productsSubtotal,
+        freteValor,
+        prazoDias,
+        prescriptionPdfUrl: protocol.prescription_pdf_url ?? '',
+        pharmacyCarrierCode: parseInt(configMap.pharmacy_carrier_code ?? '24', 10),
+        pharmacyPaymentCode: parseInt(configMap.pharmacy_payment_code ?? '15', 10),
+        pharmacyCompanyId: parseInt(configMap.pharmacy_company_id ?? '2', 10),
+        pesoLiquido: dimensions.peso,
+        clienteExistente: !!priorOrder,
+      })
 
-    const { error: itemsError } = await admin.from('order_items').insert(
-      activeItems.map(item => ({
-        order_id: order.id,
-        product_id: item.product_id,
-        pharmacy_sku: item.products?.[skuKey] ?? '',
-        quantity: 1,
-        unit_price: getUnitPriceFromProduct(item.products, planType),
-      }))
-    )
+      const { error: pharmacyJsonError } = await admin
+        .from('orders')
+        .update({ pharmacy_json: pharmacyJson })
+        .eq('id', order.id)
 
-    if (itemsError) {
-      throw new Error(`Erro ao criar itens do pedido: ${itemsError.message}`)
+      if (pharmacyJsonError) {
+        throw new Error(`Erro ao salvar pharmacy_json: ${pharmacyJsonError.message}`)
+      }
+
+      const { error: itemsError } = await admin.from('order_items').insert(
+        activeItems.map(item => ({
+          order_id: order.id,
+          product_id: item.product_id,
+          pharmacy_sku: item.products?.[skuKey] ?? '',
+          quantity: 1,
+          unit_price: getUnitPriceFromProduct(item.products, planType),
+        }))
+      )
+
+      if (itemsError) {
+        throw new Error(`Erro ao criar itens do pedido: ${itemsError.message}`)
+      }
+    } catch (err) {
+      // Claim primeiro: order_id referencia orders (sem ON DELETE CASCADE).
+      await releaseClaim(
+        admin,
+        'pharmacy_order_dispatch_logs',
+        'payment_id',
+        payment.id
+      )
+      await admin.from('orders').delete().eq('id', order.id)
+      throw err
     }
+
+    await markClaimCompleted(
+      admin,
+      'pharmacy_order_dispatch_logs',
+      'payment_id',
+      payment.id,
+      'completed_at'
+    )
 
     return { orderId: order.id }
   }

@@ -3,6 +3,7 @@ import { simpleParser } from 'mailparser'
 import { inngest } from '../client'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { normalizeMessageId } from '@/lib/support/message-id'
+import { claimOnce, releaseClaim, markClaimCompleted } from '@/lib/idempotency'
 
 function imapConfigured(): boolean {
   return Boolean(
@@ -109,11 +110,13 @@ export const supportInboxPoll = inngest.createFunction(
 
         const { data: already } = await admin
           .from('support_messages')
-          .select('id')
+          .select('id, completed_at')
           .eq('message_id', messageId)
           .maybeSingle()
 
-        if (already) {
+        // Só marca lida se o processamento realmente terminou.
+        // Row sem completed_at = em andamento ou claim liberada — não pular.
+        if (already?.completed_at) {
           await client.messageFlagsAdd(message.uid, ['\\Seen'], { uid: true })
           continue
         }
@@ -156,10 +159,10 @@ export const supportInboxPoll = inngest.createFunction(
         const htmlBody =
           typeof parsed.html === 'string' ? parsed.html.replace(/<[^>]+>/g, ' ') : null
 
-        const { error: insertError } = await admin.from('support_messages').insert({
-          thread_id: threadId,
-          direction: 'inbound',
+        const messageRow = {
           message_id: messageId,
+          thread_id: threadId,
+          direction: 'inbound' as const,
           in_reply_to: inReplyTo,
           from_email: fromEmail,
           to_email:
@@ -167,26 +170,126 @@ export const supportInboxPoll = inngest.createFunction(
             process.env.SUPPORT_IMAP_USER ??
             null,
           body_text: parsed.text ?? htmlBody,
-        })
-
-        if (insertError) {
-          if (insertError.code !== '23505') {
-            console.error('Erro ao inserir support_messages:', insertError)
-          }
-        } else {
-          await admin
-            .from('support_threads')
-            .update({ last_message_at: new Date().toISOString() })
-            .eq('id', threadId)
-
-          await inngest.send({
-            name: 'suporte/email-recebido',
-            data: { thread_id: threadId },
-          })
-          processed += 1
         }
 
-        await client.messageFlagsAdd(message.uid, ['\\Seen'], { uid: true })
+        let won = false
+        try {
+          const result = await claimOnce(admin, 'support_messages', messageRow, {
+            completedColumn: 'completed_at',
+          })
+          won = result.won
+        } catch (insertError) {
+          console.error('Erro ao inserir support_messages:', insertError)
+        }
+
+        if (won) {
+          let eventSent = false
+          try {
+            await admin
+              .from('support_threads')
+              .update({ last_message_at: new Date().toISOString() })
+              .eq('id', threadId)
+
+            await inngest.send({
+              name: 'suporte/email-recebido',
+              data: { thread_id: threadId },
+            })
+            eventSent = true
+            // Evidência antes do stamp — heal stale não reenvia nem dropa.
+            const { error: dispatchedError } = await admin
+              .from('support_messages')
+              .update({ event_dispatched_at: new Date().toISOString() })
+              .eq('message_id', messageId)
+            if (dispatchedError) {
+              console.error(
+                'support-inbox-poll: falha ao gravar event_dispatched_at:',
+                dispatchedError
+              )
+            }
+          } catch (processError) {
+            console.error(
+              'Erro ao processar support message após claim:',
+              processError
+            )
+            await releaseClaim(admin, 'support_messages', 'message_id', messageId)
+            // Não marca \\Seen — próximo poll tenta de novo.
+          }
+
+          if (eventSent) {
+            let stamped = false
+            for (let attempt = 0; attempt < 3 && !stamped; attempt++) {
+              try {
+                await markClaimCompleted(
+                  admin,
+                  'support_messages',
+                  'message_id',
+                  messageId,
+                  'completed_at'
+                )
+                stamped = true
+              } catch (completeError) {
+                console.error(
+                  `support-inbox-poll: falha ao marcar completed_at (tentativa ${attempt + 1}):`,
+                  completeError
+                )
+                if (attempt < 2) {
+                  await new Promise((r) => setTimeout(r, 250 * (attempt + 1)))
+                }
+              }
+            }
+            if (stamped) {
+              processed += 1
+              await client.messageFlagsAdd(message.uid, ['\\Seen'], { uid: true })
+            }
+          }
+        } else {
+          const { data: existing } = await admin
+            .from('support_messages')
+            .select('completed_at, event_dispatched_at, created_at')
+            .eq('message_id', messageId)
+            .maybeSingle()
+          if (existing?.completed_at) {
+            await client.messageFlagsAdd(message.uid, ['\\Seen'], { uid: true })
+          } else if (existing) {
+            // Claim parcial: jovem = outro poll ativo. Stale: reenvia só se
+            // ainda não há evidência de dispatch; senão só completa o stamp.
+            try {
+              const ageMs = existing.created_at
+                ? Date.now() - new Date(existing.created_at).getTime()
+                : Number.POSITIVE_INFINITY
+
+              if (ageMs < 2 * 60 * 1000) {
+                continue
+              }
+
+              // Stale: sempre reenvia. Auto-ack é idempotente; replies em
+              // threads já avançadas precisam de nova análise se o Inngest
+              // falhou após o dispatch.
+              await inngest.send({
+                name: 'suporte/email-recebido',
+                data: { thread_id: threadId },
+              })
+              await admin
+                .from('support_messages')
+                .update({ event_dispatched_at: new Date().toISOString() })
+                .eq('message_id', messageId)
+
+              await markClaimCompleted(
+                admin,
+                'support_messages',
+                'message_id',
+                messageId,
+                'completed_at'
+              )
+              await client.messageFlagsAdd(message.uid, ['\\Seen'], { uid: true })
+            } catch (healError) {
+              console.error(
+                'support-inbox-poll: falha ao curar mensagem parcial:',
+                healError
+              )
+            }
+          }
+        }
       }
     } finally {
       lock.release()

@@ -10,6 +10,7 @@ import {
   getThreadReplyHeaders,
   sendSupportEmail,
 } from '@/lib/support/mailer'
+import { claimByFlag, releaseFlag } from '@/lib/idempotency'
 
 const AUTO_ACK_BODY = `Olá! Recebemos sua mensagem e nossa equipe já vai analisar. Pra agilizar e garantir que encontramos seu cadastro certinho, pode confirmar seu CPF e o e-mail usado na compra, por favor?
 
@@ -39,8 +40,16 @@ export const supportAnalyze = inngest.createFunction(
       throw new Error(`Thread de suporte não encontrada: ${threadId}`)
     }
 
-    // 4.1 — Aviso automático genérico (uma vez por thread)
-    if (!thread.auto_ack_sent_at) {
+    // 4.1 — Aviso automático genérico (uma vez por thread, claim permanente)
+    const claimed = await claimByFlag(
+      admin,
+      'support_threads',
+      threadId,
+      'auto_ack_sent_at',
+      false
+    )
+
+    if (claimed) {
       try {
         const headers = await getThreadReplyHeaders(threadId)
         await sendSupportEmail({
@@ -52,12 +61,9 @@ export const supportAnalyze = inngest.createFunction(
           referencesMessageIds: headers.referencesMessageIds,
           useReplySubject: false,
         })
-        await admin
-          .from('support_threads')
-          .update({ auto_ack_sent_at: new Date().toISOString() })
-          .eq('id', threadId)
       } catch (error) {
         console.error('Falha ao enviar auto-ack de suporte:', error)
+        await releaseFlag(admin, 'support_threads', threadId, 'auto_ack_sent_at')
       }
     }
 

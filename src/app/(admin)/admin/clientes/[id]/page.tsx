@@ -43,6 +43,8 @@ type OrderRow = {
     valor?: number
     prazoDias?: number
     codigoServico?: string
+    transportadora?: string
+    nomeServico?: string
   } | null
   shipping_json: { eventos?: TrackingEvent[] } | null
 }
@@ -261,9 +263,9 @@ export default async function AdminClienteDetalhePage({
       `)
       .eq('user_id', id)
       .order('generated_at', { ascending: false }),
-    admin.from('quiz_responses').select('*').eq('user_id', id).order('created_at', { ascending: false }),
+    admin.from('quiz_responses').select('*').eq('user_id', id).order('completed_at', { ascending: false, nullsFirst: false }),
     admin.from('health_records').select('*').eq('user_id', id),
-    admin.from('notification_logs').select('*').eq('user_id', id).order('created_at', { ascending: false }).limit(20),
+    admin.from('notification_logs').select('*').eq('user_id', id).order('sent_at', { ascending: false }).limit(20),
     admin.from('user_login_history').select('*').eq('user_id', id).order('logged_at', { ascending: false }).limit(20),
     admin.from('terms_acceptances').select('*').eq('user_id', id).order('accepted_at', { ascending: false }),
   ])
@@ -451,7 +453,17 @@ export default async function AdminClienteDetalhePage({
                       label="Frete"
                       value={
                         quote
-                          ? `${quote.tipo ?? '—'} · ${money(quote.valor)} · ${quote.prazoDias ?? '—'}d${freightOrigin ? ` · origem ${freightOrigin}` : ''}`
+                          ? [
+                              quote.transportadora,
+                              quote.nomeServico,
+                              quote.tipo,
+                              money(quote.valor),
+                              quote.prazoDias != null ? `${quote.prazoDias}d` : null,
+                              quote.codigoServico,
+                              freightOrigin ? `origem ${freightOrigin}` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')
                           : freightOrigin
                             ? `origem ${freightOrigin}`
                             : '—'
@@ -622,7 +634,13 @@ export default async function AdminClienteDetalhePage({
                     {String(n.status ?? '—')}
                   </span>
                   <span className="ml-auto text-gray-400">
-                    {fmtDateTime(n.created_at ? String(n.created_at) : null)}
+                    {fmtDateTime(
+                      n.sent_at
+                        ? String(n.sent_at)
+                        : n.created_at
+                          ? String(n.created_at)
+                          : null
+                    )}
                   </span>
                 </li>
               ))}

@@ -7,6 +7,11 @@ export function digitsOnly(value: string): string {
   return value.replace(/\D/g, '')
 }
 
+/** Escapa `%`, `_` e `\` pra uso seguro em padrões LIKE/ILIKE. */
+export function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (c) => `\\${c}`)
+}
+
 export function extractEmails(text: string): string[] {
   const matches = text.match(EMAIL_RE) ?? []
   return Array.from(new Set(matches.map((e) => e.toLowerCase())))
@@ -35,7 +40,7 @@ export async function identifySupportUser(params: {
     const { data } = await admin
       .from('users')
       .select('id')
-      .ilike('email', email)
+      .ilike('email', escapeLikePattern(email))
       .limit(1)
       .maybeSingle()
     if (data?.id) return data.id

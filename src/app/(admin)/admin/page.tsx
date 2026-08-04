@@ -138,9 +138,6 @@ export default async function AdminVisaoGeralPage({
   const since =
     periodo === 'all' ? null : daysAgoIso(parseInt(periodo, 10))
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const withCreatedAt = (q: any) => (since ? q.gte('created_at', since) : q)
-
   const [
     quizStarted,
     quizCompleted,
@@ -151,11 +148,21 @@ export default async function AdminVisaoGeralPage({
     dispatched,
     delivered,
   ] = await Promise.all([
-    countRows(admin, 'quiz_sessions', withCreatedAt),
-    countRows(admin, 'quiz_responses', withCreatedAt),
-    countRows(admin, 'terms_acceptances', q =>
-      since ? q.gte('accepted_at', since) : q
-    ),
+    countRows(admin, 'funnel_events', q => {
+      let next = q.eq('event_type', 'quiz_started')
+      if (since) next = next.gte('created_at', since)
+      return next
+    }),
+    countRows(admin, 'funnel_events', q => {
+      let next = q.eq('event_type', 'quiz_eligible')
+      if (since) next = next.gte('created_at', since)
+      return next
+    }),
+    countRows(admin, 'funnel_events', q => {
+      let next = q.eq('event_type', 'checkout_started')
+      if (since) next = next.gte('created_at', since)
+      return next
+    }),
     countRows(admin, 'payments', q => {
       let next = q.eq('status', 'paid')
       if (since) next = next.gte('paid_at', since)
@@ -185,7 +192,7 @@ export default async function AdminVisaoGeralPage({
 
   const rawSteps = [
     { key: 'quiz_started', label: 'Quiz iniciado', count: quizStarted },
-    { key: 'quiz_completed', label: 'Quiz concluído', count: quizCompleted },
+    { key: 'quiz_completed', label: 'Quiz apto', count: quizCompleted },
     { key: 'checkout', label: 'Checkout iniciado', count: checkoutStarted },
     { key: 'paid', label: 'Pagamento confirmado', count: paymentConfirmed },
     { key: 'signed', label: 'Prescrição assinada', count: prescriptionSigned },

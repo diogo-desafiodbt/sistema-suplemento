@@ -6,6 +6,12 @@ import {
   View,
   StyleSheet,
 } from '@react-pdf/renderer'
+import {
+  calcAge,
+  DIAGNOSIS_LABELS,
+  RENAL_LABELS,
+  HEPATIC_LABELS,
+} from '@/lib/protocol/triage'
 
 const styles = StyleSheet.create({
   page: {
@@ -112,19 +118,33 @@ type PrescriptionData = {
   }>
   quiz: {
     diagnosis_type: string
-    years_diagnosed: string
+    birth_date?: string | null
+    sex?: string | null
+    is_pregnant_or_breastfeeding?: boolean | null
+    renal_conditions?: string[] | null
+    hepatic_conditions?: string[] | null
     medications: string[]
+    years_diagnosed?: string | null
+    hba1c_range?: string | null
     allergies?: string | null
   }
 }
 
-const diagnosisLabel: Record<string, string> = {
-  type2: 'Diabetes tipo 2',
-  prediabetes: 'Pré-diabetes',
-  undiagnosed: 'Histórico familiar / não diagnosticado',
-}
-
 export function PrescriptionDocument({ data }: { data: PrescriptionData }) {
+  const isLegacyQuiz = !data.quiz.birth_date
+  const age =
+    data.quiz.birth_date && !Number.isNaN(new Date(data.quiz.birth_date).getTime())
+      ? calcAge(data.quiz.birth_date)
+      : null
+  const renal = data.quiz.renal_conditions ?? []
+  const hepatic = data.quiz.hepatic_conditions ?? []
+  const sexLabel =
+    data.quiz.sex === 'mulher' ? 'Mulher' : data.quiz.sex === 'homem' ? 'Homem' : '—'
+
+  const legacyYearsLabel = data.quiz.allergies?.startsWith('idade:')
+    ? `Não informado (idade: ${data.quiz.allergies.replace('idade:', '')} anos)`
+    : (data.quiz.years_diagnosed ?? '—')
+
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -146,22 +166,78 @@ export function PrescriptionDocument({ data }: { data: PrescriptionData }) {
           </View>
           <View style={styles.row}>
             <Text style={styles.label}>Diagnóstico:</Text>
-            <Text style={styles.value}>{diagnosisLabel[data.quiz.diagnosis_type] ?? data.quiz.diagnosis_type}</Text>
+            <Text style={styles.value}>{DIAGNOSIS_LABELS[data.quiz.diagnosis_type] ?? data.quiz.diagnosis_type}</Text>
           </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Tempo de diagnóstico:</Text>
-            <Text style={styles.value}>
-              {data.quiz.allergies?.startsWith('idade:')
-                ? `Não informado (idade: ${data.quiz.allergies.replace('idade:', '')} anos)`
-                : data.quiz.years_diagnosed}
-            </Text>
-          </View>
-          {data.quiz.medications?.length > 0 &&
-            !data.quiz.allergies?.startsWith('idade:') && (
-            <View style={styles.row}>
-              <Text style={styles.label}>Medicamentos em uso:</Text>
-              <Text style={styles.value}>{data.quiz.medications.join(', ')}</Text>
-            </View>
+          {isLegacyQuiz ? (
+            <>
+              <View style={styles.row}>
+                <Text style={styles.label}>Tempo de diagnóstico:</Text>
+                <Text style={styles.value}>{legacyYearsLabel}</Text>
+              </View>
+              {data.quiz.hba1c_range ? (
+                <View style={styles.row}>
+                  <Text style={styles.label}>HbA1c:</Text>
+                  <Text style={styles.value}>{data.quiz.hba1c_range}</Text>
+                </View>
+              ) : null}
+              {data.quiz.allergies &&
+              data.quiz.allergies !== 'nao' &&
+              data.quiz.allergies !== 'nao_sei' &&
+              !data.quiz.allergies.startsWith('idade:') ? (
+                <View style={styles.row}>
+                  <Text style={styles.label}>Alergias:</Text>
+                  <Text style={styles.value}>{data.quiz.allergies}</Text>
+                </View>
+              ) : null}
+              {data.quiz.medications?.length > 0 &&
+              !data.quiz.allergies?.startsWith('idade:') ? (
+                <View style={styles.row}>
+                  <Text style={styles.label}>Medicamentos em uso:</Text>
+                  <Text style={styles.value}>{data.quiz.medications.join(', ')}</Text>
+                </View>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <View style={styles.row}>
+                <Text style={styles.label}>Idade:</Text>
+                <Text style={styles.value}>{age != null ? `${age} anos` : '—'}</Text>
+              </View>
+              <View style={styles.row}>
+                <Text style={styles.label}>Sexo:</Text>
+                <Text style={styles.value}>{sexLabel}</Text>
+              </View>
+              {data.quiz.sex === 'mulher' ? (
+                <View style={styles.row}>
+                  <Text style={styles.label}>Gravidez/amamentação:</Text>
+                  <Text style={styles.value}>
+                    {data.quiz.is_pregnant_or_breastfeeding ? 'Sim' : 'Não'}
+                  </Text>
+                </View>
+              ) : null}
+              {renal.length > 0 ? (
+                <View style={styles.row}>
+                  <Text style={styles.label}>Condições renais:</Text>
+                  <Text style={styles.value}>
+                    {renal.map((c) => RENAL_LABELS[c] ?? c).join(', ')}
+                  </Text>
+                </View>
+              ) : null}
+              {hepatic.length > 0 ? (
+                <View style={styles.row}>
+                  <Text style={styles.label}>Condições hepáticas:</Text>
+                  <Text style={styles.value}>
+                    {hepatic.map((c) => HEPATIC_LABELS[c] ?? c).join(', ')}
+                  </Text>
+                </View>
+              ) : null}
+              {data.quiz.medications?.length > 0 ? (
+                <View style={styles.row}>
+                  <Text style={styles.label}>Medicamentos em uso:</Text>
+                  <Text style={styles.value}>{data.quiz.medications.join(', ')}</Text>
+                </View>
+              ) : null}
+            </>
           )}
         </View>
 

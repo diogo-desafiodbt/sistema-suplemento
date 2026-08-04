@@ -41,6 +41,27 @@ export const ALL_PRODUCT_KEYS: ProductKey[] = [
   'resistencia_insulina',
 ]
 
+export const DIAGNOSIS_LABELS: Record<string, string> = {
+  type1: 'Diabetes Tipo 1',
+  type2: 'Diabetes tipo 2',
+  prediabetes: 'Pré-diabetes',
+  lada_avancado: 'LADA avançado',
+  undiagnosed: 'Não diagnosticado / histórico familiar',
+}
+
+export const RENAL_LABELS: Record<string, string> = {
+  hemodialise: 'Hemodiálise',
+  insuficiencia_renal_aguda: 'Insuficiência renal aguda',
+  tfg_menor_30: 'TFG < 30',
+}
+
+export const HEPATIC_LABELS: Record<string, string> = {
+  cirrose: 'Cirrose',
+  hepatite_ativa: 'Hepatite ativa',
+  ictericia: 'Icterícia',
+  esteatose: 'Esteatose',
+}
+
 export function calcAge(birthDateIso: string): number {
   const birth = new Date(`${birthDateIso}T00:00:00`)
   if (Number.isNaN(birth.getTime())) return 0
@@ -58,7 +79,7 @@ export type TriageResult =
   | {
       blocked: false
       allowed: ProductKey[]
-      triggeredReasons: string[]
+      gates: Array<{ allowed: ProductKey[]; reason: string }>
     }
 
 function intersect(a: ProductKey[], b: ProductKey[]): ProductKey[] {
@@ -122,7 +143,7 @@ export function computeTriage(answers: TriageAnswers): TriageResult {
     return {
       blocked: false,
       allowed: [...ALL_PRODUCT_KEYS],
-      triggeredReasons: [],
+      gates: [],
     }
   }
 
@@ -134,7 +155,7 @@ export function computeTriage(answers: TriageAnswers): TriageResult {
   return {
     blocked: false,
     allowed,
-    triggeredReasons: gates.map(g => g.reason),
+    gates,
   }
 }
 
@@ -153,15 +174,36 @@ export function defaultSuggestion(allowed: ProductKey[]): ProductKey[] {
 
 /** Casa nome de produto da tabela `products` com ProductKey. */
 export function productKeyFromName(name: string): ProductKey | null {
-  const needle = name.toLowerCase()
+  const needle = name.toLowerCase().trim()
+  if (!needle) return null
+
   for (const key of ALL_PRODUCT_KEYS) {
     if (PRODUCT_NAME_BY_KEY[key].toLowerCase() === needle) return key
   }
+
+  const matches: ProductKey[] = []
   for (const key of ALL_PRODUCT_KEYS) {
     const label = PRODUCT_NAME_BY_KEY[key].toLowerCase()
-    if (needle.includes(label) || label.includes(needle.split(' ')[0])) {
-      return key
+    const firstWord = needle.split(/\s+/)[0] ?? ''
+    if (!firstWord) continue
+    if (needle.includes(label) || label.includes(firstWord)) {
+      matches.push(key)
     }
+  }
+
+  // Na dúvida (0 ou >1), não adivinha.
+  if (matches.length === 1) return matches[0]
+  if (matches.length === 0) {
+    console.error(
+      'productKeyFromName: nenhum produto do catálogo casou com o nome:',
+      name
+    )
+  } else {
+    console.error(
+      'productKeyFromName: match ambíguo (mais de um produto); não resolvido:',
+      name,
+      { matches }
+    )
   }
   return null
 }
@@ -169,14 +211,15 @@ export function productKeyFromName(name: string): ProductKey | null {
 /** Motivo de bloqueio para um produto fora do `allowed`. */
 export function blockReasonForProduct(
   key: ProductKey,
-  triggeredReasons: string[],
-  allowed: ProductKey[]
+  gates: Array<{ allowed: ProductKey[]; reason: string }>
 ): string {
-  if (allowed.includes(key)) return ''
-  // Motivos na ordem dos gates; junta todos os que restringem o catálogo
-  if (triggeredReasons.length === 0) {
+  const reasons = gates
+    .filter((g) => !g.allowed.includes(key))
+    .map((g) => g.reason)
+
+  if (reasons.length === 0) {
     return 'Bloqueado por segurança clínica.'
   }
-  if (triggeredReasons.length === 1) return triggeredReasons[0]
-  return triggeredReasons.join(' ')
+  if (reasons.length === 1) return reasons[0]
+  return reasons.join(' ')
 }

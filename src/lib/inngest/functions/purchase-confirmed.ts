@@ -1,6 +1,7 @@
 import { Resend } from 'resend'
 import { inngest } from '../client'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { claimOnce, releaseClaim, markClaimCompleted } from '@/lib/idempotency'
 
 function escapeHtml(text: string): string {
   return text
@@ -27,7 +28,9 @@ function formatPlanLabel(planType: string | null | undefined): string {
 }
 
 function formatCurrency(amount: number | null | undefined): string {
-  if (amount == null || Number.isNaN(amount)) return '—'
+  if (amount == null || Number.isNaN(amount) || amount === 0) {
+    return 'valor não disponível'
+  }
   return amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
@@ -40,15 +43,14 @@ async function logNotification(
   userId: string,
   status: 'sent' | 'failed'
 ): Promise<void> {
-  try {
-    const admin = createAdminClient()
-    await admin.from('notification_logs').insert({
-      user_id: userId,
-      type: 'purchase_confirmed',
-      channel: 'email',
-      status,
-    })
-  } catch (error) {
+  const admin = createAdminClient()
+  const { error } = await admin.from('notification_logs').insert({
+    user_id: userId,
+    type: 'purchase_confirmed',
+    channel: 'email',
+    status,
+  })
+  if (error) {
     console.error('Erro ao registrar notification_logs:', error)
   }
 }
@@ -122,9 +124,10 @@ export const purchaseConfirmed = inngest.createFunction(
     triggers: [{ event: 'pagamento/confirmado' }],
   },
   async ({ event }) => {
-    const { subscription_id, user_id } = event.data as {
+    const { subscription_id, user_id, payment_id: eventPaymentId } = event.data as {
       subscription_id: string
       user_id: string
+      payment_id?: string
     }
 
     if (!subscription_id || !user_id) {
@@ -133,26 +136,51 @@ export const purchaseConfirmed = inngest.createFunction(
 
     const admin = createAdminClient()
 
-    const [{ data: subscription }, { data: user }, { data: payment }] =
-      await Promise.all([
-        admin
-          .from('subscriptions')
-          .select('plan_type, expires_at')
-          .eq('id', subscription_id)
-          .maybeSingle(),
-        admin
-          .from('users')
-          .select('full_name, email')
-          .eq('id', user_id)
-          .maybeSingle(),
-        admin
-          .from('payments')
-          .select('amount')
-          .eq('subscription_id', subscription_id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-      ])
+    let payment: { id: string; amount: number | null } | null = null
+
+    if (eventPaymentId) {
+      const { data } = await admin
+        .from('payments')
+        .select('id, amount')
+        .eq('id', eventPaymentId)
+        .eq('subscription_id', subscription_id)
+        .maybeSingle()
+      payment = data
+    } else {
+      // Sem payment_id: pega o pago mais recente que ainda NÃO tem confirmação completa.
+      const { data: candidates } = await admin
+        .from('payments')
+        .select('id, amount')
+        .eq('subscription_id', subscription_id)
+        .eq('status', 'paid')
+        .order('created_at', { ascending: false })
+        .limit(20)
+
+      for (const candidate of candidates ?? []) {
+        const { data: confirmLog } = await admin
+          .from('purchase_confirmation_logs')
+          .select('completed_at')
+          .eq('payment_id', candidate.id)
+          .maybeSingle()
+        if (!confirmLog?.completed_at) {
+          payment = candidate
+          break
+        }
+      }
+    }
+
+    const [{ data: subscription }, { data: user }] = await Promise.all([
+      admin
+        .from('subscriptions')
+        .select('plan_type, expires_at')
+        .eq('id', subscription_id)
+        .maybeSingle(),
+      admin
+        .from('users')
+        .select('full_name, email')
+        .eq('id', user_id)
+        .maybeSingle(),
+    ])
 
     if (!user?.email) {
       console.error('purchase-confirmed: usuário sem e-mail', user_id)
@@ -160,20 +188,14 @@ export const purchaseConfirmed = inngest.createFunction(
       return { ok: false, reason: 'missing_email' }
     }
 
-    // Evita e-mail duplicado quando checkout (cartão) e webhook disparam o mesmo evento em sequência.
-    const since = new Date(Date.now() - 15 * 60 * 1000).toISOString()
-    const { data: recentSent } = await admin
-      .from('notification_logs')
-      .select('id')
-      .eq('user_id', user_id)
-      .eq('type', 'purchase_confirmed')
-      .eq('status', 'sent')
-      .gte('created_at', since)
-      .limit(1)
-      .maybeSingle()
-
-    if (recentSent) {
-      return { ok: true, skipped: 'duplicate_recent' }
+    if (!payment?.id) {
+      console.error('purchase-confirmed: payment ausente', subscription_id)
+      await logNotification(user_id, 'failed')
+      throw new Error(
+        eventPaymentId
+          ? `purchase-confirmed: payment ${eventPaymentId} não pertence à subscription ${subscription_id}`
+          : `purchase-confirmed: nenhum payment pago pendente de e-mail para subscription ${subscription_id}`
+      )
     }
 
     const resendApiKey = process.env.RESEND_API_KEY
@@ -186,10 +208,60 @@ export const purchaseConfirmed = inngest.createFunction(
     const firstName = user.full_name?.split(' ')[0] ?? 'Olá'
     const { subject, html } = buildPurchaseConfirmedEmailHtml({
       firstName,
-      amountLabel: formatCurrency(payment?.amount),
+      amountLabel: formatCurrency(payment.amount),
       planLabel: formatPlanLabel(subscription?.plan_type),
       expiresLabel: formatDate(subscription?.expires_at),
     })
+
+    const { won } = await claimOnce(
+      admin,
+      'purchase_confirmation_logs',
+      { payment_id: payment.id },
+      {
+        timestampColumn: 'sent_at',
+        completedColumn: 'completed_at',
+        protectColumns: ['email_sent_at'],
+        // Crash antes do send: reclaim após 10 min. Após o send gravamos
+        // email_sent_at na claim — heal correlacionado ao payment_id.
+        staleAfterMs: 10 * 60 * 1000,
+      }
+    )
+    if (!won) {
+      const { data: existingClaim } = await admin
+        .from('purchase_confirmation_logs')
+        .select('completed_at, email_sent_at')
+        .eq('payment_id', payment.id)
+        .maybeSingle()
+
+      if (existingClaim?.completed_at) {
+        return {
+          ok: true,
+          skipped: 'duplicate_payment',
+          payment_id: payment.id,
+        }
+      }
+
+      // E-mail pode ter saído e markClaimCompleted falhado — confere email_sent_at.
+      if (existingClaim?.email_sent_at) {
+        await markClaimCompleted(
+          admin,
+          'purchase_confirmation_logs',
+          'payment_id',
+          payment.id,
+          'completed_at'
+        )
+        return {
+          ok: true,
+          skipped: 'duplicate_payment',
+          payment_id: payment.id,
+        }
+      }
+
+      // Sem evidência de envio: NÃO liberar a claim. claimOnce reclaima após stale.
+      throw new Error(
+        `purchase-confirmed: claim em andamento sem completed_at para payment ${payment.id}`
+      )
+    }
 
     try {
       const resend = new Resend(resendApiKey)
@@ -199,12 +271,50 @@ export const purchaseConfirmed = inngest.createFunction(
         subject,
         html,
       })
-      await logNotification(user_id, 'sent')
-      return { ok: true }
     } catch (error) {
       console.error('Erro ao enviar e-mail de compra confirmada:', error)
+      await releaseClaim(
+        admin,
+        'purchase_confirmation_logs',
+        'payment_id',
+        payment.id
+      )
       await logNotification(user_id, 'failed')
       throw error
     }
+
+    // Evidência na própria claim (payment_id) — nunca releaseClaim pós-send.
+    const { error: emailSentError } = await admin
+      .from('purchase_confirmation_logs')
+      .update({ email_sent_at: new Date().toISOString() })
+      .eq('payment_id', payment.id)
+    if (emailSentError) {
+      try {
+        await markClaimCompleted(
+          admin,
+          'purchase_confirmation_logs',
+          'payment_id',
+          payment.id,
+          'completed_at'
+        )
+      } catch (stampError) {
+        console.error(
+          'purchase-confirmed: falha ao stamp após e-mail (email_sent_at também falhou):',
+          stampError
+        )
+      }
+      throw new Error(
+        `purchase-confirmed: falha ao gravar email_sent_at: ${emailSentError.message}`
+      )
+    }
+    await markClaimCompleted(
+      admin,
+      'purchase_confirmation_logs',
+      'payment_id',
+      payment.id,
+      'completed_at'
+    )
+    await logNotification(user_id, 'sent')
+    return { ok: true }
   }
 )

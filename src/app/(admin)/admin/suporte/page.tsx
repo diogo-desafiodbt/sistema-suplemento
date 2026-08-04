@@ -6,6 +6,15 @@ import {
   type SupportThreadView,
 } from '@/components/admin/SupportThreadPanel'
 
+const THREAD_SELECT = `
+  id, from_email, subject, status, user_id, db_facts, suggested_reply,
+  last_message_at, created_at,
+  users ( full_name, email ),
+  support_messages (
+    id, direction, from_email, body_text, created_at
+  )
+`
+
 export default async function AdminSuportePage() {
   const supabase = await createClient()
   const {
@@ -22,24 +31,23 @@ export default async function AdminSuportePage() {
 
   if (profile?.role !== 'admin') redirect('/dashboard')
 
-  const { data: threads } = await admin
-    .from('support_threads')
-    .select(`
-      id, from_email, subject, status, user_id, db_facts, suggested_reply,
-      last_message_at, created_at,
-      users ( full_name, email ),
-      support_messages (
-        id, direction, from_email, body_text, created_at
-      )
-    `)
-    .order('last_message_at', { ascending: false })
-    .limit(100)
+  const [{ data: pendingRows }, { data: historyRows }] = await Promise.all([
+    admin
+      .from('support_threads')
+      .select(THREAD_SELECT)
+      .in('status', ['aguardando_revisao', 'aguardando_dados', 'novo'])
+      .order('last_message_at', { ascending: false })
+      .limit(500),
+    admin
+      .from('support_threads')
+      .select(THREAD_SELECT)
+      .eq('status', 'respondido')
+      .order('last_message_at', { ascending: false })
+      .limit(100),
+  ])
 
-  const list = (threads ?? []) as unknown as SupportThreadView[]
-  const pending = list.filter((t) =>
-    ['aguardando_revisao', 'aguardando_dados', 'novo'].includes(t.status)
-  )
-  const history = list.filter((t) => t.status === 'respondido')
+  const pending = (pendingRows ?? []) as unknown as SupportThreadView[]
+  const history = (historyRows ?? []) as unknown as SupportThreadView[]
 
   return (
     <main className="max-w-4xl mx-auto px-6 py-8">

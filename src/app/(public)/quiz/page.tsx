@@ -19,6 +19,7 @@ import {
   type TriageAnswers,
 } from '@/lib/protocol/triage'
 import { findSupplementImageByProductName } from '@/lib/supplements-content'
+import { trackFunnelEvent } from '@/lib/funnel/track'
 
 type TriageForm = {
   full_name: string
@@ -155,6 +156,7 @@ export default function QuizPage() {
   >([])
 
   useEffect(() => {
+    trackFunnelEvent('quiz_started')
     // Captura o estado do carrinho uma vez após a hidratação do useCart
     if (cartItems.length > 0) {
       setHadCartOnEntry(true)
@@ -381,10 +383,12 @@ export default function QuizPage() {
     }
 
     const result = computeTriage(answers)
+    trackFunnelEvent('quiz_completed')
     if (result.blocked) {
       setBlockReason(result.blockReason)
       return
     }
+    trackFunnelEvent('quiz_eligible')
 
     setLoading(true)
     try {
@@ -396,14 +400,9 @@ export default function QuizPage() {
       )
 
       const productByKey = new Map<ProductKey, ProductRow>()
-      for (const key of ALL_PRODUCT_KEYS) {
-        const name = PRODUCT_NAME_BY_KEY[key]
-        const product =
-          products.find(p => p.name.toLowerCase() === name.toLowerCase()) ??
-          products.find(p =>
-            p.name.toLowerCase().includes(name.toLowerCase().split(' ')[0])
-          )
-        if (product) productByKey.set(key, product)
+      for (const product of products) {
+        const key = productKeyFromName(product.name)
+        if (key && !productByKey.has(key)) productByKey.set(key, product)
       }
 
       const cartKeys = new Set<ProductKey>()
@@ -424,7 +423,11 @@ export default function QuizPage() {
 
       for (const key of ALL_PRODUCT_KEYS) {
         const product = productByKey.get(key)
-        if (!product) continue
+        if (!product) {
+          throw new Error(
+            `Produto sem match no catálogo: ${key} (${PRODUCT_NAME_BY_KEY[key]})`
+          )
+        }
 
         const name = PRODUCT_NAME_BY_KEY[key]
         const image = findSupplementImageByProductName(name) ?? undefined
@@ -445,11 +448,7 @@ export default function QuizPage() {
             is_required: false,
             removed: true,
             blocked: true,
-            activation_reason: blockReasonForProduct(
-              key,
-              result.triggeredReasons,
-              result.allowed
-            ),
+            activation_reason: blockReasonForProduct(key, result.gates),
           })
           continue
         }
@@ -586,7 +585,64 @@ export default function QuizPage() {
           </QuestionWrapper>
         )
 
-      case 'nascimento':
+      case 'nascimento': {
+        const [selYear, selMonth, selDay] = form.birth_date
+          ? form.birth_date.split('-')
+          : ['', '', '']
+
+        const currentYear = new Date().getFullYear()
+        const years = Array.from({ length: 100 }, (_, i) => String(currentYear - i))
+        const months = [
+          { value: '01', label: 'Janeiro' },
+          { value: '02', label: 'Fevereiro' },
+          { value: '03', label: 'Março' },
+          { value: '04', label: 'Abril' },
+          { value: '05', label: 'Maio' },
+          { value: '06', label: 'Junho' },
+          { value: '07', label: 'Julho' },
+          { value: '08', label: 'Agosto' },
+          { value: '09', label: 'Setembro' },
+          { value: '10', label: 'Outubro' },
+          { value: '11', label: 'Novembro' },
+          { value: '12', label: 'Dezembro' },
+        ]
+        const daysInMonth =
+          selYear && selMonth
+            ? new Date(Number(selYear), Number(selMonth), 0).getDate()
+            : 31
+        const days = Array.from({ length: daysInMonth }, (_, i) =>
+          String(i + 1).padStart(2, '0')
+        )
+
+        function updateBirthDate(part: 'day' | 'month' | 'year', value: string) {
+          const next = {
+            day: part === 'day' ? value : selDay,
+            month: part === 'month' ? value : selMonth,
+            year: part === 'year' ? value : selYear,
+          }
+          if (next.day && next.month && next.year) {
+            const maxDay = new Date(
+              Number(next.year),
+              Number(next.month),
+              0
+            ).getDate()
+            const dayNum = Number(next.day)
+            const clampedDay =
+              dayNum > maxDay
+                ? String(maxDay).padStart(2, '0')
+                : next.day
+            setForm((prev) => ({
+              ...prev,
+              birth_date: `${next.year}-${next.month}-${clampedDay}`,
+            }))
+          } else {
+            setForm((prev) => ({ ...prev, birth_date: '' }))
+          }
+        }
+
+        const selectClass =
+          'w-full border border-gray-200 rounded-xl px-3 py-3.5 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f]'
+
         return (
           <QuestionWrapper
             category="DADOS BÁSICOS"
@@ -594,15 +650,47 @@ export default function QuizPage() {
             showContinue
             continueDisabled={!form.birth_date}
           >
-            <input
-              type="date"
-              value={form.birth_date}
-              onChange={e => setForm(prev => ({ ...prev, birth_date: e.target.value }))}
-              max={new Date().toISOString().slice(0, 10)}
-              className="w-full border border-gray-200 rounded-xl px-4 py-3.5 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f]"
-            />
+            <div className="grid grid-cols-3 gap-2">
+              <select
+                value={selDay}
+                onChange={(e) => updateBirthDate('day', e.target.value)}
+                className={selectClass}
+              >
+                <option value="">Dia</option>
+                {days.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={selMonth}
+                onChange={(e) => updateBirthDate('month', e.target.value)}
+                className={selectClass}
+              >
+                <option value="">Mês</option>
+                {months.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={selYear}
+                onChange={(e) => updateBirthDate('year', e.target.value)}
+                className={selectClass}
+              >
+                <option value="">Ano</option>
+                {years.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </div>
           </QuestionWrapper>
         )
+      }
 
       case 'sexo':
         return (

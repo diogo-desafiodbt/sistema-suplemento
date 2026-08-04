@@ -36,7 +36,11 @@ export async function POST(request: NextRequest) {
       .select(`
         *,
         users ( full_name, email, client_code ),
-        quiz_responses ( diagnosis_type, years_diagnosed, medications, allergies ),
+        quiz_responses (
+          diagnosis_type, birth_date, sex, is_pregnant_or_breastfeeding,
+          renal_conditions, hepatic_conditions, medications,
+          years_diagnosed, hba1c_range, allergies
+        ),
         protocol_items (
           id, is_required, removed_by_patient, activation_reason,
           products ( name )
@@ -74,8 +78,14 @@ export async function POST(request: NextRequest) {
     const professionalUser = professional.users as unknown as { full_name: string } | null
     const quiz = protocol.quiz_responses as unknown as {
       diagnosis_type: string
-      years_diagnosed: string
+      birth_date: string | null
+      sex: string | null
+      is_pregnant_or_breastfeeding: boolean | null
+      renal_conditions: string[] | null
+      hepatic_conditions: string[] | null
       medications: string[]
+      years_diagnosed: string | null
+      hba1c_range: string | null
       allergies: string | null
     }
 

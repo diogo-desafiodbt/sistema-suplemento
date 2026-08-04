@@ -143,11 +143,33 @@ export type ShippingSelection = {
   valor: number
   prazoDias: number
   codigoServico: string
+  transportadora?: string
+  nomeServico?: string
 }
 
 export type ShippingOptionPublic = {
-  tipo: 'economica' | 'expressa'
+  /** econômica = menor preço; expressa = menor prazo; demais = todas as cotações. */
+  tipo: 'economica' | 'expressa' | 'padrao'
   valor: number
   prazoDias: number
   codigoServico: string
+  transportadora: string
+  nomeServico: string
+}
+
+/** Identidade estável de uma cotação (codigoServico sozinho pode colidir). */
+export function shippingQuoteKey(q: {
+  codigoServico: string
+  transportadora?: string | null
+  nomeServico?: string | null
+  valor: number
+  prazoDias: number
+}): string {
+  return [
+    q.codigoServico,
+    q.transportadora ?? '',
+    q.nomeServico ?? '',
+    String(q.valor),
+    String(q.prazoDias),
+  ].join('|')
 }
