@@ -190,18 +190,37 @@ export const pharmacyOrder = inngest.createFunction(
     const planType = subscription.plan_type as string
     const skuKey = getPharmacySkuKey(planType)
 
-    const activeItems = (protocol.protocol_items ?? []).filter(
-      item => !item.removed_by_patient
-    )
+    const pending = subscription.pending_checkout as {
+      shipping?: ShippingSelection
+      protocol_items?: Array<{
+        product_id?: string
+        removed?: boolean
+        blocked?: boolean
+      }>
+      fulfillment_locked_at?: string
+    } | null
+    const shipping = pending?.shipping
+
+    // Prefer snapshot do pagamento (itens travados) — não confiar em edits pós-pago.
+    const lockedProductIds = pending?.fulfillment_locked_at
+      ? new Set(
+          (pending.protocol_items ?? [])
+            .filter(
+              (i) =>
+                !i.removed && !i.blocked && typeof i.product_id === 'string'
+            )
+            .map((i) => i.product_id as string)
+        )
+      : null
+
+    const activeItems = (protocol.protocol_items ?? []).filter((item) => {
+      if (lockedProductIds) return lockedProductIds.has(item.product_id)
+      return !item.removed_by_patient
+    })
 
     if (activeItems.length === 0) {
       throw new Error(`Nenhum item ativo no protocolo da assinatura ${subscription_id}`)
     }
-
-    const pending = subscription.pending_checkout as {
-      shipping?: ShippingSelection
-    } | null
-    const shipping = pending?.shipping
 
     const { data: configs, error: configError } = await admin
       .from('system_config')

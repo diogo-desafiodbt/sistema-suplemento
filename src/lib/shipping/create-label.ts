@@ -61,7 +61,15 @@ export async function createShippingLabelForOrder(orderId: string): Promise<{
 
   const subscription = order.subscriptions as unknown as {
     plan_type: string
-    pending_checkout: { shipping?: ShippingSelection } | null
+    pending_checkout: {
+      shipping?: ShippingSelection
+      protocol_items?: Array<{
+        product_id?: string
+        removed?: boolean
+        blocked?: boolean
+      }>
+      fulfillment_locked_at?: string
+    } | null
     protocols: {
       protocol_items: Array<{
         product_id: string
@@ -71,8 +79,23 @@ export async function createShippingLabelForOrder(orderId: string): Promise<{
     } | null
   } | null
 
+  const pending = subscription?.pending_checkout
+  const lockedProductIds = pending?.fulfillment_locked_at
+    ? new Set(
+        (pending.protocol_items ?? [])
+          .filter(
+            (i) =>
+              !i.removed && !i.blocked && typeof i.product_id === 'string'
+          )
+          .map((i) => i.product_id as string)
+      )
+    : null
+
   const protocolItems = (subscription?.protocols?.protocol_items ?? []).filter(
-    i => !i.removed_by_patient
+    (i) =>
+      lockedProductIds
+        ? lockedProductIds.has(i.product_id)
+        : !i.removed_by_patient
   )
 
   const packageItems: PackageItem[] = protocolItems

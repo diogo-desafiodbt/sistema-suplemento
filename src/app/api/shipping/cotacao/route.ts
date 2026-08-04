@@ -14,7 +14,7 @@ const bodySchema = z.object({
     .array(
       z.object({
         product_id: z.string().uuid(),
-        quantity: z.number().positive().default(1),
+        quantity: z.number().int().min(1).max(20).default(1),
       })
     )
     .min(1),

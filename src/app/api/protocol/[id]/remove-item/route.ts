@@ -9,7 +9,9 @@ export async function PATCH(
   try {
     const { id } = await params
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
@@ -20,13 +22,45 @@ export async function PATCH(
 
     const { data: protocol } = await admin
       .from('protocols')
-      .select('id')
+      .select('id, status')
       .eq('id', id)
       .eq('user_id', user.id)
       .single()
 
     if (!protocol) {
       return NextResponse.json({ error: 'Protocolo não encontrado' }, { status: 404 })
+    }
+
+    // Após pagamento a composição fica congelada (farmácia usa protocol_items).
+    const { data: linkedSub } = await admin
+      .from('subscriptions')
+      .select('id')
+      .eq('protocol_id', id)
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (linkedSub?.id) {
+      const { data: paid } = await admin
+        .from('payments')
+        .select('id')
+        .eq('subscription_id', linkedSub.id)
+        .eq('status', 'paid')
+        .limit(1)
+        .maybeSingle()
+
+      if (paid) {
+        return NextResponse.json(
+          { error: 'Protocolo já pago — itens não podem ser alterados' },
+          { status: 400 }
+        )
+      }
+    }
+
+    if (protocol.status !== 'pending_signature') {
+      return NextResponse.json(
+        { error: 'Protocolo não permite alteração de itens neste status' },
+        { status: 400 }
+      )
     }
 
     const { data: item } = await admin

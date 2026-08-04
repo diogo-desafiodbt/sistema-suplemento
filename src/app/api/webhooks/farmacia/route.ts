@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { isBearerTokenAuthorized } from '@/lib/security/token'
+import { isBearerOrQueryTokenAuthorized } from '@/lib/security/token'
+import { summarizePharmacyWebhookPayload } from '@/lib/security/webhook-payload'
 
 export async function POST(request: NextRequest) {
   if (
-    !isBearerTokenAuthorized(
+    !isBearerOrQueryTokenAuthorized(
       request,
       process.env.FARMACIA_WEBHOOK_TOKEN ?? process.env.FARMACIA_API_TOKEN
     )
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
     const { data: webhookLog } = await admin.from('webhook_logs').insert({
       source: 'pharmacy',
       event_type: 'order.dispatched',
-      payload,
+      payload: summarizePharmacyWebhookPayload(payload),
       processed: false,
     }).select('id').single()
 

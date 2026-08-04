@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { notifyShippingUpdate } from '@/lib/shipping/notify'
-import { isBearerTokenAuthorized } from '@/lib/security/token'
+import { isBearerOrQueryTokenAuthorized } from '@/lib/security/token'
+import { summarizeShippingWebhookPayload } from '@/lib/security/webhook-payload'
 import type { WebhookEtiquetaPayload } from '@/types/shipping'
 
 export async function POST(request: NextRequest) {
   if (
-    !isBearerTokenAuthorized(request, process.env.SHIPPING_WEBHOOK_TOKEN)
+    !isBearerOrQueryTokenAuthorized(request, process.env.SHIPPING_WEBHOOK_TOKEN)
   ) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest) {
     .insert({
       source: 'shipping',
       event_type: 'etiqueta_gerada',
-      payload,
+      payload: summarizeShippingWebhookPayload(payload),
       processed: false,
     })
     .select('id')
@@ -34,7 +35,10 @@ export async function POST(request: NextRequest) {
   try {
     const idReq = payload.id_requisicao
     if (!idReq) {
-      console.error('webhook etiqueta sem id_requisicao', payload)
+      console.error(
+        'webhook etiqueta sem id_requisicao',
+        summarizeShippingWebhookPayload(payload)
+      )
       return NextResponse.json({ ok: true })
     }
 

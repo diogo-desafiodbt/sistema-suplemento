@@ -94,7 +94,7 @@ export function extractAmountFromPayload(payload: PagarmePayload): number {
   }
   console.error(
     'extractAmountFromPayload: nenhum valor encontrado no payload',
-    payload
+    summarizePagarmePayload(payload)
   )
   return 0
 }
@@ -295,7 +295,7 @@ async function handlePaymentSucceeded(
   } else {
     console.warn(
       'handlePaymentSucceeded: payload sem chargeId, payments não atualizado',
-      payload
+      summarizePagarmePayload(payload)
     )
   }
 

@@ -170,13 +170,25 @@ async function insertProtocolItemsFromPending(
 async function finalizeSubscriptionProtocol(
   admin: AdminClient,
   subscriptionId: string,
-  protocolId: string
+  protocolId: string,
+  pending: PendingCheckoutPayload
 ): Promise<boolean> {
+  // Mantém snapshot de frete + itens pagos pra farmácia (não confiar em edits pós-pagamento).
+  const fulfillmentCheckout = {
+    source: pending.source,
+    plan_type: pending.plan_type,
+    shipping: pending.shipping ?? null,
+    protocol_items: pending.protocol_items.filter(
+      (i) => !i.removed && !i.blocked && Boolean(i.product_id)
+    ),
+    fulfillment_locked_at: new Date().toISOString(),
+  }
+
   const { error } = await admin
     .from('subscriptions')
     .update({
       protocol_id: protocolId,
-      pending_checkout: null,
+      pending_checkout: fulfillmentCheckout,
     })
     .eq('id', subscriptionId)
   if (error) {
@@ -298,7 +310,8 @@ export async function ensureProtocolAfterPayment(
       const linked = await finalizeSubscriptionProtocol(
         admin,
         subscriptionId,
-        resumeProtocolId
+        resumeProtocolId,
+        pending
       )
       if (!linked) {
         await releaseClaim(
@@ -424,7 +437,8 @@ export async function ensureProtocolAfterPayment(
     const linked = await finalizeSubscriptionProtocol(
       admin,
       subscriptionId,
-      protocol.id
+      protocol.id,
+      pending
     )
     if (!linked) {
       await rollbackPartialAndRelease()
