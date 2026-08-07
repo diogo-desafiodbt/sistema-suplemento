@@ -1,11 +1,11 @@
-import { createAdminClient } from '@/lib/supabase/admin'
-import { productKeyFromName } from '@/lib/protocol/triage'
 import { claimOnce, releaseClaim } from '@/lib/idempotency'
 import { getPharmacyCycleMultiplier } from '@/lib/plans'
+import { productKeyFromName } from '@/lib/protocol/triage'
+import type { createAdminClient } from '@/lib/supabase/admin'
 
-export type CheckoutSource = 'full_quiz' | 'mini_quiz'
+type CheckoutSource = 'full_quiz' | 'mini_quiz'
 
-export type PendingProtocolItem = {
+type PendingProtocolItem = {
   product_id?: string
   product_name: string
   is_required?: boolean
@@ -46,7 +46,7 @@ type AdminClient = ReturnType<typeof createAdminClient>
 
 async function waitForProtocolId(
   admin: AdminClient,
-  subscriptionId: string
+  subscriptionId: string,
 ): Promise<string | null> {
   // ~15s no request path (checkout/webhook); se esgotar, o webhook responde 500 e retenta.
   for (let i = 0; i < 30; i++) {
@@ -65,7 +65,7 @@ async function waitForProtocolId(
   }
   console.error(
     'ensureProtocolAfterPayment: timed out waiting for protocol_id',
-    subscriptionId
+    subscriptionId,
   )
   return null
 }
@@ -73,24 +73,27 @@ async function waitForProtocolId(
 async function stampLockProtocolId(
   admin: AdminClient,
   subscriptionId: string,
-  protocolId: string
+  protocolId: string,
 ): Promise<void> {
   const { error } = await admin
     .from('protocol_creation_locks')
     .update({ protocol_id: protocolId })
     .eq('subscription_id', subscriptionId)
   if (error) {
-    console.error('ensureProtocolAfterPayment: falha ao gravar protocol_id no lock', error)
+    console.error(
+      'ensureProtocolAfterPayment: falha ao gravar protocol_id no lock',
+      error,
+    )
   }
 }
 
 async function insertProtocolItemsFromPending(
   admin: AdminClient,
   protocolId: string,
-  pending: PendingCheckoutPayload
+  pending: PendingCheckoutPayload,
 ): Promise<boolean> {
   const activeItems = pending.protocol_items.filter(
-    (item) => !item.removed && !item.blocked
+    (item) => !item.removed && !item.blocked,
   )
   if (activeItems.length === 0) return true
 
@@ -154,7 +157,7 @@ async function insertProtocolItemsFromPending(
         {
           protocolId,
           pendingNames: activeItems.map((item) => item.product_name),
-        }
+        },
       )
       return false
     }
@@ -175,7 +178,7 @@ async function finalizeSubscriptionProtocol(
   admin: AdminClient,
   subscriptionId: string,
   protocolId: string,
-  pending: PendingCheckoutPayload
+  pending: PendingCheckoutPayload,
 ): Promise<boolean> {
   // Mantém snapshot de frete + itens pagos pra farmácia (não confiar em edits pós-pagamento).
   const fulfillmentCheckout = {
@@ -183,7 +186,7 @@ async function finalizeSubscriptionProtocol(
     plan_type: pending.plan_type,
     shipping: pending.shipping ?? null,
     protocol_items: pending.protocol_items.filter(
-      (i) => !i.removed && !i.blocked && Boolean(i.product_id)
+      (i) => !i.removed && !i.blocked && Boolean(i.product_id),
     ),
     fulfillment_locked_at: new Date().toISOString(),
   }
@@ -196,10 +199,7 @@ async function finalizeSubscriptionProtocol(
     })
     .eq('id', subscriptionId)
   if (error) {
-    console.error(
-      'ensureProtocolAfterPayment: subscription link error',
-      error
-    )
+    console.error('ensureProtocolAfterPayment: subscription link error', error)
     return false
   }
   return true
@@ -217,7 +217,7 @@ async function finalizeSubscriptionProtocol(
 export async function ensureProtocolAfterPayment(
   admin: AdminClient,
   subscriptionId: string,
-  userId: string
+  userId: string,
 ): Promise<string | null> {
   const { data: subscription, error: subError } = await admin
     .from('subscriptions')
@@ -227,7 +227,10 @@ export async function ensureProtocolAfterPayment(
     .single()
 
   if (subError || !subscription) {
-    console.error('ensureProtocolAfterPayment: subscription not found', subError)
+    console.error(
+      'ensureProtocolAfterPayment: subscription not found',
+      subError,
+    )
     return null
   }
 
@@ -243,7 +246,7 @@ export async function ensureProtocolAfterPayment(
     // Link órfão (rollback antigo sem limpar protocol_id) — limpa e recria.
     console.warn(
       'ensureProtocolAfterPayment: protocol_id órfão na subscription, limpando',
-      { subscriptionId, protocol_id: subscription.protocol_id }
+      { subscriptionId, protocol_id: subscription.protocol_id },
     )
     await admin
       .from('subscriptions')
@@ -253,14 +256,24 @@ export async function ensureProtocolAfterPayment(
   }
 
   const pending = subscription.pending_checkout as PendingCheckoutPayload | null
-  if (!pending?.quiz?.diagnosis_type || !Array.isArray(pending.protocol_items)) {
-    console.error('ensureProtocolAfterPayment: missing pending_checkout', subscriptionId)
+  if (
+    !pending?.quiz?.diagnosis_type ||
+    !Array.isArray(pending.protocol_items)
+  ) {
+    console.error(
+      'ensureProtocolAfterPayment: missing pending_checkout',
+      subscriptionId,
+    )
     return null
   }
 
-  const { won, reclaimedStale } = await claimOnce(admin, 'protocol_creation_locks', {
-    subscription_id: subscriptionId,
-  })
+  const { won, reclaimedStale } = await claimOnce(
+    admin,
+    'protocol_creation_locks',
+    {
+      subscription_id: subscriptionId,
+    },
+  )
   if (!won) {
     return waitForProtocolId(admin, subscriptionId)
   }
@@ -298,7 +311,7 @@ export async function ensureProtocolAfterPayment(
       const itemsOk = await insertProtocolItemsFromPending(
         admin,
         resumeProtocolId,
-        pending
+        pending,
       )
       if (!itemsOk) {
         // Libera o lock pra o webhook poder retentar; protocolo fica com
@@ -307,7 +320,7 @@ export async function ensureProtocolAfterPayment(
           admin,
           'protocol_creation_locks',
           'subscription_id',
-          subscriptionId
+          subscriptionId,
         )
         return null
       }
@@ -315,14 +328,14 @@ export async function ensureProtocolAfterPayment(
         admin,
         subscriptionId,
         resumeProtocolId,
-        pending
+        pending,
       )
       if (!linked) {
         await releaseClaim(
           admin,
           'protocol_creation_locks',
           'subscription_id',
-          subscriptionId
+          subscriptionId,
         )
         return null
       }
@@ -330,7 +343,7 @@ export async function ensureProtocolAfterPayment(
         admin,
         'protocol_creation_locks',
         'subscription_id',
-        subscriptionId
+        subscriptionId,
       )
       return resumeProtocolId
     }
@@ -345,7 +358,7 @@ export async function ensureProtocolAfterPayment(
       admin,
       'protocol_creation_locks',
       'subscription_id',
-      subscriptionId
+      subscriptionId,
     )
     if (protocolIdCreated) {
       // Se finalize já tinha linkado, limpa o id órfão e restaura pending
@@ -418,7 +431,10 @@ export async function ensureProtocolAfterPayment(
       .single()
 
     if (protocolError || !protocol) {
-      console.error('ensureProtocolAfterPayment: protocol insert error', protocolError)
+      console.error(
+        'ensureProtocolAfterPayment: protocol insert error',
+        protocolError,
+      )
       await rollbackPartialAndRelease()
       return null
     }
@@ -430,7 +446,7 @@ export async function ensureProtocolAfterPayment(
     const itemsOk = await insertProtocolItemsFromPending(
       admin,
       protocol.id,
-      pending
+      pending,
     )
     if (!itemsOk) {
       await rollbackPartialAndRelease()
@@ -442,7 +458,7 @@ export async function ensureProtocolAfterPayment(
       admin,
       subscriptionId,
       protocol.id,
-      pending
+      pending,
     )
     if (!linked) {
       await rollbackPartialAndRelease()
@@ -453,7 +469,7 @@ export async function ensureProtocolAfterPayment(
       admin,
       'protocol_creation_locks',
       'subscription_id',
-      subscriptionId
+      subscriptionId,
     )
 
     return protocol.id as string

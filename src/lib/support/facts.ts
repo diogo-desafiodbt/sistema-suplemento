@@ -1,8 +1,8 @@
-import { createAdminClient } from '@/lib/supabase/admin'
 import {
   addBusinessDays,
   estimateCustomerDeliveryDays,
 } from '@/lib/shipping/estimate'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export type SupportCategory = 'frete' | 'pagamento' | 'fora_de_escopo'
 
@@ -42,7 +42,7 @@ type TrackingEvent = {
 
 export async function fetchSupportFacts(
   userId: string,
-  category: SupportCategory
+  category: SupportCategory,
 ): Promise<SupportDbFacts> {
   if (category === 'fora_de_escopo') {
     return { category }
@@ -54,7 +54,7 @@ export async function fetchSupportFacts(
     const { data: order } = await admin
       .from('orders')
       .select(
-        'id, status, tracking_code, created_at, shipping_json, shipping_quote_json'
+        'id, status, tracking_code, created_at, shipping_json, shipping_quote_json',
       )
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
@@ -75,7 +75,9 @@ export async function fetchSupportFacts(
       }
     }
 
-    const shippingJson = order.shipping_json as { eventos?: TrackingEvent[] } | null
+    const shippingJson = order.shipping_json as {
+      eventos?: TrackingEvent[]
+    } | null
     const eventos = [...(shippingJson?.eventos ?? [])].sort((a, b) => {
       const ta = a.datahora ? new Date(a.datahora).getTime() : 0
       const tb = b.datahora ? new Date(b.datahora).getTime() : 0
@@ -91,7 +93,7 @@ export async function fetchSupportFacts(
       prazoDias > 0
         ? addBusinessDays(
             new Date(order.created_at),
-            estimateCustomerDeliveryDays(prazoDias)
+            estimateCustomerDeliveryDays(prazoDias),
           ).toISOString()
         : null
 

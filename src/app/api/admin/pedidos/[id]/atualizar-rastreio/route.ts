@@ -1,16 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { getRastreamento } from '@/lib/shipping/envie-agora/rastreamento'
+import { type NextRequest, NextResponse } from 'next/server'
 import { mergeTrackingEvents } from '@/lib/shipping/create-label'
+import { getRastreamento } from '@/lib/shipping/envie-agora/rastreamento'
 import {
   getNewTrackingEvents,
   notifyNewTrackingEvents,
 } from '@/lib/shipping/notify'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 
 async function requireAdmin() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) return null
   const admin = createAdminClient()
   const { data: profile } = await admin
@@ -24,7 +26,7 @@ async function requireAdmin() {
 
 export async function POST(
   _request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const admin = await requireAdmin()
@@ -42,7 +44,7 @@ export async function POST(
     if (!order?.shipping_request_id) {
       return NextResponse.json(
         { error: 'Pedido sem shipping_request_id' },
-        { status: 400 }
+        { status: 400 },
       )
     }
 
@@ -52,11 +54,11 @@ export async function POST(
     // Persiste antes de notificar (mesmo padrão do webhook de rastreamento).
     const merged = mergeTrackingEvents(
       order.shipping_json,
-      eventos as unknown as Array<Record<string, unknown>>
+      eventos as unknown as Array<Record<string, unknown>>,
     )
 
     const updates: Record<string, unknown> = { shipping_json: merged }
-    if (eventos.some(e => e.finalizado === 1)) {
+    if (eventos.some((e) => e.finalizado === 1)) {
       updates.status = 'delivered'
     }
 
@@ -67,7 +69,7 @@ export async function POST(
 
     if (updateError) {
       throw new Error(
-        `atualizar-rastreio: falha ao persistir shipping_json: ${updateError.message}`
+        `atualizar-rastreio: falha ao persistir shipping_json: ${updateError.message}`,
       )
     }
 
@@ -75,7 +77,7 @@ export async function POST(
     await notifyNewTrackingEvents(
       admin,
       order.id,
-      newEvents.length > 0 ? newEvents : eventos
+      newEvents.length > 0 ? newEvents : eventos,
     )
 
     return NextResponse.json({ ok: true, eventos: eventos.length })
@@ -83,7 +85,7 @@ export async function POST(
     console.error('atualizar-rastreio error:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Erro interno' },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }

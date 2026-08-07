@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 
 type PeriodKey = '7' | '30' | '90' | 'all'
 
@@ -46,10 +46,12 @@ async function countRows(
   admin: ReturnType<typeof createAdminClient>,
   table: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  filters: (q: any) => any
+  filters: (q: any) => any,
 ): Promise<number> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let query: any = admin.from(table).select('id', { count: 'exact', head: true })
+  let query: any = admin
+    .from(table)
+    .select('id', { count: 'exact', head: true })
   query = filters(query)
   const { count } = await query
   return count ?? 0
@@ -60,7 +62,9 @@ function daysAgoIso(days: number): string {
 }
 
 function daysBetween(fromIso: string): number {
-  return Math.floor((Date.now() - new Date(fromIso).getTime()) / (1000 * 60 * 60 * 24))
+  return Math.floor(
+    (Date.now() - new Date(fromIso).getTime()) / (1000 * 60 * 60 * 24),
+  )
 }
 
 function money(value: number | null | undefined): string {
@@ -135,8 +139,7 @@ export default async function AdminVisaoGeralPage({
       ? params.periodo
       : '30'
 
-  const since =
-    periodo === 'all' ? null : daysAgoIso(parseInt(periodo, 10))
+  const since = periodo === 'all' ? null : daysAgoIso(parseInt(periodo, 10))
 
   const [
     quizStarted,
@@ -148,42 +151,42 @@ export default async function AdminVisaoGeralPage({
     dispatched,
     delivered,
   ] = await Promise.all([
-    countRows(admin, 'funnel_events', q => {
+    countRows(admin, 'funnel_events', (q) => {
       let next = q.eq('event_type', 'quiz_started')
       if (since) next = next.gte('created_at', since)
       return next
     }),
-    countRows(admin, 'funnel_events', q => {
+    countRows(admin, 'funnel_events', (q) => {
       let next = q.eq('event_type', 'quiz_eligible')
       if (since) next = next.gte('created_at', since)
       return next
     }),
-    countRows(admin, 'funnel_events', q => {
+    countRows(admin, 'funnel_events', (q) => {
       let next = q.eq('event_type', 'checkout_started')
       if (since) next = next.gte('created_at', since)
       return next
     }),
-    countRows(admin, 'payments', q => {
+    countRows(admin, 'payments', (q) => {
       let next = q.eq('status', 'paid')
       if (since) next = next.gte('paid_at', since)
       return next
     }),
-    countRows(admin, 'protocols', q => {
+    countRows(admin, 'protocols', (q) => {
       let next = q.eq('status', 'signed')
       if (since) next = next.gte('signed_at', since)
       return next
     }),
-    countRows(admin, 'orders', q => {
+    countRows(admin, 'orders', (q) => {
       let next = q.not('pharmacy_sent_at', 'is', null)
       if (since) next = next.gte('pharmacy_sent_at', since)
       return next
     }),
-    countRows(admin, 'orders', q => {
+    countRows(admin, 'orders', (q) => {
       let next = q.eq('status', 'dispatched')
       if (since) next = next.gte('created_at', since)
       return next
     }),
-    countRows(admin, 'orders', q => {
+    countRows(admin, 'orders', (q) => {
       let next = q.eq('status', 'delivered')
       if (since) next = next.gte('created_at', since)
       return next
@@ -230,7 +233,7 @@ export default async function AdminVisaoGeralPage({
       generated_at: string
       users: { full_name: string } | { full_name: string }[] | null
     }>
-  ).map(p => {
+  ).map((p) => {
     const u = p.users
     const name = Array.isArray(u) ? u[0]?.full_name : u?.full_name
     return {
@@ -256,7 +259,7 @@ export default async function AdminVisaoGeralPage({
       created_at: string
       users: { full_name: string } | { full_name: string }[] | null
     }>
-  ).map(o => {
+  ).map((o) => {
     const u = o.users
     const name = Array.isArray(u) ? u[0]?.full_name : u?.full_name
     return {
@@ -276,8 +279,11 @@ export default async function AdminVisaoGeralPage({
     .maybeSingle()
 
   const reconAt = latestRecon?.completed_at ?? latestRecon?.started_at ?? null
-  const reconFresh = reconAt ? new Date(reconAt).getTime() >= new Date(oneDayAgo).getTime() : false
-  const reconOk = !!latestRecon && latestRecon.status === 'completed' && reconFresh
+  const reconFresh = reconAt
+    ? new Date(reconAt).getTime() >= new Date(oneDayAgo).getTime()
+    : false
+  const reconOk =
+    !!latestRecon && latestRecon.status === 'completed' && reconFresh
   const reconAlertReason = !latestRecon
     ? 'Nenhuma reconciliação registrada ainda.'
     : latestRecon.status === 'failed'
@@ -288,7 +294,9 @@ export default async function AdminVisaoGeralPage({
 
   const { data: failedPaymentsRaw } = await admin
     .from('payments')
-    .select('id, amount, created_at, subscription_id, subscriptions ( user_id, users ( full_name ) )')
+    .select(
+      'id, amount, created_at, subscription_id, subscriptions ( user_id, users ( full_name ) )',
+    )
     .eq('status', 'failed')
     .gte('created_at', sevenDaysAgo)
     .order('created_at', { ascending: false })
@@ -310,8 +318,10 @@ export default async function AdminVisaoGeralPage({
           }[]
         | null
     }>
-  ).map(p => {
-    const sub = Array.isArray(p.subscriptions) ? p.subscriptions[0] : p.subscriptions
+  ).map((p) => {
+    const sub = Array.isArray(p.subscriptions)
+      ? p.subscriptions[0]
+      : p.subscriptions
     const u = sub?.users
     const name = Array.isArray(u) ? u[0]?.full_name : u?.full_name
     return {
@@ -352,7 +362,7 @@ export default async function AdminVisaoGeralPage({
             </p>
           </div>
           <div className="flex gap-1 bg-[#f5f0eb] rounded-xl p-1">
-            {PERIOD_OPTIONS.map(opt => (
+            {PERIOD_OPTIONS.map((opt) => (
               <Link
                 key={opt.key}
                 href={opt.key === '30' ? '/admin' : `/admin?periodo=${opt.key}`}
@@ -377,11 +387,15 @@ export default async function AdminVisaoGeralPage({
                   <div className="w-px flex-1 bg-[#13244f]/15 my-1" />
                 )}
               </div>
-              <div className={`flex-1 flex flex-wrap items-baseline gap-x-3 gap-y-1 ${i < funnel.length - 1 ? 'pb-5' : ''}`}>
+              <div
+                className={`flex-1 flex flex-wrap items-baseline gap-x-3 gap-y-1 ${i < funnel.length - 1 ? 'pb-5' : ''}`}
+              >
                 <span className="text-3xl font-bold text-[#13244f] tabular-nums leading-none">
                   {step.count.toLocaleString('pt-BR')}
                 </span>
-                <span className="text-sm font-semibold text-[#13244f]">{step.label}</span>
+                <span className="text-sm font-semibold text-[#13244f]">
+                  {step.label}
+                </span>
                 {step.dropPct !== null && (
                   <span
                     className={`text-xs font-bold px-2 py-0.5 rounded-full ${
@@ -417,10 +431,16 @@ export default async function AdminVisaoGeralPage({
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <AlertCard title="Protocolos parados (>3 dias)" ok={stuckProtocols.length === 0}>
+          <AlertCard
+            title="Protocolos parados (>3 dias)"
+            ok={stuckProtocols.length === 0}
+          >
             <ul className="space-y-2">
-              {stuckProtocols.map(p => (
-                <li key={p.id} className="flex items-center justify-between gap-3 text-sm">
+              {stuckProtocols.map((p) => (
+                <li
+                  key={p.id}
+                  className="flex items-center justify-between gap-3 text-sm"
+                >
                   <Link
                     href={`/admin/clientes/${p.user_id}`}
                     className="font-semibold text-[#13244f] hover:underline"
@@ -435,10 +455,16 @@ export default async function AdminVisaoGeralPage({
             </ul>
           </AlertCard>
 
-          <AlertCard title="Pedidos sem envio à farmácia (>2 dias)" ok={stuckOrders.length === 0}>
+          <AlertCard
+            title="Pedidos sem envio à farmácia (>2 dias)"
+            ok={stuckOrders.length === 0}
+          >
             <ul className="space-y-2">
-              {stuckOrders.map(o => (
-                <li key={o.id} className="flex items-center justify-between gap-3 text-sm">
+              {stuckOrders.map((o) => (
+                <li
+                  key={o.id}
+                  className="flex items-center justify-between gap-3 text-sm"
+                >
                   <Link
                     href="/admin/pedidos"
                     className="font-semibold text-[#13244f] hover:underline"
@@ -460,7 +486,9 @@ export default async function AdminVisaoGeralPage({
           </AlertCard>
 
           <AlertCard title="Reconciliação da farmácia" ok={reconOk}>
-            <p className="text-sm text-[#13244f] font-semibold mb-1">{reconAlertReason}</p>
+            <p className="text-sm text-[#13244f] font-semibold mb-1">
+              {reconAlertReason}
+            </p>
             {latestRecon && (
               <p className="text-xs text-gray-400">
                 Último registro: {latestRecon.status}
@@ -471,10 +499,16 @@ export default async function AdminVisaoGeralPage({
             )}
           </AlertCard>
 
-          <AlertCard title="Pagamentos falhados (7 dias)" ok={failedPayments.length === 0}>
+          <AlertCard
+            title="Pagamentos falhados (7 dias)"
+            ok={failedPayments.length === 0}
+          >
             <ul className="space-y-2">
-              {failedPayments.map(p => (
-                <li key={p.id} className="flex items-center justify-between gap-3 text-sm">
+              {failedPayments.map((p) => (
+                <li
+                  key={p.id}
+                  className="flex items-center justify-between gap-3 text-sm"
+                >
                   {p.clientHref ? (
                     <Link
                       href={p.clientHref}
@@ -483,10 +517,13 @@ export default async function AdminVisaoGeralPage({
                       {p.patientName}
                     </Link>
                   ) : (
-                    <span className="font-semibold text-[#13244f]">{p.patientName}</span>
+                    <span className="font-semibold text-[#13244f]">
+                      {p.patientName}
+                    </span>
                   )}
                   <span className="text-xs text-gray-400 shrink-0">
-                    {money(p.amount)} · {new Date(p.created_at).toLocaleDateString('pt-BR')}
+                    {money(p.amount)} ·{' '}
+                    {new Date(p.created_at).toLocaleDateString('pt-BR')}
                   </span>
                 </li>
               ))}
@@ -498,9 +535,13 @@ export default async function AdminVisaoGeralPage({
             ok={webhookCount === 0}
           >
             <p className="text-sm text-[#13244f]">
-              <span className="text-2xl font-bold tabular-nums">{webhookCount}</span>
-              {' '}webhook{webhookCount === 1 ? '' : 's'} com{' '}
-              <code className="text-xs bg-gray-100 px-1 rounded">processed = false</code>
+              <span className="text-2xl font-bold tabular-nums">
+                {webhookCount}
+              </span>{' '}
+              webhook{webhookCount === 1 ? '' : 's'} com{' '}
+              <code className="text-xs bg-gray-100 px-1 rounded">
+                processed = false
+              </code>
             </p>
           </AlertCard>
         </div>

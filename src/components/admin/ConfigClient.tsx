@@ -16,7 +16,9 @@ export function ConfigClient({ configs: initialConfigs }: Props) {
   const [saving, setSaving] = useState<string | null>(null)
 
   function handleChange(key: string, newValue: string) {
-    setConfigs(prev => prev.map(c => c.key === key ? { ...c, value: newValue } : c))
+    setConfigs((prev) =>
+      prev.map((c) => (c.key === key ? { ...c, value: newValue } : c)),
+    )
   }
 
   async function handleSave(key: string, value: string) {
@@ -39,14 +41,16 @@ export function ConfigClient({ configs: initialConfigs }: Props) {
   if (configs.length === 0) {
     return (
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
-        <p className="text-sm text-gray-400">Nenhuma configuração encontrada.</p>
+        <p className="text-sm text-gray-400">
+          Nenhuma configuração encontrada.
+        </p>
       </div>
     )
   }
 
   return (
     <div className="space-y-3">
-      {configs.map(config => (
+      {configs.map((config) => (
         <div
           key={config.key}
           className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3"
@@ -56,7 +60,9 @@ export function ConfigClient({ configs: initialConfigs }: Props) {
               {config.key}
             </p>
             {config.description && (
-              <p className="text-sm text-gray-400 mt-0.5">{config.description}</p>
+              <p className="text-sm text-gray-400 mt-0.5">
+                {config.description}
+              </p>
             )}
           </div>
 
@@ -64,7 +70,7 @@ export function ConfigClient({ configs: initialConfigs }: Props) {
             <input
               type="text"
               value={config.value}
-              onChange={e => handleChange(config.key, e.target.value)}
+              onChange={(e) => handleChange(config.key, e.target.value)}
               className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#13244f] font-mono focus:outline-none focus:ring-2 focus:ring-[#13244f]/20 bg-white"
             />
             <button

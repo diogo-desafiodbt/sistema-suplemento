@@ -2,11 +2,12 @@
  * Validação E2E da sequência completa (prompt 025) — função acelerada payment-retry-teste.
  * Uso: INNGEST_DEV=1 node scripts/validate-regua-sequencia.mjs [a|b|all]
  */
-import { readFileSync } from 'fs'
-import { resolve, dirname } from 'path'
-import { fileURLToPath } from 'url'
+
 import { createClient } from '@supabase/supabase-js'
+import { readFileSync } from 'fs'
 import { Inngest } from 'inngest'
+import { dirname, resolve } from 'path'
+import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = resolve(__dirname, '..')
@@ -29,10 +30,13 @@ loadEnv()
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY,
-  { auth: { autoRefreshToken: false, persistSession: false } }
+  { auth: { autoRefreshToken: false, persistSession: false } },
 )
 
-const inngest = new Inngest({ id: 'desafio-diabetes', name: 'Desafio Diabetes' })
+const inngest = new Inngest({
+  id: 'desafio-diabetes',
+  name: 'Desafio Diabetes',
+})
 const GQL = 'http://127.0.0.1:8288/v0/gql'
 
 const EXPECTED_STEPS_A = [
@@ -50,7 +54,7 @@ const EXPECTED_STEPS_A = [
 ]
 
 function sleep(ms) {
-  return new Promise(r => setTimeout(r, ms))
+  return new Promise((r) => setTimeout(r, ms))
 }
 
 async function gql(query, variables = {}) {
@@ -135,10 +139,10 @@ async function waitForRunByEvent(eventId, timeoutMs = 180000) {
   const start = Date.now()
   while (Date.now() - start < timeoutMs) {
     const data = await gql(
-      `{ eventsV2(first: 5, filter: { eventNames: ["pagamento/falhou-teste"] }) { edges { node { id name runs { id status endedAt output } } } } } }`
+      `{ eventsV2(first: 5, filter: { eventNames: ["pagamento/falhou-teste"] }) { edges { node { id name runs { id status endedAt output } } } } } }`,
     )
     const events = data?.data?.eventsV2?.edges ?? []
-    const match = events.find(e => e.node.id === eventId)
+    const match = events.find((e) => e.node.id === eventId)
     const run = match?.node?.runs?.[0]
     if (run?.status === 'COMPLETED' || run?.status === 'FAILED') {
       return run
@@ -150,7 +154,7 @@ async function waitForRunByEvent(eventId, timeoutMs = 180000) {
 
 async function getRunTrace(runId) {
   const data = await gql(
-    `{ run(query: { runID: "${runId}" }) { status output endedAt trace { spans { name status outputID } } } }`
+    `{ run(query: { runID: "${runId}" }) { status output endedAt trace { spans { name status outputID } } } }`,
   )
   return data?.data?.run
 }
@@ -158,7 +162,7 @@ async function getRunTrace(runId) {
 async function getSpanOutput(outputId) {
   if (!outputId) return null
   const data = await gql(
-    `{ runTraceSpanOutputByID(outputID: "${outputId}") { data } }`
+    `{ runTraceSpanOutputByID(outputID: "${outputId}") { data } }`,
   )
   return data?.data?.runTraceSpanOutputByID?.data
 }
@@ -210,7 +214,7 @@ async function runScenarioA() {
   }
 
   const { run: trace, steps } = await collectStepSequence(run.id)
-  const stepNames = steps.map(s => s.name)
+  const stepNames = steps.map((s) => s.name)
 
   console.log('\nSteps executados (ordem):')
   steps.forEach((s, i) => {
@@ -228,7 +232,9 @@ async function runScenarioA() {
 
   console.log(`\n${orderOk ? '✅' : '❌'} Ordem dos steps`)
   console.log(`${finalOk ? '✅' : '❌'} Retorno final { result: 'canceled' }`)
-  console.log(`${sub.data?.status === 'canceled' ? '✅' : '❌'} subscriptions.status = canceled (${sub.data?.status})`)
+  console.log(
+    `${sub.data?.status === 'canceled' ? '✅' : '❌'} subscriptions.status = canceled (${sub.data?.status})`,
+  )
 
   if (!orderOk) {
     console.log('\nEsperado:', EXPECTED_STEPS_A.join(' → '))
@@ -265,7 +271,7 @@ async function runScenarioB() {
   }
 
   const { run: trace, steps } = await collectStepSequence(run.id)
-  const stepNames = steps.map(s => s.name)
+  const stepNames = steps.map((s) => s.name)
 
   console.log('\nSteps executados (ordem):')
   steps.forEach((s, i) => {
@@ -278,17 +284,24 @@ async function runScenarioB() {
     trace?.output?.stopped === 'resolvido-antes-d9'
   const noCancelSteps = !stepNames.includes('cancelar-assinatura')
   const noLembreteAfterStop =
-    !stepNames.includes('lembrete-d9') && !stepNames.includes('cancelar-no-pagarme')
+    !stepNames.includes('lembrete-d9') &&
+    !stepNames.includes('cancelar-no-pagarme')
   const sub = await supabase
     .from('subscriptions')
     .select('status')
     .eq('id', test.subscription_id)
     .single()
 
-  console.log(`\n${stoppedOk ? '✅' : '❌'} Parou com stopped resolvido-antes-d5/d9 (${trace?.output?.stopped})`)
+  console.log(
+    `\n${stoppedOk ? '✅' : '❌'} Parou com stopped resolvido-antes-d5/d9 (${trace?.output?.stopped})`,
+  )
   console.log(`${noCancelSteps ? '✅' : '❌'} Não executou cancelar-assinatura`)
-  console.log(`${noLembreteAfterStop ? '✅' : '❌'} Não executou lembrete-d9 nem cancelar-no-pagarme`)
-  console.log(`${sub.data?.status === 'active' ? '✅' : '❌'} Subscription ainda active (${sub.data?.status})`)
+  console.log(
+    `${noLembreteAfterStop ? '✅' : '❌'} Não executou lembrete-d9 nem cancelar-no-pagarme`,
+  )
+  console.log(
+    `${sub.data?.status === 'active' ? '✅' : '❌'} Subscription ainda active (${sub.data?.status})`,
+  )
 }
 
 const mode = process.argv[2] ?? 'all'

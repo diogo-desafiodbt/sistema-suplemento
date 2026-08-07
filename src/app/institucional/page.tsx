@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import Header from '@/components/Header'
+import { useEffect, useState } from 'react'
 import Footer from '@/components/Footer'
-import { useCountdown, pad } from '@/components/PromoBar'
+import Header from '@/components/Header'
+import { pad, useCountdown } from '@/components/PromoBar'
 import { QUIZ_URL } from '@/lib/constants'
 
 const usps = [
@@ -48,8 +48,19 @@ const timeline = [
     desc: 'O organismo inicia o processo de adaptação metabólica. Os primeiros ajustes costumam ocorrer de forma gradual, sem mudanças imediatas nos exames. Consistência é o fator mais importante nesta fase.',
     icon: (
       <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-        <path d="M16 6C10.477 6 6 10.477 6 16s4.477 10 10 10 10-4.477 10-10" stroke="#13244f" strokeWidth="2" strokeLinecap="round"/>
-        <path d="M26 6l-2 4-4-2" stroke="#13244f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        <path
+          d="M16 6C10.477 6 6 10.477 6 16s4.477 10 10 10 10-4.477 10-10"
+          stroke="#13244f"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+        <path
+          d="M26 6l-2 4-4-2"
+          stroke="#13244f"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </svg>
     ),
   },
@@ -59,8 +70,19 @@ const timeline = [
     desc: 'Com a manutenção do protocolo e da alimentação, os exames de rotina passam a refletir o processo metabólico em andamento. Os resultados variam de acordo com o histórico e a adesão de cada pessoa.',
     icon: (
       <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-        <path d="M16 26V10M10 16l6-6 6 6" stroke="#13244f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M8 26h16" stroke="#13244f" strokeWidth="2" strokeLinecap="round"/>
+        <path
+          d="M16 26V10M10 16l6-6 6 6"
+          stroke="#13244f"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M8 26h16"
+          stroke="#13244f"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
       </svg>
     ),
   },
@@ -70,16 +92,30 @@ const timeline = [
     desc: 'Pessoas que seguem o protocolo de forma consistente relatam melhorias perceptíveis nos exames de glicemia e hemoglobina glicada. O acompanhamento contínuo permite ajustes individuais para apoiar a saúde metabólica a longo prazo.',
     icon: (
       <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-        <circle cx="16" cy="16" r="10" stroke="#13244f" strokeWidth="2"/>
-        <path d="M11 16l3.5 3.5L21 11" stroke="#13244f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        <circle cx="16" cy="16" r="10" stroke="#13244f" strokeWidth="2" />
+        <path
+          d="M11 16l3.5 3.5L21 11"
+          stroke="#13244f"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </svg>
     ),
   },
 ]
 
 const whyCards = [
-  { title: 'Suplementos Comprovados', desc: 'Fórmulas com base em evidências científicas, manipuladas por farmácias parceiras autorizadas pela ANVISA.',                      img: 'https://placehold.co/758x400/f5f3f0/13244f?text=Suplementos' },
-  { title: 'Entrega Mensal',          desc: 'Seus suplementos chegam na sua porta todo mês, sem que você precise se preocupar com nada.',                                     img: 'https://placehold.co/758x400/f5f3f0/13244f?text=Entrega' },
+  {
+    title: 'Suplementos Comprovados',
+    desc: 'Fórmulas com base em evidências científicas, manipuladas por farmácias parceiras autorizadas pela ANVISA.',
+    img: 'https://placehold.co/758x400/f5f3f0/13244f?text=Suplementos',
+  },
+  {
+    title: 'Entrega Mensal',
+    desc: 'Seus suplementos chegam na sua porta todo mês, sem que você precise se preocupar com nada.',
+    img: 'https://placehold.co/758x400/f5f3f0/13244f?text=Entrega',
+  },
   {
     title: 'Dieta baseada no tipo metabólico',
     desc: 'Nossa dieta de baixo índice glicêmico é validada por estudos científicos americanos da Virta Health — referência mundial em reversão do diabetes tipo 2 por meio da alimentação.',
@@ -88,17 +124,35 @@ const whyCards = [
 ]
 
 const faqs = [
-  { q: 'O que é o Desafio Diabetes?',                          a: 'O Desafio Diabetes é uma plataforma healthtech que combina um questionário clínico, avaliação de profissional habilitado e entrega mensal de suplementos personalizados para pessoas com diabetes tipo 2 e pré-diabetes.' },
-  { q: 'Os suplementos substituem os medicamentos?',           a: 'Não. Os suplementos do Desafio Diabetes são complementares ao tratamento médico convencional. Nunca interrompa ou altere medicações prescritas sem orientação do seu médico.' },
-  { q: 'Qual a diferença da Berberina para outros suplementos?', a: 'A Berberina é o ativo central do protocolo — um dos mais estudados na nutrição funcional, com pesquisas associadas ao apoio no controle da glicemia e da resistência à insulina.' },
-  { q: 'Quando verei resultados?',                              a: 'Os primeiros resultados costumam aparecer entre 4 e 8 semanas de uso regular. Resultados mais expressivos, como redução de HbA1c, são observados a partir de 3 a 6 meses.' },
-  { q: 'O protocolo precisa de prescrição?',                    a: 'Sim. Um profissional habilitado avalia seu questionário clínico e assina digitalmente o protocolo antes do envio.' },
-  { q: 'Quem não deve usar o protocolo?',                       a: 'Gestantes, lactantes, menores de 18 anos e pessoas com doença renal crônica grave, doença cardíaca severa ou cirrose não devem iniciar o protocolo sem autorização médica específica.' },
+  {
+    q: 'O que é o Desafio Diabetes?',
+    a: 'O Desafio Diabetes é uma plataforma healthtech que combina um questionário clínico, avaliação de profissional habilitado e entrega mensal de suplementos personalizados para pessoas com diabetes tipo 2 e pré-diabetes.',
+  },
+  {
+    q: 'Os suplementos substituem os medicamentos?',
+    a: 'Não. Os suplementos do Desafio Diabetes são complementares ao tratamento médico convencional. Nunca interrompa ou altere medicações prescritas sem orientação do seu médico.',
+  },
+  {
+    q: 'Qual a diferença da Berberina para outros suplementos?',
+    a: 'A Berberina é o ativo central do protocolo — um dos mais estudados na nutrição funcional, com pesquisas associadas ao apoio no controle da glicemia e da resistência à insulina.',
+  },
+  {
+    q: 'Quando verei resultados?',
+    a: 'Os primeiros resultados costumam aparecer entre 4 e 8 semanas de uso regular. Resultados mais expressivos, como redução de HbA1c, são observados a partir de 3 a 6 meses.',
+  },
+  {
+    q: 'O protocolo precisa de prescrição?',
+    a: 'Sim. Um profissional habilitado avalia seu questionário clínico e assina digitalmente o protocolo antes do envio.',
+  },
+  {
+    q: 'Quem não deve usar o protocolo?',
+    a: 'Gestantes, lactantes, menores de 18 anos e pessoas com doença renal crônica grave, doença cardíaca severa ou cirrose não devem iniciar o protocolo sem autorização médica específica.',
+  },
 ]
 
 export default function LandingPage() {
-  const [popupOpen, setPopupOpen]       = useState(false)
-  const [activeFaq, setActiveFaq]       = useState<number | null>(null)
+  const [popupOpen, setPopupOpen] = useState(false)
+  const [activeFaq, setActiveFaq] = useState<number | null>(null)
   const [farmaciaPopupOpen, setFarmaciaPopupOpen] = useState(false)
   const time = useCountdown()
 
@@ -112,10 +166,11 @@ export default function LandingPage() {
     } catch {}
   }, [])
 
-
   const closePopup = () => {
     setPopupOpen(false)
-    try { localStorage.setItem('dd_popup_dismissed', '1') } catch {}
+    try {
+      localStorage.setItem('dd_popup_dismissed', '1')
+    } catch {}
   }
 
   return (
@@ -139,21 +194,39 @@ export default function LandingPage() {
               aria-label="Fechar oferta"
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M11 3L3 11M3 3l8 8" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                <path
+                  d="M11 3L3 11M3 3l8 8"
+                  stroke="white"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
               </svg>
             </button>
             <div className="bg-[#13244f] px-6 py-8 text-white text-center">
-              <p className="text-xs font-bold tracking-widest uppercase opacity-70 mb-3">OFERTA POR TEMPO LIMITADO</p>
+              <p className="text-xs font-bold tracking-widest uppercase opacity-70 mb-3">
+                OFERTA POR TEMPO LIMITADO
+              </p>
               <div className="flex justify-center gap-2 mb-4">
-                {[{ v: time.h, l: 'Horas' }, { v: time.m, l: 'Minutos' }, { v: time.s, l: 'Segundos' }].map(({ v, l }) => (
-                  <div key={l} className="bg-white/10 rounded-xl px-3 py-2 text-center min-w-[60px]">
+                {[
+                  { v: time.h, l: 'Horas' },
+                  { v: time.m, l: 'Minutos' },
+                  { v: time.s, l: 'Segundos' },
+                ].map(({ v, l }) => (
+                  <div
+                    key={l}
+                    className="bg-white/10 rounded-xl px-3 py-2 text-center min-w-[60px]"
+                  >
                     <div className="text-xl font-bold">{pad(v)}</div>
                     <div className="text-xs opacity-70">{l}</div>
                   </div>
                 ))}
               </div>
-              <h3 className="text-xl font-bold mb-1">30% OFF no seu protocolo</h3>
-              <p className="text-sm opacity-70">Cadastre-se e garanta seu desconto.</p>
+              <h3 className="text-xl font-bold mb-1">
+                30% OFF no seu protocolo
+              </h3>
+              <p className="text-sm opacity-70">
+                Cadastre-se e garanta seu desconto.
+              </p>
             </div>
             <div className="p-5">
               <input
@@ -161,11 +234,17 @@ export default function LandingPage() {
                 placeholder="Seu email"
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 mb-3 text-sm focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f]"
               />
-              <Link href={QUIZ_URL} className="block w-full bg-[#f4001e] text-white text-center py-3.5 rounded-xl font-bold text-sm hover:bg-[#a30000] transition">
+              <Link
+                href={QUIZ_URL}
+                className="block w-full bg-[#f4001e] text-white text-center py-3.5 rounded-xl font-bold text-sm hover:bg-[#a30000] transition"
+              >
                 Resgatar cupom
               </Link>
               <p className="text-xs text-gray-400 mt-3 text-center">
-                Ao continuar concordo com os <a href="#" className="underline">Termos e Condições</a>
+                Ao continuar concordo com os{' '}
+                <a href="#" className="underline">
+                  Termos e Condições
+                </a>
               </p>
             </div>
           </div>
@@ -175,13 +254,20 @@ export default function LandingPage() {
       {/* ── POPUP FARMÁCIA ── */}
       {farmaciaPopupOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setFarmaciaPopupOpen(false)} />
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => setFarmaciaPopupOpen(false)}
+          />
           <div className="relative bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl overflow-hidden">
             {/* Header */}
             <div className="bg-[#13244f] px-6 py-5 text-white flex items-start justify-between">
               <div>
-                <h3 className="text-lg font-bold">Seja uma farmácia credenciada</h3>
-                <p className="text-sm opacity-70 mt-0.5">Preencha os dados e entraremos em contato</p>
+                <h3 className="text-lg font-bold">
+                  Seja uma farmácia credenciada
+                </h3>
+                <p className="text-sm opacity-70 mt-0.5">
+                  Preencha os dados e entraremos em contato
+                </p>
               </div>
               <button
                 onClick={() => setFarmaciaPopupOpen(false)}
@@ -189,7 +275,12 @@ export default function LandingPage() {
                 aria-label="Fechar"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path d="M11 3L3 11M3 3l8 8" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                  <path
+                    d="M11 3L3 11M3 3l8 8"
+                    stroke="white"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
                 </svg>
               </button>
             </div>
@@ -197,7 +288,9 @@ export default function LandingPage() {
             {/* Formulário */}
             <div className="p-6 flex flex-col gap-3">
               <div>
-                <label className="text-xs font-semibold text-[#13244f] block mb-1">Nome da farmácia *</label>
+                <label className="text-xs font-semibold text-[#13244f] block mb-1">
+                  Nome da farmácia *
+                </label>
                 <input
                   type="text"
                   placeholder="Ex: Farmácia Central Ltda"
@@ -205,7 +298,9 @@ export default function LandingPage() {
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-[#13244f] block mb-1">CNPJ *</label>
+                <label className="text-xs font-semibold text-[#13244f] block mb-1">
+                  CNPJ *
+                </label>
                 <input
                   type="text"
                   placeholder="00.000.000/0000-00"
@@ -213,7 +308,9 @@ export default function LandingPage() {
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-[#13244f] block mb-1">Responsável técnico *</label>
+                <label className="text-xs font-semibold text-[#13244f] block mb-1">
+                  Responsável técnico *
+                </label>
                 <input
                   type="text"
                   placeholder="Nome do farmacêutico responsável"
@@ -222,7 +319,9 @@ export default function LandingPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-semibold text-[#13244f] block mb-1">CRF *</label>
+                  <label className="text-xs font-semibold text-[#13244f] block mb-1">
+                    CRF *
+                  </label>
                   <input
                     type="text"
                     placeholder="CRF-SP 00000"
@@ -230,7 +329,9 @@ export default function LandingPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-[#13244f] block mb-1">Estado *</label>
+                  <label className="text-xs font-semibold text-[#13244f] block mb-1">
+                    Estado *
+                  </label>
                   <input
                     type="text"
                     placeholder="SP"
@@ -239,7 +340,9 @@ export default function LandingPage() {
                 </div>
               </div>
               <div>
-                <label className="text-xs font-semibold text-[#13244f] block mb-1">E-mail *</label>
+                <label className="text-xs font-semibold text-[#13244f] block mb-1">
+                  E-mail *
+                </label>
                 <input
                   type="email"
                   placeholder="contato@suafarmacia.com.br"
@@ -247,7 +350,9 @@ export default function LandingPage() {
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-[#13244f] block mb-1">WhatsApp *</label>
+                <label className="text-xs font-semibold text-[#13244f] block mb-1">
+                  WhatsApp *
+                </label>
                 <input
                   type="tel"
                   placeholder="(11) 99999-9999"
@@ -273,7 +378,6 @@ export default function LandingPage() {
       {/* ── HERO ── */}
       <section className="bg-white py-10 md:py-16 px-4 md:px-6">
         <div className="max-w-6xl mx-auto flex flex-col md:grid md:grid-cols-2 gap-8 md:gap-12 items-center">
-
           {/* Imagem */}
           <div className="w-full md:order-1">
             <img
@@ -286,20 +390,26 @@ export default function LandingPage() {
           {/* Texto */}
           <div className="w-full md:order-2 flex flex-col items-center md:items-start text-center md:text-left">
             <h1 className="font-display text-3xl sm:text-4xl md:text-5xl text-[#13244f] leading-tight mb-4 md:mb-5">
-              Suplemento comum <span className="text-[#f4001e]">não</span> é suplemento para <span className="text-[#f4001e]">diabético</span>
+              Suplemento comum <span className="text-[#f4001e]">não</span> é
+              suplemento para <span className="text-[#f4001e]">diabético</span>
             </h1>
             <p className="text-gray-600 text-base md:text-lg mb-6 md:mb-8 leading-relaxed max-w-md md:max-w-none">
-              Desenvolvido pelo Dr. Turí Souza com componentes de altíssima qualidade — sem os carboidratos de rápida absorção presentes na maioria dos suplementos do mercado. Os produtos Desafio Diabetes são pensados para quem convive com diabetes.
+              Desenvolvido pelo Dr. Turí Souza com componentes de altíssima
+              qualidade — sem os carboidratos de rápida absorção presentes na
+              maioria dos suplementos do mercado. Os produtos Desafio Diabetes
+              são pensados para quem convive com diabetes.
             </p>
 
             <div className="mt-8 border-t border-gray-200 pt-6 w-full text-center md:text-left">
-              <span className="text-3xl md:text-4xl font-black text-[#13244f]">100 mil</span>
+              <span className="text-3xl md:text-4xl font-black text-[#13244f]">
+                100 mil
+              </span>
               <p className="text-sm text-gray-500 mt-1 leading-relaxed">
-                Mais de 100.000 pessoas já foram impactadas pelo Desafio Diabetes.
+                Mais de 100.000 pessoas já foram impactadas pelo Desafio
+                Diabetes.
               </p>
             </div>
           </div>
-
         </div>
       </section>
 
@@ -309,9 +419,14 @@ export default function LandingPage() {
           {[0, 1].map((set) => (
             <div key={set} className="marquee-inner flex-shrink-0">
               {usps.map((usp) => (
-                <div key={usp} className="flex items-center gap-2 whitespace-nowrap px-4">
+                <div
+                  key={usp}
+                  className="flex items-center gap-2 whitespace-nowrap px-4"
+                >
                   <div className="w-4 h-4 rounded-full bg-[#13244f]/20 flex-shrink-0" />
-                  <span className="text-xs md:text-sm font-medium text-[#13244f]">{usp}</span>
+                  <span className="text-xs md:text-sm font-medium text-[#13244f]">
+                    {usp}
+                  </span>
                 </div>
               ))}
             </div>
@@ -323,19 +438,26 @@ export default function LandingPage() {
       <section className="py-14 md:py-20 px-4 md:px-6 bg-white">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-10 md:mb-12">
-            <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-2">ÍNDICE GLICÊMICO</p>
+            <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-2">
+              ÍNDICE GLICÊMICO
+            </p>
             <h2 className="font-display text-2xl md:text-3xl text-[#13244f] max-w-2xl mx-auto">
               Nem todo suplemento serve pra quem tem diabetes
             </h2>
             <p className="mt-4 text-gray-600 max-w-2xl mx-auto leading-relaxed text-sm md:text-base">
-              A maioria dos suplementos do mercado foi formulada pra população geral — carregados de maltodextrina, dextrose e açúcares &ldquo;escondidos&rdquo; que fazem sua glicose disparar como um doce. Não é falha de fabricação. É que nunca pensaram em você.
+              A maioria dos suplementos do mercado foi formulada pra população
+              geral — carregados de maltodextrina, dextrose e açúcares
+              &ldquo;escondidos&rdquo; que fazem sua glicose disparar como um
+              doce. Não é falha de fabricação. É que nunca pensaram em você.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
             {/* Suplemento comum */}
             <div className="rounded-2xl border border-red-200 bg-red-50/60 p-6 md:p-7">
-              <h3 className="font-bold text-[#13244f] mb-4">Suplemento comum</h3>
+              <h3 className="font-bold text-[#13244f] mb-4">
+                Suplemento comum
+              </h3>
               <ul className="space-y-3">
                 {[
                   'Maltodextrina/dextrose como base',
@@ -343,7 +465,10 @@ export default function LandingPage() {
                   'Pico de glicose rápido após a dose',
                   'Maior demanda de insulina do pâncreas',
                 ].map((item) => (
-                  <li key={item} className="flex items-start gap-2 text-sm text-gray-700">
+                  <li
+                    key={item}
+                    className="flex items-start gap-2 text-sm text-gray-700"
+                  >
                     <span className="text-red-500 font-bold mt-0.5">✕</span>
                     {item}
                   </li>
@@ -353,7 +478,9 @@ export default function LandingPage() {
 
             {/* Suplemento Desafio Diabetes */}
             <div className="rounded-2xl border border-[#13244f]/20 bg-[#13244f]/5 p-6 md:p-7">
-              <h3 className="font-bold text-[#13244f] mb-4">Suplemento Desafio Diabetes</h3>
+              <h3 className="font-bold text-[#13244f] mb-4">
+                Suplemento Desafio Diabetes
+              </h3>
               <ul className="space-y-3">
                 {[
                   'Adoçado com stevia/eritritol, sem carga glicêmica',
@@ -361,7 +488,10 @@ export default function LandingPage() {
                   'Resposta glicêmica testada e estável',
                   'Farmácia credenciada ANVISA',
                 ].map((item) => (
-                  <li key={item} className="flex items-start gap-2 text-sm text-gray-700">
+                  <li
+                    key={item}
+                    className="flex items-start gap-2 text-sm text-gray-700"
+                  >
                     <span className="text-[#13244f] font-bold mt-0.5">✓</span>
                     {item}
                   </li>
@@ -376,7 +506,9 @@ export default function LandingPage() {
       <section className="py-14 md:py-20 px-4 md:px-6 bg-[#f5f5f0]">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-10 md:mb-12">
-            <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-2">DEPOIMENTOS</p>
+            <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-2">
+              DEPOIMENTOS
+            </p>
             <h2 className="font-display text-2xl md:text-3xl text-[#13244f]">
               Veja os resultados dos nossos pacientes
             </h2>
@@ -389,8 +521,17 @@ export default function LandingPage() {
                 className="bg-white rounded-2xl p-6 md:p-7 flex flex-col gap-4 shadow-sm border border-gray-100"
               >
                 {/* Aspas decorativas */}
-                <svg width="32" height="24" viewBox="0 0 32 24" fill="none" className="flex-shrink-0 opacity-20">
-                  <path d="M0 24V14.4C0 6.4 4.8 1.6 14.4 0L16 3.2C11.2 4.267 8.533 7.2 8 12H14.4V24H0ZM17.6 24V14.4C17.6 6.4 22.4 1.6 32 0L33.6 3.2C28.8 4.267 26.133 7.2 25.6 12H32V24H17.6Z" fill="#13244f"/>
+                <svg
+                  width="32"
+                  height="24"
+                  viewBox="0 0 32 24"
+                  fill="none"
+                  className="flex-shrink-0 opacity-20"
+                >
+                  <path
+                    d="M0 24V14.4C0 6.4 4.8 1.6 14.4 0L16 3.2C11.2 4.267 8.533 7.2 8 12H14.4V24H0ZM17.6 24V14.4C17.6 6.4 22.4 1.6 32 0L33.6 3.2C28.8 4.267 26.133 7.2 25.6 12H32V24H17.6Z"
+                    fill="#13244f"
+                  />
                 </svg>
 
                 {/* Título em destaque */}
@@ -411,10 +552,17 @@ export default function LandingPage() {
                   </div>
                   <div className="flex items-center gap-1.5 bg-green-50 px-2.5 py-1 rounded-full">
                     <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-                      <circle cx="7" cy="7" r="7" fill="#22c55e"/>
-                      <path d="M4 7l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                      <circle cx="7" cy="7" r="7" fill="#22c55e" />
+                      <path
+                        d="M4 7l2 2 4-4"
+                        stroke="white"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                      />
                     </svg>
-                    <span className="text-xs text-green-700 font-medium">Verificado</span>
+                    <span className="text-xs text-green-700 font-medium">
+                      Verificado
+                    </span>
                   </div>
                 </div>
               </div>
@@ -426,18 +574,29 @@ export default function LandingPage() {
       {/* ── TIMELINE ── */}
       <section className="bg-[#f5f3f0] py-14 md:py-20 px-4 md:px-6">
         <div className="max-w-6xl mx-auto">
-          <p className="text-xs font-bold tracking-widest text-[#13244f] uppercase mb-2">O QUE ESPERAR?</p>
-          <h2 className="font-display text-2xl md:text-3xl text-[#13244f] mb-8 md:mb-12">Evolução do Protocolo</h2>
+          <p className="text-xs font-bold tracking-widest text-[#13244f] uppercase mb-2">
+            O QUE ESPERAR?
+          </p>
+          <h2 className="font-display text-2xl md:text-3xl text-[#13244f] mb-8 md:mb-12">
+            Evolução do Protocolo
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-10 md:mb-12">
             {timeline.map((item, i) => (
-              <div key={i} className="bg-white rounded-2xl p-5 md:p-6 flex gap-4 items-start">
+              <div
+                key={i}
+                className="bg-white rounded-2xl p-5 md:p-6 flex gap-4 items-start"
+              >
                 <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-[#ececec] flex items-center justify-center flex-shrink-0">
                   {item.icon}
                 </div>
                 <div>
-                  <h3 className="font-bold text-[#13244f] text-base md:text-lg">{item.period}</h3>
+                  <h3 className="font-bold text-[#13244f] text-base md:text-lg">
+                    {item.period}
+                  </h3>
                   <p className="text-xs text-gray-400 mb-1">{item.label}</p>
-                  <p className="text-xs md:text-sm text-gray-600 leading-relaxed">{item.desc}</p>
+                  <p className="text-xs md:text-sm text-gray-600 leading-relaxed">
+                    {item.desc}
+                  </p>
                 </div>
               </div>
             ))}
@@ -450,7 +609,9 @@ export default function LandingPage() {
               Quero meu protocolo
             </Link>
             <p className="mt-4 text-xs text-gray-400 max-w-xl mx-auto leading-relaxed">
-              ⚠️ Os resultados variam de pessoa para pessoa. O protocolo Desafio Diabetes não garante resultados específicos e não substitui o acompanhamento médico.
+              ⚠️ Os resultados variam de pessoa para pessoa. O protocolo Desafio
+              Diabetes não garante resultados específicos e não substitui o
+              acompanhamento médico.
             </p>
           </div>
         </div>
@@ -459,14 +620,25 @@ export default function LandingPage() {
       {/* ── POR QUE DD ── */}
       <section className="py-14 md:py-20 px-4 md:px-6">
         <div className="max-w-6xl mx-auto">
-          <p className="text-xs font-bold tracking-widest text-[#13244f] uppercase mb-2">Por que Desafio Diabetes?</p>
-          <h2 className="font-display text-2xl md:text-3xl text-[#13244f] mb-8 md:mb-12">Uma solução prática e segura</h2>
+          <p className="text-xs font-bold tracking-widest text-[#13244f] uppercase mb-2">
+            Por que Desafio Diabetes?
+          </p>
+          <h2 className="font-display text-2xl md:text-3xl text-[#13244f] mb-8 md:mb-12">
+            Uma solução prática e segura
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
             {whyCards.map((card) => (
-              <div key={card.title} className="border border-gray-200 rounded-2xl overflow-hidden">
+              <div
+                key={card.title}
+                className="border border-gray-200 rounded-2xl overflow-hidden"
+              >
                 <div className="p-5 md:p-6">
-                  <h3 className="font-bold text-lg md:text-xl text-[#13244f] mb-2 md:mb-3">{card.title}</h3>
-                  <p className="text-sm text-gray-600 leading-relaxed">{card.desc}</p>
+                  <h3 className="font-bold text-lg md:text-xl text-[#13244f] mb-2 md:mb-3">
+                    {card.title}
+                  </h3>
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    {card.desc}
+                  </p>
                 </div>
                 <img src={card.img} alt={card.title} className="w-full" />
               </div>
@@ -479,38 +651,57 @@ export default function LandingPage() {
       <section className="py-10 md:py-12 px-4 md:px-6 border-t border-gray-100">
         <div className="max-w-6xl mx-auto">
           <div className="bg-[#13244f] text-white rounded-2xl p-8 md:p-10 text-center">
-            <p className="text-xs font-bold tracking-widest uppercase opacity-60 mb-2">Impacto real</p>
-            <h3 className="text-4xl md:text-5xl font-black mb-2 md:mb-3">100 mil</h3>
-            <p className="text-sm md:text-base opacity-80">pessoas já foram impactadas pelo Desafio Diabetes</p>
+            <p className="text-xs font-bold tracking-widest uppercase opacity-60 mb-2">
+              Impacto real
+            </p>
+            <h3 className="text-4xl md:text-5xl font-black mb-2 md:mb-3">
+              100 mil
+            </h3>
+            <p className="text-sm md:text-base opacity-80">
+              pessoas já foram impactadas pelo Desafio Diabetes
+            </p>
           </div>
         </div>
       </section>
 
       {/* ── SOBRE O DESAFIO DIABETES ── */}
-      <section id="quem-somos" className="py-14 md:py-20 px-4 md:px-6 border-t border-gray-100">
+      <section
+        id="quem-somos"
+        className="py-14 md:py-20 px-4 md:px-6 border-t border-gray-100"
+      >
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-10 md:mb-12">
-            <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-2">Sobre o Desafio Diabetes</p>
+            <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-2">
+              Sobre o Desafio Diabetes
+            </p>
             <h2 className="font-display text-2xl md:text-3xl text-[#13244f] mb-4">
               O maior programa de reversão do diabetes do Brasil no YouTube
             </h2>
             <p className="text-gray-600 max-w-2xl mx-auto leading-relaxed text-sm md:text-base">
-              Criado pelo Dr. Turi Souza, o Desafio Diabetes já impactou mais de 15 milhões de diabéticos com conteúdo científico, prático e acessível — e os resultados falam por si.
+              Criado pelo Dr. Turi Souza, o Desafio Diabetes já impactou mais de
+              15 milhões de diabéticos com conteúdo científico, prático e
+              acessível — e os resultados falam por si.
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-10 md:mb-12">
             <div className="bg-[#13244f] text-white rounded-2xl p-7 text-center flex flex-col items-center gap-2">
               <span className="text-4xl md:text-5xl font-black">+15M</span>
-              <p className="text-sm opacity-80 leading-relaxed">diabéticos impactados nas redes sociais</p>
+              <p className="text-sm opacity-80 leading-relaxed">
+                diabéticos impactados nas redes sociais
+              </p>
             </div>
             <div className="bg-[#f4001e] text-white rounded-2xl p-7 text-center flex flex-col items-center gap-2">
               <span className="text-4xl md:text-5xl font-black">#1</span>
-              <p className="text-sm opacity-80 leading-relaxed">programa de reversão do diabetes no YouTube Brasil</p>
+              <p className="text-sm opacity-80 leading-relaxed">
+                programa de reversão do diabetes no YouTube Brasil
+              </p>
             </div>
             <div className="bg-[#13244f] text-white rounded-2xl p-7 text-center flex flex-col items-center gap-2">
               <span className="text-3xl md:text-4xl font-black">Milhares</span>
-              <p className="text-sm opacity-80 leading-relaxed">de relatos de melhora nos exames documentados pela comunidade</p>
+              <p className="text-sm opacity-80 leading-relaxed">
+                de relatos de melhora nos exames documentados pela comunidade
+              </p>
             </div>
           </div>
 
@@ -521,7 +712,9 @@ export default function LandingPage() {
             >
               Quero meu protocolo
             </Link>
-            <p className="text-xs text-gray-400 mt-3">Cancele quando quiser · Sem taxas</p>
+            <p className="text-xs text-gray-400 mt-3">
+              Cancele quando quiser · Sem taxas
+            </p>
           </div>
         </div>
       </section>
@@ -530,13 +723,20 @@ export default function LandingPage() {
       <section className="py-14 md:py-20 px-4 md:px-6 border-t border-gray-100">
         <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-8 md:gap-16">
           <div>
-            <p className="text-xs font-bold tracking-widest text-[#13244f] uppercase mb-2">FAQ</p>
-            <h2 className="font-display text-2xl md:text-3xl text-[#13244f] mb-3 md:mb-4">Diabetes: tire suas dúvidas</h2>
+            <p className="text-xs font-bold tracking-widest text-[#13244f] uppercase mb-2">
+              FAQ
+            </p>
+            <h2 className="font-display text-2xl md:text-3xl text-[#13244f] mb-3 md:mb-4">
+              Diabetes: tire suas dúvidas
+            </h2>
             <p className="text-sm text-gray-500">Equipe Desafio Diabetes</p>
           </div>
           <div className="md:col-span-2">
             {faqs.map((faq, i) => (
-              <div key={i} className={`border-b border-gray-200 ${i === 0 ? 'border-t' : ''}`}>
+              <div
+                key={i}
+                className={`border-b border-gray-200 ${i === 0 ? 'border-t' : ''}`}
+              >
                 <button
                   className="w-full text-left py-4 md:py-5 flex items-center justify-between gap-4 text-[#13244f] font-medium text-sm"
                   onClick={() => setActiveFaq(activeFaq === i ? null : i)}
@@ -545,14 +745,26 @@ export default function LandingPage() {
                   <span>{faq.q}</span>
                   <svg
                     className={`flex-shrink-0 transition-transform duration-300 ${activeFaq === i ? 'rotate-180' : ''}`}
-                    width="20" height="20" viewBox="0 0 24 24" fill="none"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
                   >
-                    <path d="M5 8.5L12 15.5L19 8.5" stroke="#13244f" strokeWidth="1.5" strokeLinecap="round"/>
+                    <path
+                      d="M5 8.5L12 15.5L19 8.5"
+                      stroke="#13244f"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    />
                   </svg>
                 </button>
                 {/* Animação suave do accordion */}
-                <div className={`overflow-hidden transition-all duration-300 ease-in-out ${activeFaq === i ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
-                  <p className="text-sm text-gray-600 leading-relaxed pb-5">{faq.a}</p>
+                <div
+                  className={`overflow-hidden transition-all duration-300 ease-in-out ${activeFaq === i ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}
+                >
+                  <p className="text-sm text-gray-600 leading-relaxed pb-5">
+                    {faq.a}
+                  </p>
                 </div>
               </div>
             ))}
@@ -565,13 +777,22 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto flex items-start justify-center gap-4 md:gap-6">
           <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#ececec] flex items-center justify-center flex-shrink-0 mt-0.5">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke="#13244f" strokeWidth="1.5" strokeLinejoin="round"/>
+              <path
+                d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                stroke="#13244f"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
+              />
             </svg>
           </div>
           <div className="text-center">
-            <h3 className="font-bold text-[#13244f] mb-1 text-sm md:text-base">Farmácias credenciadas ANVISA</h3>
+            <h3 className="font-bold text-[#13244f] mb-1 text-sm md:text-base">
+              Farmácias credenciadas ANVISA
+            </h3>
             <p className="text-xs md:text-sm text-gray-500 leading-relaxed max-w-2xl">
-              O Desafio Diabetes não é uma farmácia. Todos os suplementos são manipulados por farmácias credenciadas de acordo com as normas da ANVISA.
+              O Desafio Diabetes não é uma farmácia. Todos os suplementos são
+              manipulados por farmácias credenciadas de acordo com as normas da
+              ANVISA.
             </p>
             <button
               onClick={() => setFarmaciaPopupOpen(true)}
@@ -584,7 +805,6 @@ export default function LandingPage() {
       </section>
 
       <Footer />
-
     </>
   )
 }

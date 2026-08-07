@@ -17,7 +17,7 @@ export type PharmacyOrderItem = {
   Movimentacao: unknown[]
 }
 
-export type PharmacyVendaPagamento = {
+type PharmacyVendaPagamento = {
   Valor: string
   DataVencimento: string
   FormaPagamentoCodigo: number

@@ -1,6 +1,6 @@
-import Header from '@/components/Header'
-import Footer from '@/components/Footer'
 import CategoryCarousel from '@/components/CategoryCarousel'
+import Footer from '@/components/Footer'
+import Header from '@/components/Header'
 
 /** Página interna da linha de produtos — não linkada no funil principal. */
 export default function LinhaSuplementosPage() {

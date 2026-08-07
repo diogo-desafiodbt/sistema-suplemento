@@ -8,7 +8,7 @@ function digitsOnly(value: string | null | undefined): string {
   return (value ?? '').replace(/\D/g, '')
 }
 
-export function clientCodeToInt(clientCode: string | null | undefined): number {
+function clientCodeToInt(clientCode: string | null | undefined): number {
   const digits = digitsOnly(clientCode)
   const n = parseInt(digits || '0', 10)
   return Number.isFinite(n) ? n : 0

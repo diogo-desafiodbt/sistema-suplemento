@@ -1,7 +1,7 @@
 import { Resend } from 'resend'
-import { inngest } from '../client'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { isRecurringPlan } from '@/lib/plans'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { inngest } from '../client'
 
 type ReminderKind = 'd-5' | 'd-1' | 'd+3'
 
@@ -39,7 +39,7 @@ async function aindaAtivo(userId: string): Promise<boolean> {
 
 async function logNotification(
   userId: string,
-  status: 'sent' | 'failed'
+  status: 'sent' | 'failed',
 ): Promise<void> {
   try {
     const admin = createAdminClient()
@@ -92,7 +92,8 @@ function buildRenewalEmailHtml(params: {
       cta: 'Renovar antes que expire',
     },
     'd+3': {
-      subject: 'Sentimos sua falta — que tal voltar a cuidar do seu tratamento?',
+      subject:
+        'Sentimos sua falta — que tal voltar a cuidar do seu tratamento?',
       body: `
         <p style="margin:0 0 16px;color:#4b5563;font-size:15px;line-height:1.7;">
           Faz alguns dias que seu plano expirou e a gente sente sua falta nessa jornada de cuidado com a saúde.
@@ -158,7 +159,7 @@ function buildRenewalEmailHtml(params: {
 
 async function sendRenewalReminderEmail(
   userId: string,
-  kind: ReminderKind
+  kind: ReminderKind,
 ): Promise<void> {
   const resendApiKey = process.env.RESEND_API_KEY
   if (!resendApiKey) {
@@ -225,35 +226,47 @@ export const avulsoRenewalReminder = inngest.createFunction(
     if (
       !sub ||
       isRecurringPlan(sub.plan_type) ||
-      Boolean(sub.pagarme_sub_id) ||
+      sub.pagarme_sub_id ||
       !sub.expires_at
     ) {
       return { skipped: 'plano-e-recorrente' }
     }
 
     const expiresAt = new Date(sub.expires_at)
-    const data5DiasAntes = new Date(expiresAt.getTime() - 5 * 24 * 60 * 60 * 1000)
-    const data1DiaAntes = new Date(expiresAt.getTime() - 1 * 24 * 60 * 60 * 1000)
-    const data3DiasDepois = new Date(expiresAt.getTime() + 3 * 24 * 60 * 60 * 1000)
+    const data5DiasAntes = new Date(
+      expiresAt.getTime() - 5 * 24 * 60 * 60 * 1000,
+    )
+    const data1DiaAntes = new Date(
+      expiresAt.getTime() - 1 * 24 * 60 * 60 * 1000,
+    )
+    const data3DiasDepois = new Date(
+      expiresAt.getTime() + 3 * 24 * 60 * 60 * 1000,
+    )
 
     await step.sleepUntil('aguardar-d-5', data5DiasAntes)
     if (await step.run('checar-renovou-1', () => aindaAtivo(user_id))) {
       return { stopped: 'renovou-antes-d-5' }
     }
-    await step.run('lembrete-d-5', () => sendRenewalReminderEmail(user_id, 'd-5'))
+    await step.run('lembrete-d-5', () =>
+      sendRenewalReminderEmail(user_id, 'd-5'),
+    )
 
     await step.sleepUntil('aguardar-d-1', data1DiaAntes)
     if (await step.run('checar-renovou-2', () => aindaAtivo(user_id))) {
       return { stopped: 'renovou-antes-d-1' }
     }
-    await step.run('lembrete-d-1', () => sendRenewalReminderEmail(user_id, 'd-1'))
+    await step.run('lembrete-d-1', () =>
+      sendRenewalReminderEmail(user_id, 'd-1'),
+    )
 
     await step.sleepUntil('aguardar-d+3', data3DiasDepois)
     if (await step.run('checar-renovou-3', () => aindaAtivo(user_id))) {
       return { stopped: 'renovou-apos-expirar' }
     }
-    await step.run('reativacao-d+3', () => sendRenewalReminderEmail(user_id, 'd+3'))
+    await step.run('reativacao-d+3', () =>
+      sendRenewalReminderEmail(user_id, 'd+3'),
+    )
 
     return { result: 'sequencia-concluida' }
-  }
+  },
 )

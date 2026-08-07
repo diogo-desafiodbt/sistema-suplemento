@@ -17,7 +17,8 @@ export const supplements: SupplementContent[] = [
     slug: 'neuropatia',
     name: 'Neuropatia',
     headline: 'Alívio e suporte nutricional personalizado para os nervos',
-    description: 'Combata os sintomas com suporte especializado — com R-ALA, Benfotiamina e B12 Ativa.',
+    description:
+      'Combata os sintomas com suporte especializado — com R-ALA, Benfotiamina e B12 Ativa.',
     composition: [
       { ativo: 'Benfotiamina', dose: '50 mg' },
       { ativo: 'Ácido Alfa Lipóico (ALA)', dose: '100 mg' },
@@ -39,7 +40,10 @@ export const supplements: SupplementContent[] = [
       'Com R-ALA, Canela e Melão de São Caetano para ajudar no equilíbrio da resistência à insulina.',
     composition: [
       { ativo: 'R-Ácido Alfa Lipóico estabilizado (R-ALA)', dose: '50 mg' },
-      { ativo: 'Melão de São Caetano (Momordica charantia, ext. seco pad.)', dose: '300 mg' },
+      {
+        ativo: 'Melão de São Caetano (Momordica charantia, ext. seco pad.)',
+        dose: '300 mg',
+      },
       { ativo: 'Canela (Cinnamomum, ext. seco pad.)', dose: '300 mg' },
     ],
     heroHorizontal: '/banners/banner-resistencia-insulina-horizontal.png',

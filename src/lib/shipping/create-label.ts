@@ -1,7 +1,10 @@
-import { createAdminClient } from '@/lib/supabase/admin'
-import { computePackageDimensions, type PackageItem } from '@/lib/shipping/package'
 import { getCotacao } from '@/lib/shipping/envie-agora/cotacao'
 import { criarEtiqueta } from '@/lib/shipping/envie-agora/etiqueta'
+import {
+  computePackageDimensions,
+  type PackageItem,
+} from '@/lib/shipping/package'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { ShippingSelection } from '@/types/shipping'
 
 type ProtocolProduct = {
@@ -84,10 +87,9 @@ export async function createShippingLabelForOrder(orderId: string): Promise<{
     ? new Set(
         (pending.protocol_items ?? [])
           .filter(
-            (i) =>
-              !i.removed && !i.blocked && typeof i.product_id === 'string'
+            (i) => !i.removed && !i.blocked && typeof i.product_id === 'string',
           )
-          .map((i) => i.product_id as string)
+          .map((i) => i.product_id as string),
       )
     : null
 
@@ -95,11 +97,11 @@ export async function createShippingLabelForOrder(orderId: string): Promise<{
     (i) =>
       lockedProductIds
         ? lockedProductIds.has(i.product_id)
-        : !i.removed_by_patient
+        : !i.removed_by_patient,
   )
 
   const packageItems: PackageItem[] = protocolItems
-    .map(i => {
+    .map((i) => {
       const box = i.products?.box_type
       if (box !== 'R80' && box !== 'R110') return null
       return { box_type: box, quantity: 1 }
@@ -110,7 +112,7 @@ export async function createShippingLabelForOrder(orderId: string): Promise<{
 
   const productsValue = protocolItems.reduce(
     (sum, i) => sum + (i.products?.price_monthly ?? 0),
-    0
+    0,
   )
   const valorDeclarado =
     productsValue > 0 ? productsValue : Number(order.total_amount ?? 0)
@@ -122,7 +124,7 @@ export async function createShippingLabelForOrder(orderId: string): Promise<{
       addresses: Array<{ zip_code: string; state: string; is_default: boolean }>
     }
     const address =
-      user.addresses?.find(a => a.is_default) ?? user.addresses?.[0]
+      user.addresses?.find((a) => a.is_default) ?? user.addresses?.[0]
     if (!address) throw new Error('Endereço ausente para cotação de fallback')
 
     const quotes = await getCotacao({
@@ -206,14 +208,18 @@ export function trackingEventKey(ev: Record<string, unknown>): string {
 
 export function mergeTrackingEvents(
   existingJson: unknown,
-  newEventos: Array<Record<string, unknown>>
+  newEventos: Array<Record<string, unknown>>,
 ): Record<string, unknown> {
   const base =
-    existingJson && typeof existingJson === 'object' && !Array.isArray(existingJson)
+    existingJson &&
+    typeof existingJson === 'object' &&
+    !Array.isArray(existingJson)
       ? { ...(existingJson as Record<string, unknown>) }
       : {}
 
-  const prev = Array.isArray(base.eventos) ? (base.eventos as Array<Record<string, unknown>>) : []
+  const prev = Array.isArray(base.eventos)
+    ? (base.eventos as Array<Record<string, unknown>>)
+    : []
   const byId = new Map<string, Record<string, unknown>>()
 
   for (const ev of prev) {

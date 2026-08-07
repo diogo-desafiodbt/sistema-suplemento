@@ -1,7 +1,7 @@
 import { Resend } from 'resend'
-import { inngest } from '../client'
+import { claimOnce, markClaimCompleted, releaseClaim } from '@/lib/idempotency'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { claimOnce, releaseClaim, markClaimCompleted } from '@/lib/idempotency'
+import { inngest } from '../client'
 
 function escapeHtml(text: string): string {
   return text
@@ -43,7 +43,7 @@ function formatDate(iso: string | null | undefined): string {
 
 async function logNotification(
   userId: string,
-  status: 'sent' | 'failed'
+  status: 'sent' | 'failed',
 ): Promise<void> {
   const admin = createAdminClient()
   const { error } = await admin.from('notification_logs').insert({
@@ -126,14 +126,20 @@ export const purchaseConfirmed = inngest.createFunction(
     triggers: [{ event: 'pagamento/confirmado' }],
   },
   async ({ event }) => {
-    const { subscription_id, user_id, payment_id: eventPaymentId } = event.data as {
+    const {
+      subscription_id,
+      user_id,
+      payment_id: eventPaymentId,
+    } = event.data as {
       subscription_id: string
       user_id: string
       payment_id?: string
     }
 
     if (!subscription_id || !user_id) {
-      throw new Error('Evento pagamento/confirmado sem subscription_id ou user_id')
+      throw new Error(
+        'Evento pagamento/confirmado sem subscription_id ou user_id',
+      )
     }
 
     const admin = createAdminClient()
@@ -196,7 +202,7 @@ export const purchaseConfirmed = inngest.createFunction(
       throw new Error(
         eventPaymentId
           ? `purchase-confirmed: payment ${eventPaymentId} não pertence à subscription ${subscription_id}`
-          : `purchase-confirmed: nenhum payment pago pendente de e-mail para subscription ${subscription_id}`
+          : `purchase-confirmed: nenhum payment pago pendente de e-mail para subscription ${subscription_id}`,
       )
     }
 
@@ -226,7 +232,7 @@ export const purchaseConfirmed = inngest.createFunction(
         // Crash antes do send: reclaim após 10 min. Após o send gravamos
         // email_sent_at na claim — heal correlacionado ao payment_id.
         staleAfterMs: 10 * 60 * 1000,
-      }
+      },
     )
     if (!won) {
       const { data: existingClaim } = await admin
@@ -250,7 +256,7 @@ export const purchaseConfirmed = inngest.createFunction(
           'purchase_confirmation_logs',
           'payment_id',
           payment.id,
-          'completed_at'
+          'completed_at',
         )
         return {
           ok: true,
@@ -261,7 +267,7 @@ export const purchaseConfirmed = inngest.createFunction(
 
       // Sem evidência de envio: NÃO liberar a claim. claimOnce reclaima após stale.
       throw new Error(
-        `purchase-confirmed: claim em andamento sem completed_at para payment ${payment.id}`
+        `purchase-confirmed: claim em andamento sem completed_at para payment ${payment.id}`,
       )
     }
 
@@ -279,7 +285,7 @@ export const purchaseConfirmed = inngest.createFunction(
         admin,
         'purchase_confirmation_logs',
         'payment_id',
-        payment.id
+        payment.id,
       )
       await logNotification(user_id, 'failed')
       throw error
@@ -297,16 +303,16 @@ export const purchaseConfirmed = inngest.createFunction(
           'purchase_confirmation_logs',
           'payment_id',
           payment.id,
-          'completed_at'
+          'completed_at',
         )
       } catch (stampError) {
         console.error(
           'purchase-confirmed: falha ao stamp após e-mail (email_sent_at também falhou):',
-          stampError
+          stampError,
         )
       }
       throw new Error(
-        `purchase-confirmed: falha ao gravar email_sent_at: ${emailSentError.message}`
+        `purchase-confirmed: falha ao gravar email_sent_at: ${emailSentError.message}`,
       )
     }
     await markClaimCompleted(
@@ -314,9 +320,9 @@ export const purchaseConfirmed = inngest.createFunction(
       'purchase_confirmation_logs',
       'payment_id',
       payment.id,
-      'completed_at'
+      'completed_at',
     )
     await logNotification(user_id, 'sent')
     return { ok: true }
-  }
+  },
 )

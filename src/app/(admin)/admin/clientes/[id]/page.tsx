@@ -1,11 +1,11 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { CopyButton } from '@/components/CopyButton'
 import { RFM_TIER_BADGE, RFM_TIER_LABEL } from '@/lib/admin/rfm-tier'
 import { PLAN_LABELS } from '@/lib/plans'
 import { isNorteNordeste } from '@/lib/shipping/sender-region'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 
 type AddressRow = {
   id?: string
@@ -154,7 +154,9 @@ function money(value: number | null | undefined): string {
 }
 
 /** Chave/valor legível de um registro genérico (quiz, health record). */
-function readableEntries(record: Record<string, unknown>): Array<[string, string]> {
+function readableEntries(
+  record: Record<string, unknown>,
+): Array<[string, string]> {
   const skip = new Set(['id', 'user_id', 'protocol_id'])
   const entries: Array<[string, string]> = []
   for (const [key, value] of Object.entries(record)) {
@@ -162,7 +164,7 @@ function readableEntries(record: Record<string, unknown>): Array<[string, string
     if (value === null || value === undefined || value === '') continue
     if (Array.isArray(value)) {
       if (value.length === 0) continue
-      entries.push([key, value.map(v => String(v)).join(', ')])
+      entries.push([key, value.map((v) => String(v)).join(', ')])
       continue
     }
     if (typeof value === 'object') {
@@ -202,8 +204,12 @@ function Empty({ text }: { text: string }) {
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
-      <p className="text-[11px] font-bold tracking-wider text-gray-400 uppercase">{label}</p>
-      <p className="text-sm text-[#13244f] mt-0.5 break-words">{value ?? '—'}</p>
+      <p className="text-[11px] font-bold tracking-wider text-gray-400 uppercase">
+        {label}
+      </p>
+      <p className="text-sm text-[#13244f] mt-0.5 break-words">
+        {value ?? '—'}
+      </p>
     </div>
   )
 }
@@ -214,7 +220,9 @@ export default async function AdminClienteDetalhePage({
   params: Promise<{ id: string }>
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   const admin = createAdminClient()
@@ -249,9 +257,21 @@ export default async function AdminClienteDetalhePage({
     { data: termsAcceptances },
   ] = await Promise.all([
     admin.from('user_rfm_scores').select('*').eq('user_id', id).maybeSingle(),
-    admin.from('addresses').select('*').eq('user_id', id).order('is_default', { ascending: false }),
-    admin.from('subscriptions').select('*').eq('user_id', id).order('created_at', { ascending: false }),
-    admin.from('orders').select('*').eq('user_id', id).order('created_at', { ascending: false }),
+    admin
+      .from('addresses')
+      .select('*')
+      .eq('user_id', id)
+      .order('is_default', { ascending: false }),
+    admin
+      .from('subscriptions')
+      .select('*')
+      .eq('user_id', id)
+      .order('created_at', { ascending: false }),
+    admin
+      .from('orders')
+      .select('*')
+      .eq('user_id', id)
+      .order('created_at', { ascending: false }),
     admin
       .from('protocols')
       .select(`
@@ -263,11 +283,29 @@ export default async function AdminClienteDetalhePage({
       `)
       .eq('user_id', id)
       .order('generated_at', { ascending: false }),
-    admin.from('quiz_responses').select('*').eq('user_id', id).order('completed_at', { ascending: false, nullsFirst: false }),
+    admin
+      .from('quiz_responses')
+      .select('*')
+      .eq('user_id', id)
+      .order('completed_at', { ascending: false, nullsFirst: false }),
     admin.from('health_records').select('*').eq('user_id', id),
-    admin.from('notification_logs').select('*').eq('user_id', id).order('sent_at', { ascending: false }).limit(20),
-    admin.from('user_login_history').select('*').eq('user_id', id).order('logged_at', { ascending: false }).limit(20),
-    admin.from('terms_acceptances').select('*').eq('user_id', id).order('accepted_at', { ascending: false }),
+    admin
+      .from('notification_logs')
+      .select('*')
+      .eq('user_id', id)
+      .order('sent_at', { ascending: false })
+      .limit(20),
+    admin
+      .from('user_login_history')
+      .select('*')
+      .eq('user_id', id)
+      .order('logged_at', { ascending: false })
+      .limit(20),
+    admin
+      .from('terms_acceptances')
+      .select('*')
+      .eq('user_id', id)
+      .order('accepted_at', { ascending: false }),
   ])
 
   const addressList = (addresses ?? []) as AddressRow[]
@@ -281,7 +319,7 @@ export default async function AdminClienteDetalhePage({
   const termsList = (termsAcceptances ?? []) as TermsRow[]
 
   // Pagamentos das assinaturas do cliente
-  const subIds = subList.map(s => s.id)
+  const subIds = subList.map((s) => s.id)
   let paymentList: PaymentRow[] = []
   if (subIds.length > 0) {
     const { data: payments } = await admin
@@ -293,7 +331,11 @@ export default async function AdminClienteDetalhePage({
   }
 
   // Profissionais que assinaram protocolos
-  const signerIds = [...new Set(protocolList.map(p => p.signed_by).filter((v): v is string => !!v))]
+  const signerIds = [
+    ...new Set(
+      protocolList.map((p) => p.signed_by).filter((v): v is string => !!v),
+    ),
+  ]
   const professionalsById = new Map<string, ProfessionalRow>()
   if (signerIds.length > 0) {
     const { data: pros } = await admin
@@ -311,11 +353,13 @@ export default async function AdminClienteDetalhePage({
     if (!pro) return '—'
     const u = pro.users
     const name = Array.isArray(u) ? u[0]?.full_name : u?.full_name
-    const crm = pro.crm ? ` — CRM ${pro.crm}${pro.crm_state ? `/${pro.crm_state}` : ''}` : ''
+    const crm = pro.crm
+      ? ` — CRM ${pro.crm}${pro.crm_state ? `/${pro.crm_state}` : ''}`
+      : ''
     return `${name ?? '—'}${crm}`
   }
 
-  const defaultAddress = addressList.find(a => a.is_default) ?? addressList[0]
+  const defaultAddress = addressList.find((a) => a.is_default) ?? addressList[0]
   const freightOrigin = defaultAddress
     ? isNorteNordeste(defaultAddress.state)
       ? 'Fortaleza (Norte/Nordeste)'
@@ -326,372 +370,520 @@ export default async function AdminClienteDetalhePage({
 
   return (
     <main className="max-w-6xl mx-auto px-6 py-8 space-y-5">
+      <div>
+        <Link
+          href="/admin/clientes"
+          className="text-xs text-[#13244f]/60 hover:text-[#13244f] transition"
+        >
+          ← Voltar para clientes
+        </Link>
+      </div>
 
-        <div>
-          <Link href="/admin/clientes" className="text-xs text-[#13244f]/60 hover:text-[#13244f] transition">
-            ← Voltar para clientes
-          </Link>
-        </div>
-
-        {/* 2.1 — Cabeçalho */}
-        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
-            <div>
-              <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-1">Cliente 360°</p>
-              <h1 className="text-2xl font-bold text-[#13244f]">{client.full_name}</h1>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-[#13244f]/10 text-[#13244f]">
-                {client.role}
+      {/* 2.1 — Cabeçalho */}
+      <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
+          <div>
+            <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-1">
+              Cliente 360°
+            </p>
+            <h1 className="text-2xl font-bold text-[#13244f]">
+              {client.full_name}
+            </h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-[#13244f]/10 text-[#13244f]">
+              {client.role}
+            </span>
+            {tier && (
+              <span
+                className={`text-xs font-bold px-2.5 py-1 rounded-full ${RFM_TIER_BADGE[tier] ?? 'bg-gray-100 text-gray-600'}`}
+              >
+                RFM: {RFM_TIER_LABEL[tier] ?? tier}
               </span>
-              {tier && (
-                <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${RFM_TIER_BADGE[tier] ?? 'bg-gray-100 text-gray-600'}`}>
-                  RFM: {RFM_TIER_LABEL[tier] ?? tier}
+            )}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <Field label="E-mail" value={client.email} />
+          <Field label="Telefone" value={client.phone ?? '—'} />
+          <Field label="CPF" value={client.cpf ?? '—'} />
+          <Field
+            label="Código do cliente"
+            value={
+              <span className="font-mono text-xs">{client.client_code}</span>
+            }
+          />
+          <Field label="Cadastro" value={fmtDateTime(client.created_at)} />
+        </div>
+      </section>
+
+      {/* 2.2 — Endereço */}
+      <SectionCard title="Endereço">
+        {addressList.length === 0 && (
+          <Empty text="Nenhum endereço cadastrado." />
+        )}
+        <div className="space-y-4">
+          {addressList.map((a, i) => (
+            <div
+              key={a.id ?? i}
+              className="flex items-start justify-between gap-4 border border-gray-100 rounded-xl p-4"
+            >
+              <div className="text-sm text-[#13244f]">
+                <p>
+                  {a.street}, {a.number}
+                  {a.complement ? ` — ${a.complement}` : ''}
+                </p>
+                <p className="text-gray-500">
+                  {a.neighborhood} — {a.city}/{a.state} — CEP {a.zip_code}
+                </p>
+              </div>
+              {a.is_default && (
+                <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-green-50 text-green-700 shrink-0">
+                  Padrão
                 </span>
               )}
             </div>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <Field label="E-mail" value={client.email} />
-            <Field label="Telefone" value={client.phone ?? '—'} />
-            <Field label="CPF" value={client.cpf ?? '—'} />
-            <Field label="Código do cliente" value={<span className="font-mono text-xs">{client.client_code}</span>} />
-            <Field label="Cadastro" value={fmtDateTime(client.created_at)} />
-          </div>
-        </section>
+          ))}
+        </div>
+      </SectionCard>
 
-        {/* 2.2 — Endereço */}
-        <SectionCard title="Endereço">
-          {addressList.length === 0 && <Empty text="Nenhum endereço cadastrado." />}
-          <div className="space-y-4">
-            {addressList.map((a, i) => (
-              <div key={a.id ?? i} className="flex items-start justify-between gap-4 border border-gray-100 rounded-xl p-4">
-                <div className="text-sm text-[#13244f]">
-                  <p>
-                    {a.street}, {a.number}
-                    {a.complement ? ` — ${a.complement}` : ''}
-                  </p>
-                  <p className="text-gray-500">
-                    {a.neighborhood} — {a.city}/{a.state} — CEP {a.zip_code}
-                  </p>
-                </div>
-                {a.is_default && (
-                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-green-50 text-green-700 shrink-0">
-                    Padrão
-                  </span>
-                )}
+      {/* 2.3 — Assinatura */}
+      <SectionCard title="Assinatura">
+        {subList.length === 0 && <Empty text="Nenhuma assinatura." />}
+        <div className="space-y-4">
+          {subList.map((sub) => (
+            <div key={sub.id} className="border border-gray-100 rounded-xl p-4">
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <span className="text-sm font-bold text-[#13244f]">
+                  {PLAN_LABELS[sub.plan_type] ?? sub.plan_type}
+                </span>
+                <span
+                  className={`text-xs font-bold px-2.5 py-1 rounded-full ${SUB_STATUS_BADGE[sub.status] ?? 'bg-gray-100 text-gray-600'}`}
+                >
+                  {sub.status}
+                </span>
               </div>
-            ))}
-          </div>
-        </SectionCard>
-
-        {/* 2.3 — Assinatura */}
-        <SectionCard title="Assinatura">
-          {subList.length === 0 && <Empty text="Nenhuma assinatura." />}
-          <div className="space-y-4">
-            {subList.map(sub => (
-              <div key={sub.id} className="border border-gray-100 rounded-xl p-4">
-                <div className="flex flex-wrap items-center gap-2 mb-3">
-                  <span className="text-sm font-bold text-[#13244f]">
-                    {PLAN_LABELS[sub.plan_type] ?? sub.plan_type}
-                  </span>
-                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${SUB_STATUS_BADGE[sub.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                    {sub.status}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <Field label="Iniciada em" value={fmtDate(sub.started_at)} />
-                  <Field label="Expira em" value={fmtDate(sub.expires_at)} />
-                  <Field label="Próxima cobrança" value={fmtDate(sub.next_billing_at)} />
-                  <Field
-                    label="Pagar.me sub"
-                    value={sub.pagarme_sub_id ? <span className="font-mono text-xs">{sub.pagarme_sub_id}</span> : '—'}
-                  />
-                  <Field label="Tentativas de cobrança" value={String(sub.retry_count ?? 0)} />
-                </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <Field label="Iniciada em" value={fmtDate(sub.started_at)} />
+                <Field label="Expira em" value={fmtDate(sub.expires_at)} />
+                <Field
+                  label="Próxima cobrança"
+                  value={fmtDate(sub.next_billing_at)}
+                />
+                <Field
+                  label="Pagar.me sub"
+                  value={
+                    sub.pagarme_sub_id ? (
+                      <span className="font-mono text-xs">
+                        {sub.pagarme_sub_id}
+                      </span>
+                    ) : (
+                      '—'
+                    )
+                  }
+                />
+                <Field
+                  label="Tentativas de cobrança"
+                  value={String(sub.retry_count ?? 0)}
+                />
               </div>
-            ))}
-          </div>
-        </SectionCard>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
 
-        {/* 2.4 — Pedidos e entrega */}
-        <SectionCard title="Pedidos e entrega">
-          {orderList.length === 0 && <Empty text="Nenhum pedido." />}
-          <div className="space-y-4">
-            {orderList.map(order => {
-              const eventos = [...(order.shipping_json?.eventos ?? [])].sort((a, b) => {
+      {/* 2.4 — Pedidos e entrega */}
+      <SectionCard title="Pedidos e entrega">
+        {orderList.length === 0 && <Empty text="Nenhum pedido." />}
+        <div className="space-y-4">
+          {orderList.map((order) => {
+            const eventos = [...(order.shipping_json?.eventos ?? [])].sort(
+              (a, b) => {
                 const ta = a.datahora ? new Date(a.datahora).getTime() : 0
                 const tb = b.datahora ? new Date(b.datahora).getTime() : 0
                 return ta - tb
-              })
-              const quote = order.shipping_quote_json
-              return (
-                <div key={order.id} className="border border-gray-100 rounded-xl p-4">
-                  <div className="flex flex-wrap items-center gap-2 mb-3">
-                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${ORDER_STATUS_BADGE[order.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {ORDER_STATUS_LABEL[order.status] ?? order.status}
-                    </span>
-                    {order.pharmacy_sent_at ? (
-                      <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
-                        ✓ Enviado à farmácia em {fmtDate(order.pharmacy_sent_at)}
-                      </span>
-                    ) : (
-                      <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-gray-100 text-gray-500">
-                        Não enviado à farmácia
-                      </span>
-                    )}
-                    <span className="ml-auto font-mono text-[11px] text-gray-300">{order.id}</span>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <Field label="Valor total" value={money(order.total_amount)} />
-                    <Field label="Data" value={fmtDateTime(order.created_at)} />
-                    <Field
-                      label="Rastreio"
-                      value={order.tracking_code ? <span className="font-mono text-xs">{order.tracking_code}</span> : '—'}
-                    />
-                    <Field
-                      label="Frete"
-                      value={
-                        quote
-                          ? [
-                              quote.transportadora,
-                              quote.nomeServico,
-                              quote.tipo,
-                              money(quote.valor),
-                              quote.prazoDias != null ? `${quote.prazoDias}d` : null,
-                              quote.codigoServico,
-                              freightOrigin ? `origem ${freightOrigin}` : null,
-                            ]
-                              .filter(Boolean)
-                              .join(' · ')
-                          : freightOrigin
-                            ? `origem ${freightOrigin}`
-                            : '—'
-                      }
-                    />
-                  </div>
-                  {eventos.length > 0 && (
-                    <div className="mt-4 border-t border-gray-100 pt-3">
-                      <p className="text-[11px] font-bold tracking-wider text-gray-400 uppercase mb-2">
-                        Rastreamento
-                      </p>
-                      <ol className="space-y-1.5">
-                        {eventos.map((ev, i) => (
-                          <li key={i} className="flex gap-3 text-xs text-gray-600">
-                            <span className="shrink-0 text-gray-400 font-mono">
-                              {fmtDateTime(ev.datahora)}
-                            </span>
-                            <span>
-                              {ev.descricao ?? '—'}
-                              {(ev.local || ev.cidade) && (
-                                <span className="text-gray-400"> — {[ev.local, ev.cidade].filter(Boolean).join(', ')}</span>
-                              )}
-                              {ev.finalizado === 1 && (
-                                <span className="ml-1 text-green-700 font-bold">✓</span>
-                              )}
-                            </span>
-                          </li>
-                        ))}
-                      </ol>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </SectionCard>
-
-        {/* 2.5 — Pagamentos */}
-        <SectionCard title="Pagamentos">
-          {paymentList.length === 0 && <Empty text="Nenhum pagamento." />}
-          {paymentList.length > 0 && (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="text-left py-2 text-[11px] font-bold tracking-wider text-gray-400 uppercase">Valor</th>
-                  <th className="text-left py-2 text-[11px] font-bold tracking-wider text-gray-400 uppercase">Status</th>
-                  <th className="text-left py-2 text-[11px] font-bold tracking-wider text-gray-400 uppercase">Data</th>
-                  <th className="text-left py-2 text-[11px] font-bold tracking-wider text-gray-400 uppercase">Pagar.me charge</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paymentList.map((p, i) => (
-                  <tr key={p.id ?? i} className="border-b border-gray-50">
-                    <td className="py-2.5 font-semibold text-[#13244f]">{money(p.amount)}</td>
-                    <td className="py-2.5">
-                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${PAYMENT_STATUS_BADGE[p.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                        {p.status}
-                      </span>
-                    </td>
-                    <td className="py-2.5 text-gray-500 text-xs">{fmtDateTime(p.paid_at ?? p.created_at)}</td>
-                    <td className="py-2.5 font-mono text-[11px] text-gray-400">{p.pagarme_charge_id ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </SectionCard>
-
-        {/* 2.6 — Protocolo e prescrição */}
-        <SectionCard title="Protocolo e prescrição">
-          {protocolList.length === 0 && <Empty text="Nenhum protocolo." />}
-          <div className="space-y-4">
-            {protocolList.map(protocol => (
-              <div key={protocol.id} className="border border-gray-100 rounded-xl p-4">
+              },
+            )
+            const quote = order.shipping_quote_json
+            return (
+              <div
+                key={order.id}
+                className="border border-gray-100 rounded-xl p-4"
+              >
                 <div className="flex flex-wrap items-center gap-2 mb-3">
-                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${PROTOCOL_STATUS_BADGE[protocol.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                    {PROTOCOL_STATUS_LABEL[protocol.status] ?? protocol.status}
+                  <span
+                    className={`text-xs font-bold px-2.5 py-1 rounded-full ${ORDER_STATUS_BADGE[order.status] ?? 'bg-gray-100 text-gray-600'}`}
+                  >
+                    {ORDER_STATUS_LABEL[order.status] ?? order.status}
                   </span>
-                  {protocol.prescription_pdf_url && (
-                    <a
-                      href={protocol.prescription_pdf_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs font-bold text-[#13244f] bg-[#13244f]/5 hover:bg-[#13244f]/10 px-3 py-1.5 rounded-lg transition"
-                    >
-                      Ver PDF da prescrição
-                    </a>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-3">
-                  <Field label="Gerado em" value={fmtDateTime(protocol.generated_at)} />
-                  <Field label="Assinado em" value={fmtDateTime(protocol.signed_at)} />
-                  <Field label="Assinado por" value={professionalName(protocol.signed_by)} />
-                </div>
-                <p className="text-[11px] font-bold tracking-wider text-gray-400 uppercase mb-2">Itens</p>
-                <ul className="space-y-1.5">
-                  {(protocol.protocol_items ?? []).map((item, i) => (
-                    <li key={i} className="flex flex-wrap items-center gap-2 text-sm text-[#13244f]">
-                      <span className={item.removed_by_patient ? 'line-through text-gray-400' : ''}>
-                        {item.products?.name ?? '—'}
-                      </span>
-                      {item.is_required && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#13244f]/10 text-[#13244f]">obrigatório</span>
-                      )}
-                      {item.removed_by_patient && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-700">removido pelo paciente</span>
-                      )}
-                      {item.activation_reason && (
-                        <span className="text-xs text-gray-400">· {item.activation_reason}</span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </SectionCard>
-
-        {/* 2.7 — Saúde */}
-        <SectionCard title="Saúde">
-          {quizList.length === 0 && healthList.length === 0 && (
-            <Empty text="Nenhuma resposta de quiz ou registro de saúde." />
-          )}
-          <div className="space-y-4">
-            {quizList.map((quiz, i) => (
-              <div key={String(quiz.id ?? i)} className="border border-gray-100 rounded-xl p-4">
-                <p className="text-[11px] font-bold tracking-wider text-gray-400 uppercase mb-2">
-                  Resposta de quiz {quizList.length > 1 ? `#${quizList.length - i}` : ''}
-                </p>
-                <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5">
-                  {readableEntries(quiz).map(([key, value]) => (
-                    <div key={key} className="flex gap-2 text-xs">
-                      <dt className="font-mono text-gray-400 shrink-0">{key}:</dt>
-                      <dd className="text-[#13244f] break-words">{value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </div>
-            ))}
-            {healthList.map((record, i) => (
-              <div key={String(record.id ?? i)} className="border border-gray-100 rounded-xl p-4">
-                <p className="text-[11px] font-bold tracking-wider text-gray-400 uppercase mb-2">
-                  Registro de saúde {healthList.length > 1 ? `#${healthList.length - i}` : ''}
-                </p>
-                <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5">
-                  {readableEntries(record).map(([key, value]) => (
-                    <div key={key} className="flex gap-2 text-xs">
-                      <dt className="font-mono text-gray-400 shrink-0">{key}:</dt>
-                      <dd className="text-[#13244f] break-words">{value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </div>
-            ))}
-          </div>
-        </SectionCard>
-
-        {/* 2.8 — Comunicações e acesso */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          <SectionCard title="Comunicações (últimas 20)">
-            {notifList.length === 0 && <Empty text="Nenhuma notificação registrada." />}
-            <ul className="space-y-2">
-              {notifList.map((n, i) => (
-                <li key={String(n.id ?? i)} className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="font-semibold text-[#13244f]">{String(n.type ?? '—')}</span>
-                  <span className="text-gray-400">via {String(n.channel ?? '—')}</span>
-                  <span className={`font-bold px-2 py-0.5 rounded-full ${n.status === 'sent' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                    {String(n.status ?? '—')}
-                  </span>
-                  <span className="ml-auto text-gray-400">
-                    {fmtDateTime(
-                      n.sent_at
-                        ? String(n.sent_at)
-                        : n.created_at
-                          ? String(n.created_at)
-                          : null
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </SectionCard>
-
-          <SectionCard title="Acessos (últimos 20)">
-            {loginList.length === 0 && <Empty text="Nenhum acesso registrado." />}
-            <ul className="space-y-2">
-              {loginList.map((l, i) => (
-                <li key={String(l.id ?? i)} className="text-xs">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-[#13244f]">
-                      {fmtDateTime(l.logged_at ? String(l.logged_at) : null)}
+                  {order.pharmacy_sent_at ? (
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
+                      ✓ Enviado à farmácia em {fmtDate(order.pharmacy_sent_at)}
                     </span>
-                    <span className="font-mono text-gray-400">{String(l.ip_address ?? '—')}</span>
-                  </div>
-                  <p className="text-gray-400 truncate mt-0.5">{String(l.user_agent ?? '—')}</p>
-                </li>
-              ))}
-            </ul>
-          </SectionCard>
-        </div>
-
-        {/* 2.9 — Conformidade */}
-        <SectionCard title="Conformidade — aceite dos Termos de Uso">
-          {termsList.length === 0 && <Empty text="Nenhum aceite registrado." />}
-          <div className="space-y-3">
-            {termsList.map((t, i) => (
-              <div key={t.id ?? i} className="border border-gray-100 rounded-xl p-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-start">
-                  <Field label="Versão" value={t.terms_version} />
+                  ) : (
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-gray-100 text-gray-500">
+                      Não enviado à farmácia
+                    </span>
+                  )}
+                  <span className="ml-auto font-mono text-[11px] text-gray-300">
+                    {order.id}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <Field
-                    label="Hash"
+                    label="Valor total"
+                    value={money(order.total_amount)}
+                  />
+                  <Field label="Data" value={fmtDateTime(order.created_at)} />
+                  <Field
+                    label="Rastreio"
                     value={
-                      <span className="flex items-center gap-2">
-                        <span className="font-mono text-xs">{t.terms_hash.slice(0, 16)}…</span>
-                        <CopyButton value={t.terms_hash} label="Copiar hash" />
-                      </span>
+                      order.tracking_code ? (
+                        <span className="font-mono text-xs">
+                          {order.tracking_code}
+                        </span>
+                      ) : (
+                        '—'
+                      )
                     }
                   />
                   <Field
-                    label="IP"
-                    value={t.ip_address ? <span className="font-mono text-xs">{t.ip_address}</span> : '—'}
+                    label="Frete"
+                    value={
+                      quote
+                        ? [
+                            quote.transportadora,
+                            quote.nomeServico,
+                            quote.tipo,
+                            money(quote.valor),
+                            quote.prazoDias != null
+                              ? `${quote.prazoDias}d`
+                              : null,
+                            quote.codigoServico,
+                            freightOrigin ? `origem ${freightOrigin}` : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')
+                        : freightOrigin
+                          ? `origem ${freightOrigin}`
+                          : '—'
+                    }
                   />
-                  <Field label="Aceito em" value={fmtDateTime(t.accepted_at)} />
                 </div>
+                {eventos.length > 0 && (
+                  <div className="mt-4 border-t border-gray-100 pt-3">
+                    <p className="text-[11px] font-bold tracking-wider text-gray-400 uppercase mb-2">
+                      Rastreamento
+                    </p>
+                    <ol className="space-y-1.5">
+                      {eventos.map((ev, i) => (
+                        <li
+                          key={i}
+                          className="flex gap-3 text-xs text-gray-600"
+                        >
+                          <span className="shrink-0 text-gray-400 font-mono">
+                            {fmtDateTime(ev.datahora)}
+                          </span>
+                          <span>
+                            {ev.descricao ?? '—'}
+                            {(ev.local || ev.cidade) && (
+                              <span className="text-gray-400">
+                                {' '}
+                                —{' '}
+                                {[ev.local, ev.cidade]
+                                  .filter(Boolean)
+                                  .join(', ')}
+                              </span>
+                            )}
+                            {ev.finalizado === 1 && (
+                              <span className="ml-1 text-green-700 font-bold">
+                                ✓
+                              </span>
+                            )}
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
               </div>
+            )
+          })}
+        </div>
+      </SectionCard>
+
+      {/* 2.5 — Pagamentos */}
+      <SectionCard title="Pagamentos">
+        {paymentList.length === 0 && <Empty text="Nenhum pagamento." />}
+        {paymentList.length > 0 && (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100">
+                <th className="text-left py-2 text-[11px] font-bold tracking-wider text-gray-400 uppercase">
+                  Valor
+                </th>
+                <th className="text-left py-2 text-[11px] font-bold tracking-wider text-gray-400 uppercase">
+                  Status
+                </th>
+                <th className="text-left py-2 text-[11px] font-bold tracking-wider text-gray-400 uppercase">
+                  Data
+                </th>
+                <th className="text-left py-2 text-[11px] font-bold tracking-wider text-gray-400 uppercase">
+                  Pagar.me charge
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {paymentList.map((p, i) => (
+                <tr key={p.id ?? i} className="border-b border-gray-50">
+                  <td className="py-2.5 font-semibold text-[#13244f]">
+                    {money(p.amount)}
+                  </td>
+                  <td className="py-2.5">
+                    <span
+                      className={`text-xs font-bold px-2.5 py-1 rounded-full ${PAYMENT_STATUS_BADGE[p.status] ?? 'bg-gray-100 text-gray-600'}`}
+                    >
+                      {p.status}
+                    </span>
+                  </td>
+                  <td className="py-2.5 text-gray-500 text-xs">
+                    {fmtDateTime(p.paid_at ?? p.created_at)}
+                  </td>
+                  <td className="py-2.5 font-mono text-[11px] text-gray-400">
+                    {p.pagarme_charge_id ?? '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </SectionCard>
+
+      {/* 2.6 — Protocolo e prescrição */}
+      <SectionCard title="Protocolo e prescrição">
+        {protocolList.length === 0 && <Empty text="Nenhum protocolo." />}
+        <div className="space-y-4">
+          {protocolList.map((protocol) => (
+            <div
+              key={protocol.id}
+              className="border border-gray-100 rounded-xl p-4"
+            >
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <span
+                  className={`text-xs font-bold px-2.5 py-1 rounded-full ${PROTOCOL_STATUS_BADGE[protocol.status] ?? 'bg-gray-100 text-gray-600'}`}
+                >
+                  {PROTOCOL_STATUS_LABEL[protocol.status] ?? protocol.status}
+                </span>
+                {protocol.prescription_pdf_url && (
+                  <a
+                    href={protocol.prescription_pdf_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-bold text-[#13244f] bg-[#13244f]/5 hover:bg-[#13244f]/10 px-3 py-1.5 rounded-lg transition"
+                  >
+                    Ver PDF da prescrição
+                  </a>
+                )}
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-3">
+                <Field
+                  label="Gerado em"
+                  value={fmtDateTime(protocol.generated_at)}
+                />
+                <Field
+                  label="Assinado em"
+                  value={fmtDateTime(protocol.signed_at)}
+                />
+                <Field
+                  label="Assinado por"
+                  value={professionalName(protocol.signed_by)}
+                />
+              </div>
+              <p className="text-[11px] font-bold tracking-wider text-gray-400 uppercase mb-2">
+                Itens
+              </p>
+              <ul className="space-y-1.5">
+                {(protocol.protocol_items ?? []).map((item, i) => (
+                  <li
+                    key={i}
+                    className="flex flex-wrap items-center gap-2 text-sm text-[#13244f]"
+                  >
+                    <span
+                      className={
+                        item.removed_by_patient
+                          ? 'line-through text-gray-400'
+                          : ''
+                      }
+                    >
+                      {item.products?.name ?? '—'}
+                    </span>
+                    {item.is_required && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#13244f]/10 text-[#13244f]">
+                        obrigatório
+                      </span>
+                    )}
+                    {item.removed_by_patient && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-700">
+                        removido pelo paciente
+                      </span>
+                    )}
+                    {item.activation_reason && (
+                      <span className="text-xs text-gray-400">
+                        · {item.activation_reason}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      {/* 2.7 — Saúde */}
+      <SectionCard title="Saúde">
+        {quizList.length === 0 && healthList.length === 0 && (
+          <Empty text="Nenhuma resposta de quiz ou registro de saúde." />
+        )}
+        <div className="space-y-4">
+          {quizList.map((quiz, i) => (
+            <div
+              key={String(quiz.id ?? i)}
+              className="border border-gray-100 rounded-xl p-4"
+            >
+              <p className="text-[11px] font-bold tracking-wider text-gray-400 uppercase mb-2">
+                Resposta de quiz{' '}
+                {quizList.length > 1 ? `#${quizList.length - i}` : ''}
+              </p>
+              <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5">
+                {readableEntries(quiz).map(([key, value]) => (
+                  <div key={key} className="flex gap-2 text-xs">
+                    <dt className="font-mono text-gray-400 shrink-0">{key}:</dt>
+                    <dd className="text-[#13244f] break-words">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ))}
+          {healthList.map((record, i) => (
+            <div
+              key={String(record.id ?? i)}
+              className="border border-gray-100 rounded-xl p-4"
+            >
+              <p className="text-[11px] font-bold tracking-wider text-gray-400 uppercase mb-2">
+                Registro de saúde{' '}
+                {healthList.length > 1 ? `#${healthList.length - i}` : ''}
+              </p>
+              <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5">
+                {readableEntries(record).map(([key, value]) => (
+                  <div key={key} className="flex gap-2 text-xs">
+                    <dt className="font-mono text-gray-400 shrink-0">{key}:</dt>
+                    <dd className="text-[#13244f] break-words">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      {/* 2.8 — Comunicações e acesso */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <SectionCard title="Comunicações (últimas 20)">
+          {notifList.length === 0 && (
+            <Empty text="Nenhuma notificação registrada." />
+          )}
+          <ul className="space-y-2">
+            {notifList.map((n, i) => (
+              <li
+                key={String(n.id ?? i)}
+                className="flex flex-wrap items-center gap-2 text-xs"
+              >
+                <span className="font-semibold text-[#13244f]">
+                  {String(n.type ?? '—')}
+                </span>
+                <span className="text-gray-400">
+                  via {String(n.channel ?? '—')}
+                </span>
+                <span
+                  className={`font-bold px-2 py-0.5 rounded-full ${n.status === 'sent' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}
+                >
+                  {String(n.status ?? '—')}
+                </span>
+                <span className="ml-auto text-gray-400">
+                  {fmtDateTime(
+                    n.sent_at
+                      ? String(n.sent_at)
+                      : n.created_at
+                        ? String(n.created_at)
+                        : null,
+                  )}
+                </span>
+              </li>
             ))}
-          </div>
+          </ul>
         </SectionCard>
-      </main>
+
+        <SectionCard title="Acessos (últimos 20)">
+          {loginList.length === 0 && <Empty text="Nenhum acesso registrado." />}
+          <ul className="space-y-2">
+            {loginList.map((l, i) => (
+              <li key={String(l.id ?? i)} className="text-xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold text-[#13244f]">
+                    {fmtDateTime(l.logged_at ? String(l.logged_at) : null)}
+                  </span>
+                  <span className="font-mono text-gray-400">
+                    {String(l.ip_address ?? '—')}
+                  </span>
+                </div>
+                <p className="text-gray-400 truncate mt-0.5">
+                  {String(l.user_agent ?? '—')}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
+      </div>
+
+      {/* 2.9 — Conformidade */}
+      <SectionCard title="Conformidade — aceite dos Termos de Uso">
+        {termsList.length === 0 && <Empty text="Nenhum aceite registrado." />}
+        <div className="space-y-3">
+          {termsList.map((t, i) => (
+            <div
+              key={t.id ?? i}
+              className="border border-gray-100 rounded-xl p-4"
+            >
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-start">
+                <Field label="Versão" value={t.terms_version} />
+                <Field
+                  label="Hash"
+                  value={
+                    <span className="flex items-center gap-2">
+                      <span className="font-mono text-xs">
+                        {t.terms_hash.slice(0, 16)}…
+                      </span>
+                      <CopyButton value={t.terms_hash} label="Copiar hash" />
+                    </span>
+                  }
+                />
+                <Field
+                  label="IP"
+                  value={
+                    t.ip_address ? (
+                      <span className="font-mono text-xs">{t.ip_address}</span>
+                    ) : (
+                      '—'
+                    )
+                  }
+                />
+                <Field label="Aceito em" value={fmtDateTime(t.accepted_at)} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+    </main>
   )
 }

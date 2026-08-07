@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { PedidosActions } from '@/components/admin/PedidosActions'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 
 type OrderRow = {
   id: string
@@ -19,7 +19,9 @@ type OrderRow = {
 
 export default async function AdminPedidosPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   const admin = createAdminClient()
@@ -44,15 +46,19 @@ export default async function AdminPedidosPage() {
 
   return (
     <main className="max-w-6xl mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-1">Operações</p>
-            <h1 className="text-2xl font-bold text-[#13244f]">Pedidos</h1>
-          </div>
-          <span className="text-sm text-gray-400">{orderList.length} registros</span>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-1">
+            Operações
+          </p>
+          <h1 className="text-2xl font-bold text-[#13244f]">Pedidos</h1>
         </div>
+        <span className="text-sm text-gray-400">
+          {orderList.length} registros
+        </span>
+      </div>
 
-        <PedidosActions orders={orderList} />
-      </main>
+      <PedidosActions orders={orderList} />
+    </main>
   )
 }

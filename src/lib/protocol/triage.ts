@@ -1,6 +1,13 @@
 export type Sex = 'homem' | 'mulher'
-export type RenalCondition = 'hemodialise' | 'insuficiencia_renal_aguda' | 'tfg_menor_30'
-export type HepaticCondition = 'cirrose' | 'hepatite_ativa' | 'ictericia' | 'esteatose'
+export type RenalCondition =
+  | 'hemodialise'
+  | 'insuficiencia_renal_aguda'
+  | 'tfg_menor_30'
+export type HepaticCondition =
+  | 'cirrose'
+  | 'hepatite_ativa'
+  | 'ictericia'
+  | 'esteatose'
 export type DiagnosisType =
   | 'type1'
   | 'type2'
@@ -9,7 +16,7 @@ export type DiagnosisType =
   | 'undiagnosed'
 
 export type TriageAnswers = {
-  birth_date: string // ISO yyyy-mm-dd
+  age: number
   sex: Sex
   is_pregnant_or_breastfeeding: boolean // sempre false quando sex === 'homem'
   renal_conditions: RenalCondition[]
@@ -74,6 +81,20 @@ export function calcAge(birthDateIso: string): number {
   return age
 }
 
+/** Aproxima uma data de nascimento a partir da idade (hoje − N anos), para persistência. */
+export function birthDateFromAge(age: number): string {
+  const today = new Date()
+  const d = new Date(
+    today.getFullYear() - age,
+    today.getMonth(),
+    today.getDate(),
+  )
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 export type TriageResult =
   | { blocked: true; blockReason: string }
   | {
@@ -84,17 +105,17 @@ export type TriageResult =
 
 function intersect(a: ProductKey[], b: ProductKey[]): ProductKey[] {
   const setB = new Set(b)
-  return a.filter(k => setB.has(k))
+  return a.filter((k) => setB.has(k))
 }
 
 function sameSet(a: ProductKey[], b: ProductKey[]): boolean {
   if (a.length !== b.length) return false
   const setB = new Set(b)
-  return a.every(k => setB.has(k))
+  return a.every((k) => setB.has(k))
 }
 
 export function computeTriage(answers: TriageAnswers): TriageResult {
-  if (calcAge(answers.birth_date) < 18) {
+  if (!Number.isFinite(answers.age) || answers.age < 18) {
     return {
       blocked: true,
       blockReason: 'Vendemos apenas para maiores de 18 anos.',
@@ -119,7 +140,9 @@ export function computeTriage(answers: TriageAnswers): TriageResult {
     })
   }
 
-  const hepaticSerious = answers.hepatic_conditions.filter(c => c !== 'esteatose')
+  const hepaticSerious = answers.hepatic_conditions.filter(
+    (c) => c !== 'esteatose',
+  )
   if (hepaticSerious.length > 0) {
     gates.push({
       allowed: ['omega3'],
@@ -163,15 +186,17 @@ export function computeTriage(answers: TriageAnswers): TriageResult {
 export function cheapestSuggestion(
   allowed: ProductKey[],
   monthlyPriceByKey: Partial<Record<ProductKey, number>>,
-  count = 2
+  count = 2,
 ): ProductKey[] {
   if (allowed.length === 0) return []
 
   const ranked = [...allowed].sort((a, b) => {
     const priceA = monthlyPriceByKey[a]
     const priceB = monthlyPriceByKey[b]
-    const valueA = typeof priceA === 'number' ? priceA : Number.POSITIVE_INFINITY
-    const valueB = typeof priceB === 'number' ? priceB : Number.POSITIVE_INFINITY
+    const valueA =
+      typeof priceA === 'number' ? priceA : Number.POSITIVE_INFINITY
+    const valueB =
+      typeof priceB === 'number' ? priceB : Number.POSITIVE_INFINITY
     return valueA - valueB
   })
 
@@ -218,13 +243,13 @@ export function productKeyFromName(name: string): ProductKey | null {
   if (matches.length === 0) {
     console.error(
       'productKeyFromName: nenhum produto do catálogo casou com o nome:',
-      name
+      name,
     )
   } else {
     console.error(
       'productKeyFromName: match ambíguo (mais de um produto); não resolvido:',
       name,
-      { matches }
+      { matches },
     )
   }
   return null
@@ -233,7 +258,7 @@ export function productKeyFromName(name: string): ProductKey | null {
 /** Motivo de bloqueio para um produto fora do `allowed`. */
 export function blockReasonForProduct(
   key: ProductKey,
-  gates: Array<{ allowed: ProductKey[]; reason: string }>
+  gates: Array<{ allowed: ProductKey[]; reason: string }>,
 ): string {
   const reasons = gates
     .filter((g) => !g.allowed.includes(key))

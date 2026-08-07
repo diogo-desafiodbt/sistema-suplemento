@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { type NextRequest, NextResponse } from 'next/server'
 import { canCancelRecurringBilling } from '@/lib/plans'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 
 async function cancelPagarmeSubscription(pagarmeSubId: string): Promise<void> {
   const apiKey = process.env.PAGARME_API_KEY
@@ -13,7 +13,7 @@ async function cancelPagarmeSubscription(pagarmeSubId: string): Promise<void> {
     {
       method: 'DELETE',
       headers: { Authorization: pagarmeAuth },
-    }
+    },
   )
 
   if (res.ok || res.status === 404) return
@@ -32,7 +32,9 @@ async function cancelPagarmeSubscription(pagarmeSubId: string): Promise<void> {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
@@ -50,13 +52,23 @@ export async function POST(request: NextRequest) {
       .maybeSingle()
 
     if (!subscription) {
-      return NextResponse.json({ error: 'Nenhuma assinatura ativa encontrada' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Nenhuma assinatura ativa encontrada' },
+        { status: 404 },
+      )
     }
 
-    if (!canCancelRecurringBilling(subscription.plan_type, subscription.pagarme_sub_id)) {
+    if (
+      !canCancelRecurringBilling(
+        subscription.plan_type,
+        subscription.pagarme_sub_id,
+      )
+    ) {
       return NextResponse.json(
-        { error: 'Este plano foi pago integralmente e não pode ser cancelado.' },
-        { status: 400 }
+        {
+          error: 'Este plano foi pago integralmente e não pode ser cancelado.',
+        },
+        { status: 400 },
       )
     }
 

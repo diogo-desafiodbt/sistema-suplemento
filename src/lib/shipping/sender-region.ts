@@ -1,8 +1,22 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const NORTE_NORDESTE_UFS = [
-  'AC', 'AP', 'AM', 'PA', 'RO', 'RR', 'TO',
-  'AL', 'BA', 'CE', 'MA', 'PB', 'PE', 'PI', 'RN', 'SE',
+  'AC',
+  'AP',
+  'AM',
+  'PA',
+  'RO',
+  'RR',
+  'TO',
+  'AL',
+  'BA',
+  'CE',
+  'MA',
+  'PB',
+  'PE',
+  'PI',
+  'RN',
+  'SE',
 ]
 
 export function isNorteNordeste(uf: string): boolean {
@@ -46,7 +60,9 @@ const FORTALEZA_DEFAULTS: SenderAddress = {
  * Origem do frete conforme destino: Norte/Nordeste sai de Fortaleza,
  * demais regiões saem de Curitiba (matriz).
  */
-export async function getSenderAddress(destinoUf: string): Promise<SenderAddress> {
+export async function getSenderAddress(
+  destinoUf: string,
+): Promise<SenderAddress> {
   const fortaleza = isNorteNordeste(destinoUf)
   const prefix = fortaleza ? 'shipping_sender_fortaleza' : 'shipping_sender'
   const defaults = fortaleza ? FORTALEZA_DEFAULTS : CURITIBA_DEFAULTS
@@ -66,7 +82,7 @@ export async function getSenderAddress(destinoUf: string): Promise<SenderAddress
       `${prefix}_uf`,
     ])
 
-  const map = Object.fromEntries((configs ?? []).map(c => [c.key, c.value]))
+  const map = Object.fromEntries((configs ?? []).map((c) => [c.key, c.value]))
 
   return {
     nome: map[`${prefix}_nome`] ?? defaults.nome,

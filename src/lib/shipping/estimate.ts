@@ -1,8 +1,10 @@
-export const PHARMACY_HANDLING_DAYS = 2
-export const SAFETY_MARGIN_DAYS = 3
+const PHARMACY_HANDLING_DAYS = 2
+const SAFETY_MARGIN_DAYS = 3
 
 /** Prazo exibido ao cliente = transporte + manipulação + margem de segurança. */
-export function estimateCustomerDeliveryDays(prazoTransporteDias: number): number {
+export function estimateCustomerDeliveryDays(
+  prazoTransporteDias: number,
+): number {
   return prazoTransporteDias + PHARMACY_HANDLING_DAYS + SAFETY_MARGIN_DAYS
 }
 

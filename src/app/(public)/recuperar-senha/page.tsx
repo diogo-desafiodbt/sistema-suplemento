@@ -1,12 +1,18 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { toast } from 'sonner'
+import { createClient } from '@/lib/supabase/client'
 
 export default function RecuperarSenhaPage() {
   const supabase = createClient()
@@ -37,9 +43,13 @@ export default function RecuperarSenhaPage() {
           <CardContent className="pt-6">
             <p className="text-lg font-medium">Email enviado</p>
             <p className="text-gray-500 mt-2">
-              Verifique sua caixa de entrada e siga as instruções para redefinir sua senha.
+              Verifique sua caixa de entrada e siga as instruções para redefinir
+              sua senha.
             </p>
-            <a href="/login" className="text-sm text-gray-500 hover:text-gray-700 mt-4 block">
+            <a
+              href="/login"
+              className="text-sm text-gray-500 hover:text-gray-700 mt-4 block"
+            >
               Voltar para o login
             </a>
           </CardContent>
@@ -75,7 +85,10 @@ export default function RecuperarSenhaPage() {
             </Button>
           </form>
           <div className="mt-4 text-center">
-            <a href="/login" className="text-sm text-gray-500 hover:text-gray-700">
+            <a
+              href="/login"
+              className="text-sm text-gray-500 hover:text-gray-700"
+            >
               Voltar para o login
             </a>
           </div>

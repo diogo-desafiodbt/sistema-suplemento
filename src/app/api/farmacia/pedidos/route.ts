@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { type NextRequest, NextResponse } from 'next/server'
 import { isFarmaciaAuthorized, parseDateRange } from '@/lib/pharmacy/pull-api'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 type OrderRow = {
   id: string
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
             status
           )
         )
-      `
+      `,
       )
       .eq('subscriptions.protocols.status', 'signed')
       .order('created_at', { ascending: true })
@@ -51,12 +51,15 @@ export async function GET(request: NextRequest) {
     const { data: orders, error } = await query
     if (error) {
       console.error('farmacia/pedidos error:', error)
-      return NextResponse.json({ error: 'Erro ao buscar pedidos' }, { status: 500 })
+      return NextResponse.json(
+        { error: 'Erro ao buscar pedidos' },
+        { status: 500 },
+      )
     }
 
     // Defesa em profundidade: omitir não assinados (não é erro)
     const signed = ((orders ?? []) as unknown as OrderRow[]).filter(
-      isSignedProtocol
+      isSignedProtocol,
     )
 
     const result = signed.map((o) => ({

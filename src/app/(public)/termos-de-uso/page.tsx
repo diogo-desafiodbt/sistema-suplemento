@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
-import Header from '@/components/Header'
 import Footer from '@/components/Footer'
+import Header from '@/components/Header'
 import { TERMS_CONTENT, TERMS_VERSION } from '@/lib/terms/content'
 
 export const metadata: Metadata = {

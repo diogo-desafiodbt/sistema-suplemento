@@ -1,14 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { type NextRequest, NextResponse } from 'next/server'
 import { generatePrescriptionPdf } from '@/lib/pdf/generator'
 import { sendToPharmacyWithPdf } from '@/lib/pharmacy/sender'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 import type { PharmacyOrder } from '@/types/pharmacy'
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
@@ -26,7 +28,10 @@ export async function POST(request: NextRequest) {
 
     const { protocol_id } = await request.json()
     if (!protocol_id) {
-      return NextResponse.json({ error: 'protocol_id obrigatório' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'protocol_id obrigatório' },
+        { status: 400 },
+      )
     }
 
     const admin = createAdminClient()
@@ -51,7 +56,10 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error || !protocol) {
-      return NextResponse.json({ error: 'Protocolo não encontrado ou já assinado' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Protocolo não encontrado ou já assinado' },
+        { status: 404 },
+      )
     }
 
     const { data: professional } = await admin
@@ -64,18 +72,29 @@ export async function POST(request: NextRequest) {
       .maybeSingle()
 
     if (!professional) {
-      return NextResponse.json({ error: 'Registro de profissional não encontrado' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Registro de profissional não encontrado' },
+        { status: 400 },
+      )
     }
 
-    const activeItems = (protocol.protocol_items as Array<{
-      removed_by_patient: boolean
-      is_required: boolean
-      activation_reason: string | null
-      products: { name: string } | null
-    }>).filter(item => !item.removed_by_patient)
+    const activeItems = (
+      protocol.protocol_items as Array<{
+        removed_by_patient: boolean
+        is_required: boolean
+        activation_reason: string | null
+        products: { name: string } | null
+      }>
+    ).filter((item) => !item.removed_by_patient)
 
-    const patient = protocol.users as unknown as { full_name: string; email: string; client_code: string }
-    const professionalUser = professional.users as unknown as { full_name: string } | null
+    const patient = protocol.users as unknown as {
+      full_name: string
+      email: string
+      client_code: string
+    }
+    const professionalUser = professional.users as unknown as {
+      full_name: string
+    } | null
     const quiz = protocol.quiz_responses as unknown as {
       diagnosis_type: string
       birth_date: string | null
@@ -103,7 +122,7 @@ export async function POST(request: NextRequest) {
         id: protocol.id,
         signed_at: signedAt,
       },
-      items: activeItems.map(item => ({
+      items: activeItems.map((item) => ({
         name: item.products?.name ?? '',
         activation_reason: item.activation_reason ?? '',
         is_required: item.is_required,
@@ -142,24 +161,32 @@ export async function POST(request: NextRequest) {
 
     if (updateError) {
       console.error('Update error:', updateError)
-      return NextResponse.json({ error: 'Erro ao atualizar protocolo' }, { status: 500 })
+      return NextResponse.json(
+        { error: 'Erro ao atualizar protocolo' },
+        { status: 500 },
+      )
     }
 
-    const { error: auditError } = await admin.from('prescription_audit_logs').insert({
-      protocol_id,
-      professional_id: professional.id,
-      action: 'signed',
-      signed_at: signedAt,
-      ip_address: request.headers.get('x-forwarded-for') ?? 'unknown',
-      user_agent: request.headers.get('user-agent') ?? 'unknown',
-      pdf_url: pdfUrl,
-      pdf_hash: hash,
-      payload_snapshot: protocol,
-    })
+    const { error: auditError } = await admin
+      .from('prescription_audit_logs')
+      .insert({
+        protocol_id,
+        professional_id: professional.id,
+        action: 'signed',
+        signed_at: signedAt,
+        ip_address: request.headers.get('x-forwarded-for') ?? 'unknown',
+        user_agent: request.headers.get('user-agent') ?? 'unknown',
+        pdf_url: pdfUrl,
+        pdf_hash: hash,
+        payload_snapshot: protocol,
+      })
 
     if (auditError) {
       console.error('Audit error:', auditError)
-      return NextResponse.json({ error: 'Erro ao registrar auditoria' }, { status: 500 })
+      return NextResponse.json(
+        { error: 'Erro ao registrar auditoria' },
+        { status: 500 },
+      )
     }
 
     const { data: linkedSubscription } = await admin
@@ -182,7 +209,7 @@ export async function POST(request: NextRequest) {
         try {
           await sendToPharmacyWithPdf(
             pendingOrder.pharmacy_json as PharmacyOrder,
-            buffer
+            buffer,
           )
           await admin
             .from('orders')

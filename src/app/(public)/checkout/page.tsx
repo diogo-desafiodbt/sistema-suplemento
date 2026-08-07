@@ -1,23 +1,23 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import { trackFunnelEvent } from '@/lib/funnel/track'
 import {
   DEFAULT_PURCHASE_PLAN,
-  PLAN_TYPE_LABEL,
   getChargePrice,
   isPurchasePlanType,
+  PLAN_TYPE_LABEL,
   type PurchasePlanType,
 } from '@/lib/plans'
+import { estimateCustomerDeliveryDays } from '@/lib/shipping/estimate'
+import { createClient } from '@/lib/supabase/client'
 import {
-  shippingQuoteKey,
   type ShippingOptionPublic,
   type ShippingSelection,
+  shippingQuoteKey,
 } from '@/types/shipping'
-import { estimateCustomerDeliveryDays } from '@/lib/shipping/estimate'
-import { trackFunnelEvent } from '@/lib/funnel/track'
 
 type Step = 2 | 3 | 4
 
@@ -90,12 +90,15 @@ export default function CheckoutPage() {
   const [state, setState] = useState('')
   const [loadingCep, setLoadingCep] = useState(false)
 
-  const [shippingOptions, setShippingOptions] = useState<ShippingOptionPublic[]>([])
+  const [shippingOptions, setShippingOptions] = useState<
+    ShippingOptionPublic[]
+  >([])
   const [shipping, setShipping] = useState<ShippingSelection>(FALLBACK_SHIPPING)
   const [loadingShipping, setLoadingShipping] = useState(false)
   const [shippingError, setShippingError] = useState(false)
 
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('credit_card')
+  const [paymentMethod, setPaymentMethod] =
+    useState<PaymentMethod>('credit_card')
   const [cardNumber, setCardNumber] = useState('')
   const [cardName, setCardName] = useState('')
   const [cardExpiry, setCardExpiry] = useState('')
@@ -105,11 +108,16 @@ export default function CheckoutPage() {
   const [processingPayment, setProcessingPayment] = useState(false)
 
   const [pixInfo, setPixInfo] = useState<PixInfo | null>(null)
-  const [pixSubscriptionId, setPixSubscriptionId] = useState<string | null>(null)
+  const [pixSubscriptionId, setPixSubscriptionId] = useState<string | null>(
+    null,
+  )
   const [pixExpired, setPixExpired] = useState(false)
   const [pixSecondsLeft, setPixSecondsLeft] = useState(0)
 
-  const [accountSummary, setAccountSummary] = useState<{ name: string; email: string } | null>(null)
+  const [accountSummary, setAccountSummary] = useState<{
+    name: string
+    email: string
+  } | null>(null)
   const [addressSummary, setAddressSummary] = useState<string | null>(null)
 
   const pixAllowed = plan === '1mes'
@@ -133,7 +141,9 @@ export default function CheckoutPage() {
     const tick = () => {
       const left = Math.max(
         0,
-        Math.floor((new Date(pixInfo.expires_at).getTime() - Date.now()) / 1000)
+        Math.floor(
+          (new Date(pixInfo.expires_at).getTime() - Date.now()) / 1000,
+        ),
       )
       setPixSecondsLeft(left)
       if (left <= 0) setPixExpired(true)
@@ -150,7 +160,7 @@ export default function CheckoutPage() {
     const poll = async () => {
       try {
         const res = await fetch(
-          `/api/checkout/status?subscription_id=${encodeURIComponent(pixSubscriptionId)}`
+          `/api/checkout/status?subscription_id=${encodeURIComponent(pixSubscriptionId)}`,
         )
         if (!res.ok) return
         const data = await res.json()
@@ -170,7 +180,9 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     const itemsRaw = sessionStorage.getItem('protocol_items')
-    const savedSource = sessionStorage.getItem('checkout_source') as CheckoutSource | null
+    const savedSource = sessionStorage.getItem(
+      'checkout_source',
+    ) as CheckoutSource | null
     const savedPlan = sessionStorage.getItem('selected_plan')
     const triagemRaw = sessionStorage.getItem('triagem_data')
 
@@ -198,7 +210,9 @@ export default function CheckoutPage() {
 
   async function checkExistingSession() {
     const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return
 
     const { data: profile } = await supabase
@@ -217,13 +231,14 @@ export default function CheckoutPage() {
   }
 
   function getActiveItems() {
-    return items.filter(item => !item.removed && !item.blocked)
+    return items.filter((item) => !item.removed && !item.blocked)
   }
 
   function hasOmega3(): boolean {
-    return getActiveItems().some(item =>
-      item.product_name.toLowerCase().includes('ômega') ||
-      item.product_name.toLowerCase().includes('omega')
+    return getActiveItems().some(
+      (item) =>
+        item.product_name.toLowerCase().includes('ômega') ||
+        item.product_name.toLowerCase().includes('omega'),
     )
   }
 
@@ -265,11 +280,13 @@ export default function CheckoutPage() {
       }
 
       if (!data.user) {
-        toast.error('Este email já está cadastrado. Faça login ou use outro email.')
+        toast.error(
+          'Este email já está cadastrado. Faça login ou use outro email.',
+        )
         return
       }
 
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      await new Promise((resolve) => setTimeout(resolve, 1000))
 
       setAccountSummary({ name: fullName, email })
       setStep(3)
@@ -286,7 +303,7 @@ export default function CheckoutPage() {
     setLoadingShipping(true)
     setShippingError(false)
     try {
-      const active = getActiveItems().filter(i => i.product_id)
+      const active = getActiveItems().filter((i) => i.product_id)
       if (active.length === 0) {
         setShippingOptions([])
         setShipping(FALLBACK_SHIPPING)
@@ -301,7 +318,7 @@ export default function CheckoutPage() {
           cepdestino: cepDigits,
           uf,
           valordeclarado: getProductsSubtotal(),
-          protocol_items: active.map(i => ({
+          protocol_items: active.map((i) => ({
             product_id: i.product_id,
             quantity: i.quantity ?? 1,
           })),
@@ -318,7 +335,8 @@ export default function CheckoutPage() {
       }
 
       setShippingOptions(options)
-      const preferred = options.find(o => o.tipo === 'economica') ?? options[0]
+      const preferred =
+        options.find((o) => o.tipo === 'economica') ?? options[0]
       setShipping({
         tipo: preferred.tipo,
         valor: preferred.valor,
@@ -360,16 +378,19 @@ export default function CheckoutPage() {
   async function handlePayment(e?: React.FormEvent) {
     e?.preventDefault()
     if (!termsAccepted) {
-      toast.error('É necessário aceitar os Termos de Uso para finalizar a compra.')
+      toast.error(
+        'É necessário aceitar os Termos de Uso para finalizar a compra.',
+      )
       return
     }
     setProcessingPayment(true)
     setPixExpired(false)
 
     const [expMonth, expYearRaw] = cardExpiry.split('/')
-    const expYear = expYearRaw?.trim().length === 2
-      ? `20${expYearRaw.trim()}`
-      : expYearRaw?.trim()
+    const expYear =
+      expYearRaw?.trim().length === 2
+        ? `20${expYearRaw.trim()}`
+        : expYearRaw?.trim()
 
     try {
       const quiz = buildQuizPayload()
@@ -452,7 +473,7 @@ export default function CheckoutPage() {
           results?.subscription?.paid === true
         if (!paid) {
           toast.error(
-            'Pagamento recusado pela operadora do cartão. Verifique os dados ou tente outro cartão.'
+            'Pagamento recusado pela operadora do cartão. Verifique os dados ou tente outro cartão.',
           )
           return
         }
@@ -479,10 +500,13 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen bg-[#f5f0eb]">
-
       <header className="bg-[#f5f0eb] px-6 py-5 border-b border-[#13244f]/10">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <img src="/logo-azul.png" alt="Desafio Diabetes" className="h-7 w-auto" />
+          <img
+            src="/logo-azul.png"
+            alt="Desafio Diabetes"
+            className="h-7 w-auto"
+          />
           <nav className="hidden sm:flex items-center gap-2 text-xs text-[#13244f]/50 font-medium">
             {['Conta', 'Entrega', 'Pagamento'].map((label, i) => {
               const stepNum = i + 2
@@ -491,7 +515,9 @@ export default function CheckoutPage() {
               return (
                 <span key={label} className="flex items-center gap-2">
                   {i > 0 && <span className="opacity-30">›</span>}
-                  <span className={`${isActive ? 'text-[#13244f] font-bold' : isDone ? 'text-[#13244f]/70' : ''}`}>
+                  <span
+                    className={`${isActive ? 'text-[#13244f] font-bold' : isDone ? 'text-[#13244f]/70' : ''}`}
+                  >
                     {isDone ? `✓ ${label}` : label}
                   </span>
                 </span>
@@ -502,19 +528,22 @@ export default function CheckoutPage() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8 flex flex-col lg:flex-row gap-8 items-start">
-
         <div className="flex-1 space-y-3 w-full min-w-0">
-
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4">
               <div className="flex items-center gap-3">
-                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${step > 2 ? 'bg-[#13244f] text-white' : step === 2 ? 'bg-[#13244f] text-white' : 'border-2 border-gray-300 text-gray-400'}`}>
+                <span
+                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${step > 2 ? 'bg-[#13244f] text-white' : step === 2 ? 'bg-[#13244f] text-white' : 'border-2 border-gray-300 text-gray-400'}`}
+                >
                   {step > 2 ? '✓' : '1'}
                 </span>
                 <h2 className="font-bold text-[#13244f]">Criar sua conta</h2>
               </div>
               {step > 2 && (
-                <button onClick={() => setStep(2)} className="text-xs text-[#f4001e] font-semibold hover:underline">
+                <button
+                  onClick={() => setStep(2)}
+                  className="text-xs text-[#f4001e] font-semibold hover:underline"
+                >
                   Editar
                 </button>
               )}
@@ -524,14 +553,19 @@ export default function CheckoutPage() {
               <div className="px-6 pb-6 space-y-3 border-t border-gray-50">
                 <p className="text-sm md:text-base text-gray-400 pt-3">
                   Já tem conta?{' '}
-                  <a href="/login" className="text-[#f4001e] font-semibold hover:underline">Faça login</a>
+                  <a
+                    href="/login"
+                    className="text-[#f4001e] font-semibold hover:underline"
+                  >
+                    Faça login
+                  </a>
                 </p>
                 <form onSubmit={handleCreateAccount} className="space-y-3">
                   <input
                     type="text"
                     placeholder="Nome completo"
                     value={fullName}
-                    onChange={e => setFullName(e.target.value)}
+                    onChange={(e) => setFullName(e.target.value)}
                     required
                     className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                   />
@@ -539,7 +573,7 @@ export default function CheckoutPage() {
                     type="email"
                     placeholder="E-mail"
                     value={email}
-                    onChange={e => setEmail(e.target.value)}
+                    onChange={(e) => setEmail(e.target.value)}
                     required
                     className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                   />
@@ -547,7 +581,7 @@ export default function CheckoutPage() {
                     type="password"
                     placeholder="Crie uma senha (mínimo 6 caracteres)"
                     value={password}
-                    onChange={e => setPassword(e.target.value)}
+                    onChange={(e) => setPassword(e.target.value)}
                     minLength={6}
                     required
                     className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
@@ -565,22 +599,35 @@ export default function CheckoutPage() {
 
             {step > 2 && accountSummary && (
               <div className="px-6 pb-4 border-t border-gray-50 pt-3">
-                <p className="text-sm md:text-base text-[#13244f] font-medium">{accountSummary.name}</p>
-                <p className="text-sm md:text-base text-gray-400">{accountSummary.email}</p>
+                <p className="text-sm md:text-base text-[#13244f] font-medium">
+                  {accountSummary.name}
+                </p>
+                <p className="text-sm md:text-base text-gray-400">
+                  {accountSummary.email}
+                </p>
               </div>
             )}
           </div>
 
-          <div className={`bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden ${step < 3 ? 'opacity-50' : ''}`}>
+          <div
+            className={`bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden ${step < 3 ? 'opacity-50' : ''}`}
+          >
             <div className="flex items-center justify-between px-6 py-4">
               <div className="flex items-center gap-3">
-                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${step > 3 ? 'bg-[#13244f] text-white' : step === 3 ? 'bg-[#13244f] text-white' : 'border-2 border-gray-300 text-gray-400'}`}>
+                <span
+                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${step > 3 ? 'bg-[#13244f] text-white' : step === 3 ? 'bg-[#13244f] text-white' : 'border-2 border-gray-300 text-gray-400'}`}
+                >
                   {step > 3 ? '✓' : '2'}
                 </span>
-                <h2 className="font-bold text-[#13244f]">Endereço de entrega</h2>
+                <h2 className="font-bold text-[#13244f]">
+                  Endereço de entrega
+                </h2>
               </div>
               {step > 3 && (
-                <button onClick={() => setStep(3)} className="text-xs text-[#f4001e] font-semibold hover:underline">
+                <button
+                  onClick={() => setStep(3)}
+                  className="text-xs text-[#f4001e] font-semibold hover:underline"
+                >
                   Editar
                 </button>
               )}
@@ -591,16 +638,18 @@ export default function CheckoutPage() {
                 <input
                   placeholder="CEP"
                   value={cep}
-                  onChange={e => setCep(e.target.value)}
+                  onChange={(e) => setCep(e.target.value)}
                   onBlur={handleCepBlur}
                   maxLength={9}
                   className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                 />
-                {loadingCep && <p className="text-xs text-gray-400">Buscando CEP...</p>}
+                {loadingCep && (
+                  <p className="text-xs text-gray-400">Buscando CEP...</p>
+                )}
                 <input
                   placeholder="Rua"
                   value={street}
-                  onChange={e => setStreet(e.target.value)}
+                  onChange={(e) => setStreet(e.target.value)}
                   required
                   className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                 />
@@ -608,21 +657,21 @@ export default function CheckoutPage() {
                   <input
                     placeholder="Número"
                     value={number}
-                    onChange={e => setNumber(e.target.value)}
+                    onChange={(e) => setNumber(e.target.value)}
                     required
                     className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                   />
                   <input
                     placeholder="Complemento"
                     value={complement}
-                    onChange={e => setComplement(e.target.value)}
+                    onChange={(e) => setComplement(e.target.value)}
                     className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                   />
                 </div>
                 <input
                   placeholder="Bairro"
                   value={neighborhood}
-                  onChange={e => setNeighborhood(e.target.value)}
+                  onChange={(e) => setNeighborhood(e.target.value)}
                   required
                   className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                 />
@@ -630,14 +679,14 @@ export default function CheckoutPage() {
                   <input
                     placeholder="Cidade"
                     value={city}
-                    onChange={e => setCity(e.target.value)}
+                    onChange={(e) => setCity(e.target.value)}
                     required
                     className="col-span-2 w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                   />
                   <input
                     placeholder="UF"
                     value={state}
-                    onChange={e => setState(e.target.value)}
+                    onChange={(e) => setState(e.target.value)}
                     maxLength={2}
                     required
                     className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
@@ -652,7 +701,7 @@ export default function CheckoutPage() {
                   )}
                   {!loadingShipping && shippingOptions.length > 0 && (
                     <div className="grid gap-2 max-h-80 overflow-y-auto pr-1">
-                      {shippingOptions.map(opt => {
+                      {shippingOptions.map((opt) => {
                         const selected =
                           shippingQuoteKey(shipping) === shippingQuoteKey(opt)
                         const tipoLabel =
@@ -698,7 +747,9 @@ export default function CheckoutPage() {
                                 </p>
                                 <p className="text-xs text-gray-500 mt-0.5">
                                   {(() => {
-                                    const dias = estimateCustomerDeliveryDays(opt.prazoDias)
+                                    const dias = estimateCustomerDeliveryDays(
+                                      opt.prazoDias,
+                                    )
                                     return `chega em até ${dias} ${dias === 1 ? 'dia útil' : 'dias úteis'} · serviço ${opt.codigoServico}`
                                   })()}
                                 </p>
@@ -714,16 +765,26 @@ export default function CheckoutPage() {
                   )}
                   {!loadingShipping && shippingError && (
                     <p className="text-xs text-gray-400 bg-[#13244f]/5 rounded-xl px-4 py-3">
-                      Não foi possível cotar o frete agora. Você pode seguir — calculamos na hora do envio.
+                      Não foi possível cotar o frete agora. Você pode seguir —
+                      calculamos na hora do envio.
                     </p>
                   )}
                 </div>
                 <button
                   onClick={() => {
-                    setAddressSummary(`${street}, ${number}${complement ? ` ${complement}` : ''} — ${city}/${state}`)
+                    setAddressSummary(
+                      `${street}, ${number}${complement ? ` ${complement}` : ''} — ${city}/${state}`,
+                    )
                     setStep(4)
                   }}
-                  disabled={!cep || !street || !number || !city || !state || loadingShipping}
+                  disabled={
+                    !cep ||
+                    !street ||
+                    !number ||
+                    !city ||
+                    !state ||
+                    loadingShipping
+                  }
                   className="w-full bg-[#f4001e] hover:bg-[#a30000] text-white py-3.5 rounded-full font-bold text-sm transition active:scale-95 disabled:opacity-40"
                 >
                   Ir para o pagamento
@@ -733,7 +794,9 @@ export default function CheckoutPage() {
 
             {step > 3 && addressSummary && (
               <div className="px-6 pb-4 border-t border-gray-50 pt-3">
-                <p className="text-sm md:text-base text-[#13244f]">{addressSummary}</p>
+                <p className="text-sm md:text-base text-[#13244f]">
+                  {addressSummary}
+                </p>
               </div>
             )}
           </div>
@@ -752,31 +815,62 @@ export default function CheckoutPage() {
                       Antes de pagar
                     </p>
                     <p className="text-lg md:text-xl font-bold leading-snug">
-                      Atenção, {(accountSummary?.name ?? '').split(' ')[0] || 'paciente'}.
+                      Atenção,{' '}
+                      {(accountSummary?.name ?? '').split(' ')[0] || 'paciente'}
+                      .
                     </p>
                   </div>
                 </div>
 
                 <div className="space-y-3.5 text-sm md:text-base leading-relaxed text-white/90">
                   <p>
-                    Nós levamos a saúde de quem tem diabetes a sério — e estamos muito orgulhosos do passo que você está dando no caminho da reversão.
+                    Nós levamos a saúde de quem tem diabetes a sério — e estamos
+                    muito orgulhosos do passo que você está dando no caminho da
+                    reversão.
                   </p>
                   <p>
-                    O Dr. Turí Souza dedicou anos à validação dessa formulação até chegar numa linha de suplementos de alto padrão, pensada exclusivamente para diabéticos.
+                    O Dr. Turí Souza dedicou anos à validação dessa formulação
+                    até chegar numa linha de suplementos de alto padrão, pensada
+                    exclusivamente para diabéticos.
                   </p>
                   <p>
-                    Seu suplemento não sai de uma linha industrial. Ele é preparado num atelier farmacêutico, lote a lote, sob a responsabilidade direta de um farmacêutico especializado — um processo raro no mercado de suplementação, reservado a quem exige o mais alto padrão de qualidade. É esse cuidado que garante alta tecnologia e rastreabilidade em cada entrega.
+                    Seu suplemento não sai de uma linha industrial. Ele é
+                    preparado num atelier farmacêutico, lote a lote, sob a
+                    responsabilidade direta de um farmacêutico especializado —
+                    um processo raro no mercado de suplementação, reservado a
+                    quem exige o mais alto padrão de qualidade. É esse cuidado
+                    que garante alta tecnologia e rastreabilidade em cada
+                    entrega.
                   </p>
                   <p className="font-semibold text-white">
-                    Sua formulação chega em breve, com a exclusividade e a segurança que o seu tratamento merece.
+                    Sua formulação chega em breve, com a exclusividade e a
+                    segurança que o seu tratamento merece.
                   </p>
                 </div>
 
                 <div className="flex flex-wrap gap-2 pt-1">
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-white/90">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-                      <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5"/>
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      aria-hidden
+                    >
+                      <path
+                        d="M9 12l2 2 4-4"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="9"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      />
                     </svg>
                     Farmácia credenciada ANVISA
                   </span>
@@ -788,9 +882,13 @@ export default function CheckoutPage() {
             </aside>
           )}
 
-          <div className={`bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden ${step < 4 ? 'opacity-50' : ''}`}>
+          <div
+            className={`bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden ${step < 4 ? 'opacity-50' : ''}`}
+          >
             <div className="px-6 py-4 flex items-center gap-3">
-              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${step === 4 ? 'bg-[#13244f] text-white' : 'border-2 border-gray-300 text-gray-400'}`}>
+              <span
+                className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${step === 4 ? 'bg-[#13244f] text-white' : 'border-2 border-gray-300 text-gray-400'}`}
+              >
                 3
               </span>
               <h2 className="font-bold text-[#13244f]">Pagamento</h2>
@@ -801,15 +899,20 @@ export default function CheckoutPage() {
                 {pixInfo ? (
                   <div className="space-y-4">
                     <div className="text-center space-y-1">
-                      <p className="font-bold text-[#13244f] text-lg">Pague com Pix</p>
+                      <p className="font-bold text-[#13244f] text-lg">
+                        Pague com Pix
+                      </p>
                       <p className="text-sm text-gray-500">
-                        Escaneie o QR Code ou copie o código. Confirmamos automaticamente após o pagamento.
+                        Escaneie o QR Code ou copie o código. Confirmamos
+                        automaticamente após o pagamento.
                       </p>
                     </div>
 
                     {pixExpired ? (
                       <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-5 text-center space-y-3">
-                        <p className="text-sm font-semibold text-amber-800">QR code expirado</p>
+                        <p className="text-sm font-semibold text-amber-800">
+                          QR code expirado
+                        </p>
                         <p className="text-xs text-amber-700">
                           Gere um novo código para concluir o pagamento.
                         </p>
@@ -819,7 +922,9 @@ export default function CheckoutPage() {
                           onClick={() => handlePayment()}
                           className="w-full bg-[#f4001e] hover:bg-[#a30000] text-white py-3 rounded-full font-bold text-sm transition disabled:opacity-50"
                         >
-                          {processingPayment ? 'Gerando…' : 'Gerar novo QR Code'}
+                          {processingPayment
+                            ? 'Gerando…'
+                            : 'Gerar novo QR Code'}
                         </button>
                       </div>
                     ) : (
@@ -859,118 +964,123 @@ export default function CheckoutPage() {
                     )}
                   </div>
                 ) : (
-                <form onSubmit={handlePayment} className="space-y-3">
-                  {pixAllowed && (
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setPaymentMethod('credit_card')}
-                        className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition ${
-                          paymentMethod === 'credit_card'
-                            ? 'border-[#13244f] bg-[#13244f] text-white'
-                            : 'border-gray-200 text-[#13244f] hover:border-[#13244f]/40'
-                        }`}
-                      >
-                        Cartão de crédito
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPaymentMethod('pix')}
-                        className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition ${
-                          paymentMethod === 'pix'
-                            ? 'border-[#13244f] bg-[#13244f] text-white'
-                            : 'border-gray-200 text-[#13244f] hover:border-[#13244f]/40'
-                        }`}
-                      >
-                        Pix
-                      </button>
-                    </div>
-                  )}
-
-                  <input
-                    placeholder={paymentMethod === 'pix' && pixAllowed ? 'CPF' : 'CPF do titular'}
-                    value={cpf}
-                    onChange={e => setCpf(e.target.value)}
-                    required
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
-                  />
-
-                  {(paymentMethod === 'credit_card' || !pixAllowed) && (
-                    <>
-                      <input
-                        placeholder="Número do cartão"
-                        value={cardNumber}
-                        onChange={e => setCardNumber(e.target.value)}
-                        maxLength={19}
-                        required
-                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
-                      />
-                      <input
-                        placeholder="Nome no cartão"
-                        value={cardName}
-                        onChange={e => setCardName(e.target.value)}
-                        required
-                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
-                      />
-                      <div className="grid grid-cols-2 gap-3">
-                        <input
-                          placeholder="Validade (MM/AA)"
-                          value={cardExpiry}
-                          onChange={e => setCardExpiry(e.target.value)}
-                          maxLength={5}
-                          required
-                          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
-                        />
-                        <input
-                          placeholder="CVV"
-                          value={cardCvv}
-                          onChange={e => setCardCvv(e.target.value)}
-                          maxLength={4}
-                          required
-                          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
-                        />
+                  <form onSubmit={handlePayment} className="space-y-3">
+                    {pixAllowed && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMethod('credit_card')}
+                          className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition ${
+                            paymentMethod === 'credit_card'
+                              ? 'border-[#13244f] bg-[#13244f] text-white'
+                              : 'border-gray-200 text-[#13244f] hover:border-[#13244f]/40'
+                          }`}
+                        >
+                          Cartão de crédito
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMethod('pix')}
+                          className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition ${
+                            paymentMethod === 'pix'
+                              ? 'border-[#13244f] bg-[#13244f] text-white'
+                              : 'border-gray-200 text-[#13244f] hover:border-[#13244f]/40'
+                          }`}
+                        >
+                          Pix
+                        </button>
                       </div>
-                    </>
-                  )}
+                    )}
 
-                  {paymentMethod === 'pix' && pixAllowed && (
-                    <p className="text-xs text-gray-500 bg-[#13244f]/5 rounded-xl px-4 py-3">
-                      Após gerar o QR Code, você terá 1 hora para pagar. A confirmação é automática.
-                    </p>
-                  )}
-
-                  <label className="flex items-start gap-3 cursor-pointer select-none">
                     <input
-                      type="checkbox"
-                      checked={termsAccepted}
-                      onChange={e => setTermsAccepted(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 accent-[#13244f]"
+                      placeholder={
+                        paymentMethod === 'pix' && pixAllowed
+                          ? 'CPF'
+                          : 'CPF do titular'
+                      }
+                      value={cpf}
+                      onChange={(e) => setCpf(e.target.value)}
+                      required
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                     />
-                    <span className="text-xs text-gray-500 leading-relaxed">
-                      Li e concordo com os{' '}
-                      <a
-                        href="/termos-de-uso"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-semibold text-[#13244f] underline hover:text-[#f4001e]"
-                      >
-                        Termos de Uso
-                      </a>
-                    </span>
-                  </label>
 
-                  <button
-                    type="submit"
-                    disabled={processingPayment || !termsAccepted}
-                    className="w-full bg-[#f4001e] hover:bg-[#a30000] text-white py-4 rounded-full font-bold text-sm transition active:scale-95 disabled:opacity-50"
-                  >
-                    {processingPayment
-                      ? 'Processando...'
-                      : paymentMethod === 'pix' && pixAllowed
-                        ? `Gerar Pix — R$ ${getTotal().toFixed(2).replace('.', ',')}`
-                        : `Pagar R$ ${getTotal().toFixed(2).replace('.', ',')}`}
-                  </button>
-                </form>
+                    {(paymentMethod === 'credit_card' || !pixAllowed) && (
+                      <>
+                        <input
+                          placeholder="Número do cartão"
+                          value={cardNumber}
+                          onChange={(e) => setCardNumber(e.target.value)}
+                          maxLength={19}
+                          required
+                          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                        />
+                        <input
+                          placeholder="Nome no cartão"
+                          value={cardName}
+                          onChange={(e) => setCardName(e.target.value)}
+                          required
+                          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                        />
+                        <div className="grid grid-cols-2 gap-3">
+                          <input
+                            placeholder="Validade (MM/AA)"
+                            value={cardExpiry}
+                            onChange={(e) => setCardExpiry(e.target.value)}
+                            maxLength={5}
+                            required
+                            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                          />
+                          <input
+                            placeholder="CVV"
+                            value={cardCvv}
+                            onChange={(e) => setCardCvv(e.target.value)}
+                            maxLength={4}
+                            required
+                            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {paymentMethod === 'pix' && pixAllowed && (
+                      <p className="text-xs text-gray-500 bg-[#13244f]/5 rounded-xl px-4 py-3">
+                        Após gerar o QR Code, você terá 1 hora para pagar. A
+                        confirmação é automática.
+                      </p>
+                    )}
+
+                    <label className="flex items-start gap-3 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={termsAccepted}
+                        onChange={(e) => setTermsAccepted(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 accent-[#13244f]"
+                      />
+                      <span className="text-xs text-gray-500 leading-relaxed">
+                        Li e concordo com os{' '}
+                        <a
+                          href="/termos-de-uso"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-semibold text-[#13244f] underline hover:text-[#f4001e]"
+                        >
+                          Termos de Uso
+                        </a>
+                      </span>
+                    </label>
+
+                    <button
+                      type="submit"
+                      disabled={processingPayment || !termsAccepted}
+                      className="w-full bg-[#f4001e] hover:bg-[#a30000] text-white py-4 rounded-full font-bold text-sm transition active:scale-95 disabled:opacity-50"
+                    >
+                      {processingPayment
+                        ? 'Processando...'
+                        : paymentMethod === 'pix' && pixAllowed
+                          ? `Gerar Pix — R$ ${getTotal().toFixed(2).replace('.', ',')}`
+                          : `Pagar R$ ${getTotal().toFixed(2).replace('.', ',')}`}
+                    </button>
+                  </form>
                 )}
 
                 <div className="pt-2 space-y-2">
@@ -979,10 +1089,24 @@ export default function CheckoutPage() {
                     'Farmácias credenciadas pela ANVISA',
                     'Cancele quando quiser, sem burocracia',
                     'Entrega discreta direto na sua porta',
-                  ].map(item => (
-                    <div key={item} className="flex items-center gap-2 text-xs text-gray-400">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                        <path d="M5 13l4 4L19 7" stroke="#13244f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  ].map((item) => (
+                    <div
+                      key={item}
+                      className="flex items-center gap-2 text-xs text-gray-400"
+                    >
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <path
+                          d="M5 13l4 4L19 7"
+                          stroke="#13244f"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
                       </svg>
                       {item}
                     </div>
@@ -991,21 +1115,25 @@ export default function CheckoutPage() {
               </div>
             )}
           </div>
-
         </div>
 
         <div className="w-full lg:w-96 lg:sticky lg:top-8">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
             <div>
-              <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-1">Resumo da compra</p>
+              <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-1">
+                Resumo da compra
+              </p>
               <p className="text-sm md:text-base text-gray-400">
                 {PLAN_TYPE_LABEL[plan]}
               </p>
             </div>
 
             <div className="space-y-3">
-              {getActiveItems().map(item => (
-                <div key={item.product_id} className="flex items-center justify-between gap-3">
+              {getActiveItems().map((item) => (
+                <div
+                  key={item.product_id}
+                  className="flex items-center justify-between gap-3"
+                >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     {item.image ? (
                       <img
@@ -1052,7 +1180,9 @@ export default function CheckoutPage() {
                   />
                 </svg>
                 <p className="text-xs text-amber-800 leading-relaxed">
-                  Caso utilize medicamentos anticoagulantes ou antiagregantes plaquetários, consulte o seu médico antes de iniciar a suplementação.
+                  Caso utilize medicamentos anticoagulantes ou antiagregantes
+                  plaquetários, consulte o seu médico antes de iniciar a
+                  suplementação.
                 </p>
               </div>
             )}
@@ -1075,7 +1205,9 @@ export default function CheckoutPage() {
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm md:text-base font-bold text-[#13244f]">Total hoje</span>
+                <span className="text-sm md:text-base font-bold text-[#13244f]">
+                  Total hoje
+                </span>
                 <span className="text-xl font-bold text-[#13244f]">
                   R$ {getTotal().toFixed(2).replace('.', ',')}
                 </span>
@@ -1087,7 +1219,6 @@ export default function CheckoutPage() {
             </div>
           </div>
         </div>
-
       </main>
     </div>
   )

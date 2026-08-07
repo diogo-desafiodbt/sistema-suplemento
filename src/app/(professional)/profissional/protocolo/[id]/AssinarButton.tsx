@@ -28,7 +28,7 @@ export function AssinarButton({ protocolId }: { protocolId: string }) {
       }
 
       toast.success('Prescrição assinada com sucesso')
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await new Promise((resolve) => setTimeout(resolve, 500))
       window.location.href = '/profissional/fila'
       return
     } catch {
@@ -42,7 +42,9 @@ export function AssinarButton({ protocolId }: { protocolId: string }) {
     <div className="space-y-3">
       {confirmed && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800">
-          <strong>Confirmação:</strong> Ao assinar, você atesta que revisou o perfil clínico do paciente e que o protocolo prescrito é adequado para o caso. Esta ação é registrada de forma imutável.
+          <strong>Confirmação:</strong> Ao assinar, você atesta que revisou o
+          perfil clínico do paciente e que o protocolo prescrito é adequado para
+          o caso. Esta ação é registrada de forma imutável.
         </div>
       )}
       <button
@@ -58,8 +60,8 @@ export function AssinarButton({ protocolId }: { protocolId: string }) {
         {loading
           ? 'Assinando...'
           : confirmed
-          ? 'Confirmar assinatura'
-          : 'Assinar prescrição'}
+            ? 'Confirmar assinatura'
+            : 'Assinar prescrição'}
       </button>
       {confirmed && (
         <button

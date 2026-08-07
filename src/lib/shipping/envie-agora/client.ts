@@ -1,6 +1,6 @@
 export async function envieAgoraFetch(
   path: string,
-  body: unknown
+  body: unknown,
 ): Promise<unknown> {
   const token = process.env.ENVIE_AGORA_API_TOKEN
   const baseUrl =

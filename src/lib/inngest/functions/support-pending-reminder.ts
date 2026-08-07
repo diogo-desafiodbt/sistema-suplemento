@@ -1,6 +1,6 @@
 import { Resend } from 'resend'
-import { inngest } from '../client'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { inngest } from '../client'
 
 function getAppBaseUrl(): string {
   if (process.env.NEXT_PUBLIC_APP_URL) {
@@ -58,5 +58,5 @@ export const supportPendingReminder = inngest.createFunction(
     })
 
     return { ok: true, pending }
-  }
+  },
 )

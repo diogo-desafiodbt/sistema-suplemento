@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { inngest } from '@/lib/inngest/client'
-import { ensureProtocolAfterPayment } from '@/lib/protocol/create-from-checkout'
-import { addPlanPeriod } from '@/lib/plans'
-import { isBearerOrQueryTokenAuthorized } from '@/lib/security/token'
-import { summarizePagarmePayload } from '@/lib/security/pagarme'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { type NextRequest, NextResponse } from 'next/server'
+import { inngest } from '@/lib/inngest/client'
+import { addPlanPeriod } from '@/lib/plans'
+import { ensureProtocolAfterPayment } from '@/lib/protocol/create-from-checkout'
+import { summarizePagarmePayload } from '@/lib/security/pagarme'
+import { isBearerOrQueryTokenAuthorized } from '@/lib/security/token'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 type PagarmePayload = {
   type?: string
@@ -94,7 +94,7 @@ export function extractAmountFromPayload(payload: PagarmePayload): number {
   }
   console.error(
     'extractAmountFromPayload: nenhum valor encontrado no payload',
-    summarizePagarmePayload(payload)
+    summarizePagarmePayload(payload),
   )
   return 0
 }
@@ -102,7 +102,7 @@ export function extractAmountFromPayload(payload: PagarmePayload): number {
 async function shouldDispatchPharmacy(
   admin: SupabaseClient,
   subscriptionId: string,
-  eventType: string | undefined
+  eventType: string | undefined,
 ): Promise<boolean> {
   const triggersPharmacy =
     eventType === 'charge.paid' ||
@@ -118,21 +118,19 @@ async function shouldDispatchPharmacy(
     .maybeSingle()
 
   // Flags legado (carrinho misto antigo) — manter para segurança em rows antigas.
-  const pending = sub?.pending_checkout as
-    | {
-        skip_pharmacy_webhook?: boolean
-        shipping_payment_pending?: boolean
-      }
-    | null
+  const pending = sub?.pending_checkout as {
+    skip_pharmacy_webhook?: boolean
+    shipping_payment_pending?: boolean
+  } | null
   if (pending?.skip_pharmacy_webhook) {
     console.log(
-      `Farmácia não disparada — subscription ${subscriptionId} marcada skip_pharmacy_webhook`
+      `Farmácia não disparada — subscription ${subscriptionId} marcada skip_pharmacy_webhook`,
     )
     return false
   }
   if (pending?.shipping_payment_pending) {
     console.log(
-      `Farmácia não disparada — frete ainda pendente na subscription ${subscriptionId}`
+      `Farmácia não disparada — frete ainda pendente na subscription ${subscriptionId}`,
     )
     return false
   }
@@ -163,7 +161,7 @@ async function shouldDispatchPharmacy(
 
   if (recentOrder) {
     console.log(
-      `Farmácia não disparada — pedido recente já existe para protocol/subscription (${ids.join(', ')})`
+      `Farmácia não disparada — pedido recente já existe para protocol/subscription (${ids.join(', ')})`,
     )
     return false
   }
@@ -177,7 +175,7 @@ async function handlePaymentSucceeded(
   chargeId: string | undefined,
   webhookLogId: string | undefined,
   dispatchPharmacy: boolean,
-  payload: PagarmePayload
+  payload: PagarmePayload,
 ): Promise<void> {
   const subscriptionId = metadata.subscription_id
   const userId = metadata.user_id
@@ -218,11 +216,9 @@ async function handlePaymentSucceeded(
         .select('id')
 
       if (updateError) {
-        console.error(
-          'Webhook payments.update error:',
-          updateError,
-          { candidateId }
-        )
+        console.error('Webhook payments.update error:', updateError, {
+          candidateId,
+        })
         continue
       }
       if (updated && updated.length > 0) {
@@ -261,7 +257,7 @@ async function handlePaymentSucceeded(
         pendingPayments?.find(
           (p) =>
             typeof p.pagarme_charge_id === 'string' &&
-            chargeIdSet.has(p.pagarme_charge_id)
+            chargeIdSet.has(p.pagarme_charge_id),
         ) ??
         pendingPayments?.find((p) => payloadMentionsCharge(p.webhook_payload))
 
@@ -296,7 +292,11 @@ async function handlePaymentSucceeded(
       } else if ((pendingPayments?.length ?? 0) > 0) {
         console.warn(
           'Webhook: pending payments existem mas nenhum correlaciona com chargeIds',
-          { subscriptionId, chargeIds, pendingIds: pendingPayments?.map((p) => p.id) }
+          {
+            subscriptionId,
+            chargeIds,
+            pendingIds: pendingPayments?.map((p) => p.id),
+          },
         )
       }
     }
@@ -333,7 +333,7 @@ async function handlePaymentSucceeded(
   } else {
     console.warn(
       'handlePaymentSucceeded: payload sem chargeId, payments não atualizado',
-      summarizePagarmePayload(payload)
+      summarizePagarmePayload(payload),
     )
   }
 
@@ -382,7 +382,7 @@ async function handlePaymentSucceeded(
       // Faz o webhook falhar pra o Pagar.me retentar — criação pode ainda estar
       // em andamento (outro worker) ou ter demorado mais que o wait local.
       throw new Error(
-        `Farmácia não disparada — protocolo ainda ausente para subscription ${subscriptionId}`
+        `Farmácia não disparada — protocolo ainda ausente para subscription ${subscriptionId}`,
       )
     }
 
@@ -405,7 +405,7 @@ async function handleSubscriptionPaymentFailed(
   admin: SupabaseClient,
   metadata: Record<string, string>,
   chargeId: string | undefined,
-  webhookLogId: string | undefined
+  webhookLogId: string | undefined,
 ): Promise<void> {
   const subscriptionId = metadata.subscription_id
   if (!subscriptionId) return
@@ -451,10 +451,7 @@ async function handleSubscriptionPaymentFailed(
 
 export async function POST(request: NextRequest) {
   if (
-    !isBearerOrQueryTokenAuthorized(
-      request,
-      process.env.PAGARME_WEBHOOK_TOKEN
-    )
+    !isBearerOrQueryTokenAuthorized(request, process.env.PAGARME_WEBHOOK_TOKEN)
   ) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -464,12 +461,16 @@ export async function POST(request: NextRequest) {
   try {
     const payload = (await request.json()) as PagarmePayload
 
-    const { data: webhookLog } = await admin.from('webhook_logs').insert({
-      source: 'pagarme',
-      event_type: payload.type ?? 'unknown',
-      payload: summarizePagarmePayload(payload),
-      processed: false,
-    }).select('id').single()
+    const { data: webhookLog } = await admin
+      .from('webhook_logs')
+      .insert({
+        source: 'pagarme',
+        event_type: payload.type ?? 'unknown',
+        payload: summarizePagarmePayload(payload),
+        processed: false,
+      })
+      .select('id')
+      .single()
 
     const eventType = payload.type
     const metadata = extractMetadata(payload)
@@ -481,7 +482,11 @@ export async function POST(request: NextRequest) {
       eventType === 'subscription.payment_succeeded'
     ) {
       const dispatchPharmacy = metadata.subscription_id
-        ? await shouldDispatchPharmacy(admin, metadata.subscription_id, eventType)
+        ? await shouldDispatchPharmacy(
+            admin,
+            metadata.subscription_id,
+            eventType,
+          )
         : false
 
       await handlePaymentSucceeded(
@@ -490,7 +495,7 @@ export async function POST(request: NextRequest) {
         chargeId,
         webhookLog?.id,
         dispatchPharmacy,
-        payload
+        payload,
       )
     }
 
@@ -499,7 +504,7 @@ export async function POST(request: NextRequest) {
         admin,
         metadata,
         chargeId,
-        webhookLog?.id
+        webhookLog?.id,
       )
     }
 
@@ -509,7 +514,7 @@ export async function POST(request: NextRequest) {
     // 500 pra o Pagar.me retentar (ex.: protocolo ainda em criação).
     return NextResponse.json(
       { error: 'Webhook processing failed' },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }

@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useEffect, useRef, useState } from 'react'
 import { supplements } from '@/lib/supplements-content'
 
 type Product = {
@@ -80,7 +80,13 @@ export default function CategoryCarousel() {
           aria-label="Ver produtos anteriores"
           className="absolute left-0 top-[28%] z-10 -translate-y-1/2 -translate-x-1 md:-translate-x-3 w-12 h-12 rounded-full bg-white border-2 border-[#13244f] text-[#13244f] shadow-md flex items-center justify-center hover:bg-[#f5f0eb] focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-[#13244f]"
         >
-          <svg width="20" height="20" viewBox="0 0 16 16" fill="none" aria-hidden>
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 16 16"
+            fill="none"
+            aria-hidden
+          >
             <path
               d="M10 4L6 8l4 4"
               stroke="currentColor"
@@ -97,7 +103,13 @@ export default function CategoryCarousel() {
           aria-label="Ver próximos produtos"
           className="absolute right-0 top-[28%] z-10 -translate-y-1/2 translate-x-1 md:translate-x-3 w-12 h-12 rounded-full bg-white border-2 border-[#13244f] text-[#13244f] shadow-md flex items-center justify-center hover:bg-[#f5f0eb] focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-[#13244f]"
         >
-          <svg width="20" height="20" viewBox="0 0 16 16" fill="none" aria-hidden>
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 16 16"
+            fill="none"
+            aria-hidden
+          >
             <path
               d="M6 4l4 4-4 4"
               stroke="currentColor"
@@ -145,7 +157,9 @@ export default function CategoryCarousel() {
                   {loading ? (
                     <p className="text-base text-[#13244f]/60">Carregando…</p>
                   ) : !product ? (
-                    <p className="text-base font-semibold text-[#13244f]">Em breve</p>
+                    <p className="text-base font-semibold text-[#13244f]">
+                      Em breve
+                    </p>
                   ) : null}
 
                   <div className="flex flex-col sm:flex-row gap-2">

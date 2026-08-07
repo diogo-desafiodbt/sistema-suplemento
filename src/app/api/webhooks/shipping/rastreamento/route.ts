@@ -1,12 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { type NextRequest, NextResponse } from 'next/server'
+import { isBearerOrQueryTokenAuthorized } from '@/lib/security/token'
+import { summarizeShippingWebhookPayload } from '@/lib/security/webhook-payload'
 import { mergeTrackingEvents } from '@/lib/shipping/create-label'
 import {
   getNewTrackingEvents,
   notifyNewTrackingEvents,
 } from '@/lib/shipping/notify'
-import { isBearerOrQueryTokenAuthorized } from '@/lib/security/token'
-import { summarizeShippingWebhookPayload } from '@/lib/security/webhook-payload'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { WebhookRastreamentoPayload } from '@/types/shipping'
 
 export async function POST(request: NextRequest) {
@@ -38,12 +38,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const eventos = payload.eventos ?? []
-    const idReq = eventos.find(e => e.id_requisicao)?.id_requisicao
+    const idReq = eventos.find((e) => e.id_requisicao)?.id_requisicao
 
     if (!idReq) {
       console.error(
         'webhook rastreamento sem id_requisicao',
-        summarizeShippingWebhookPayload(payload)
+        summarizeShippingWebhookPayload(payload),
       )
       return NextResponse.json({ ok: true })
     }
@@ -65,11 +65,11 @@ export async function POST(request: NextRequest) {
     // não tem completed_at (passamos o payload inteiro, não só "novos" vs JSON).
     const merged = mergeTrackingEvents(
       order.shipping_json,
-      eventos as unknown as Array<Record<string, unknown>>
+      eventos as unknown as Array<Record<string, unknown>>,
     )
 
     const updates: Record<string, unknown> = { shipping_json: merged }
-    if (eventos.some(e => e.finalizado === 1)) {
+    if (eventos.some((e) => e.finalizado === 1)) {
       updates.status = 'delivered'
     }
 
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
 
     if (updateError) {
       throw new Error(
-        `webhook rastreamento: falha ao persistir shipping_json: ${updateError.message}`
+        `webhook rastreamento: falha ao persistir shipping_json: ${updateError.message}`,
       )
     }
 
@@ -90,11 +90,14 @@ export async function POST(request: NextRequest) {
     await notifyNewTrackingEvents(
       admin,
       order.id,
-      newEvents.length > 0 ? newEvents : eventos
+      newEvents.length > 0 ? newEvents : eventos,
     )
 
     if (log?.id) {
-      await admin.from('webhook_logs').update({ processed: true }).eq('id', log.id)
+      await admin
+        .from('webhook_logs')
+        .update({ processed: true })
+        .eq('id', log.id)
     }
 
     return NextResponse.json({ ok: true })
@@ -102,7 +105,7 @@ export async function POST(request: NextRequest) {
     console.error('webhook shipping/rastreamento error:', error)
     return NextResponse.json(
       { error: 'Webhook processing failed' },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }

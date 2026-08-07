@@ -1,19 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { ensureProtocolAfterPayment } from '@/lib/protocol/create-from-checkout'
-import type { PendingCheckoutPayload } from '@/lib/protocol/create-from-checkout'
-import {
-  addPlanPeriod,
-  PLAN_LABELS,
-  type PurchasePlanType,
-} from '@/lib/plans'
-import { TERMS_VERSION, TERMS_CONTENT } from '@/lib/terms/content'
-import { inngest } from '@/lib/inngest/client'
 import { computeServerCheckoutTotal } from '@/lib/checkout/price'
+import { inngest } from '@/lib/inngest/client'
+import { addPlanPeriod, PLAN_LABELS, type PurchasePlanType } from '@/lib/plans'
+import type { PendingCheckoutPayload } from '@/lib/protocol/create-from-checkout'
+import { ensureProtocolAfterPayment } from '@/lib/protocol/create-from-checkout'
 import { summarizePagarmePayload } from '@/lib/security/pagarme'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
+import { TERMS_CONTENT, TERMS_VERSION } from '@/lib/terms/content'
 
 const protocolItemSchema = z.object({
   product_id: z.string().uuid().optional(),
@@ -91,7 +87,7 @@ function planItemName(planType: PlanType): string {
 
 async function insertPaymentWithRetry(
   admin: AdminClient,
-  row: Record<string, unknown>
+  row: Record<string, unknown>,
 ) {
   let { data, error } = await admin
     .from('payments')
@@ -126,10 +122,10 @@ async function insertPaymentWithRetry(
         pagarme_charge_id: row.pagarme_charge_id,
         amount: row.amount,
         status: row.status,
-      }
+      },
     )
     throw new Error(
-      `Checkout: falha ao registrar payment após cobrança (${error.message})`
+      `Checkout: falha ao registrar payment após cobrança (${error.message})`,
     )
   }
   if (!data?.id) {
@@ -145,7 +141,7 @@ async function activateSubscriptionRow(
     subscriptionId: string
     userId: string
     expiresAt: Date
-  }
+  },
 ) {
   await admin
     .from('subscriptions')
@@ -188,7 +184,7 @@ async function finalizePaidSubscription(
     subscriptionId: string
     userId: string
     expiresAt: Date
-  }
+  },
 ) {
   await activateSubscriptionRow(admin, opts)
   return ensureProtocolAfterPayment(admin, opts.subscriptionId, opts.userId)
@@ -200,7 +196,7 @@ async function recordTermsAcceptance(
     userId: string
     subscriptionId: string
     ipAddress: string | null
-  }
+  },
 ) {
   const termsHash = createHash('sha256')
     .update(TERMS_CONTENT + TERMS_VERSION)
@@ -227,7 +223,7 @@ async function createSubscriptionRow(
     planType: PlanType
     pendingCheckout: PendingCheckoutPayload
     expiresAt: Date
-  }
+  },
 ) {
   const { data: subscription, error: subError } = await admin
     .from('subscriptions')
@@ -374,7 +370,7 @@ async function chargeOneTimeOrder(opts: {
 
 async function deleteFailedSubscription(
   admin: AdminClient,
-  subscriptionId: string
+  subscriptionId: string,
 ) {
   await admin
     .from('terms_acceptances')
@@ -400,7 +396,7 @@ export async function POST(request: NextRequest) {
     if (body?.terms_accepted !== true) {
       return NextResponse.json(
         { error: 'É necessário aceitar os Termos de Uso' },
-        { status: 400 }
+        { status: 400 },
       )
     }
 
@@ -409,7 +405,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json(
         { error: 'Dados inválidos', details: parsed.error.flatten() },
-        { status: 400 }
+        { status: 400 },
       )
     }
 
@@ -419,25 +415,25 @@ export async function POST(request: NextRequest) {
     if (data.payment_method === 'pix' && planType !== '1mes') {
       return NextResponse.json(
         { error: 'Pix disponível apenas no plano de 1 mês' },
-        { status: 400 }
+        { status: 400 },
       )
     }
 
     if (data.payment_method === 'credit_card' && !data.card) {
       return NextResponse.json(
         { error: 'Dados do cartão são obrigatórios' },
-        { status: 400 }
+        { status: 400 },
       )
     }
 
     const activeItems = data.protocol_items.filter(
-      (i) => !i.removed && !i.blocked
+      (i) => !i.removed && !i.blocked,
     )
 
     if (activeItems.length === 0) {
       return NextResponse.json(
         { error: 'Nenhum item ativo no protocolo' },
-        { status: 400 }
+        { status: 400 },
       )
     }
 
@@ -450,7 +446,10 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (!profile) {
-      return NextResponse.json({ error: 'Perfil não encontrado' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Perfil não encontrado' },
+        { status: 404 },
+      )
     }
 
     await admin.from('addresses').upsert(
@@ -465,7 +464,7 @@ export async function POST(request: NextRequest) {
         state: data.address.state,
         is_default: true,
       },
-      { onConflict: 'user_id' }
+      { onConflict: 'user_id' },
     )
 
     const forwardedFor = request.headers.get('x-forwarded-for')
@@ -532,7 +531,7 @@ export async function POST(request: NextRequest) {
             'Valor do pedido desatualizado. Recarregue o frete e tente de novo.',
           server_total: priced.priced.serverTotal,
         },
-        { status: 400 }
+        { status: 400 },
       )
     }
     const serverTotal = priced.priced.serverTotal
@@ -558,7 +557,7 @@ export async function POST(request: NextRequest) {
     if (!subscription) {
       return NextResponse.json(
         { error: 'Erro ao criar assinatura' },
-        { status: 500 }
+        { status: 500 },
       )
     }
 
@@ -595,7 +594,7 @@ export async function POST(request: NextRequest) {
       await deleteFailedSubscription(admin, subscription.id)
       return NextResponse.json(
         { error: result.error ?? 'Erro no pagamento' },
-        { status: 400 }
+        { status: 400 },
       )
     }
 
@@ -605,7 +604,7 @@ export async function POST(request: NextRequest) {
       await deleteFailedSubscription(admin, subscription.id)
       return NextResponse.json(
         { error: 'Pagamento não autorizado. Tente outro cartão.' },
-        { status: 400 }
+        { status: 400 },
       )
     }
 

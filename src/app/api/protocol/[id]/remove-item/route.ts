@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params
@@ -28,7 +28,10 @@ export async function PATCH(
       .single()
 
     if (!protocol) {
-      return NextResponse.json({ error: 'Protocolo não encontrado' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Protocolo não encontrado' },
+        { status: 404 },
+      )
     }
 
     // Após pagamento a composição fica congelada (farmácia usa protocol_items).
@@ -51,7 +54,7 @@ export async function PATCH(
       if (paid) {
         return NextResponse.json(
           { error: 'Protocolo já pago — itens não podem ser alterados' },
-          { status: 400 }
+          { status: 400 },
         )
       }
     }
@@ -59,7 +62,7 @@ export async function PATCH(
     if (protocol.status !== 'pending_signature') {
       return NextResponse.json(
         { error: 'Protocolo não permite alteração de itens neste status' },
-        { status: 400 }
+        { status: 400 },
       )
     }
 
@@ -71,11 +74,17 @@ export async function PATCH(
       .single()
 
     if (!item) {
-      return NextResponse.json({ error: 'Item não encontrado' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Item não encontrado' },
+        { status: 404 },
+      )
     }
 
     if (item.is_required) {
-      return NextResponse.json({ error: 'Este item não pode ser removido' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Este item não pode ser removido' },
+        { status: 400 },
+      )
     }
 
     await admin

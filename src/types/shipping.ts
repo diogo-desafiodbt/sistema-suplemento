@@ -1,6 +1,6 @@
 /** Tipos baseados no OpenAPI oficial Envie Agora (ENVIE AGORA API.yaml). */
 
-export type CotacaoVolume = {
+type CotacaoVolume = {
   altura: number
   largura: number
   comprimento: number
@@ -20,7 +20,7 @@ export type CotacaoRequest = {
   volumes?: CotacaoVolume[]
 }
 
-export type PontoPickup = {
+type PontoPickup = {
   pudoId?: string
   cnpjCpf?: string
   ie?: string
@@ -52,7 +52,7 @@ export type CotacaoResponse = {
   }
 }
 
-export type EtiquetaObjeto = {
+type EtiquetaObjeto = {
   altura: number
   largura: number
   comprimento: number
@@ -65,7 +65,7 @@ export type EtiquetaObjeto = {
   volumes?: CotacaoVolume[]
 }
 
-export type EtiquetaEndereco = {
+type EtiquetaEndereco = {
   nome: string
   cep: string
   logradouro: string
@@ -76,7 +76,7 @@ export type EtiquetaEndereco = {
   uf: string
 }
 
-export type EtiquetaDestinatario = EtiquetaEndereco & {
+type EtiquetaDestinatario = EtiquetaEndereco & {
   cpfcnpj: string
   celular?: string
 }

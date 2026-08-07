@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import PromoBar from '@/components/PromoBar'
 
 const menuItems = [
@@ -49,10 +49,17 @@ export default function Header() {
             className="relative z-10 shrink-0"
             onClick={() => setMenuOpen(false)}
           >
-            <img src="/logo-principal.png" alt="Desafio Diabetes" className="h-12 sm:h-14 w-auto" />
+            <img
+              src="/logo-principal.png"
+              alt="Desafio Diabetes"
+              className="h-12 sm:h-14 w-auto"
+            />
           </a>
 
-          <div className="relative z-10 flex items-center gap-2 sm:gap-3" ref={menuRef}>
+          <div
+            className="relative z-10 flex items-center gap-2 sm:gap-3"
+            ref={menuRef}
+          >
             <a
               href="/quiz"
               className="hidden sm:inline-flex items-center justify-center min-h-11 px-5 py-2.5 rounded-full bg-[#f4001e] text-white text-sm font-bold hover:bg-[#a30000] transition focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-[#13244f]"
@@ -69,12 +76,34 @@ export default function Header() {
               onClick={() => setMenuOpen((open) => !open)}
             >
               {menuOpen ? (
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden>
-                  <path d="M15 5L5 15M5 5l10 10" stroke="#13244f" strokeWidth="1.5" strokeLinecap="round"/>
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  aria-hidden
+                >
+                  <path
+                    d="M15 5L5 15M5 5l10 10"
+                    stroke="#13244f"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
                 </svg>
               ) : (
-                <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
-                  <path d="M3 6h16M3 11h16M3 16h16" stroke="#13244f" strokeWidth="1.5" strokeLinecap="round"/>
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 22 22"
+                  fill="none"
+                  aria-hidden
+                >
+                  <path
+                    d="M3 6h16M3 11h16M3 16h16"
+                    stroke="#13244f"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
                 </svg>
               )}
             </button>

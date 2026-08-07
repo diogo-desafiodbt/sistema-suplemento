@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useState } from 'react'
 
 type Banner = {
   id: string
@@ -12,11 +12,36 @@ type Banner = {
 }
 
 const banners: Banner[] = [
-  { id: 'neuropatia', horizontal: '/banners/banner-neuropatia-horizontal.png', vertical: '/banners/banner-neuropatia-vertical.png', alt: 'Neuropatia — fórmula personalizada Desafio Diabetes' },
-  { id: 'omega3', horizontal: '/banners/banner-omega3-horizontal.png', vertical: '/banners/banner-omega3-vertical.png', alt: 'Ômega 3 Desafio Diabetes' },
-  { id: 'berberina', horizontal: '/banners/banner-berberina-horizontal.png', vertical: '/banners/banner-berberina-vertical.png', alt: 'Berberina Desafio Diabetes' },
-  { id: 'resistencia-insulina', horizontal: '/banners/banner-resistencia-insulina-horizontal.png', vertical: '/banners/banner-resistencia-insulina-vertical.png', alt: 'Resistência à Insulina Desafio Diabetes' },
-  { id: 'polivitaminico', horizontal: '/banners/banner-polivitaminico-horizontal.png', vertical: '/banners/banner-polivitaminico-vertical.png', alt: 'Polivitamínico Desafio Diabetes' },
+  {
+    id: 'neuropatia',
+    horizontal: '/banners/banner-neuropatia-horizontal.png',
+    vertical: '/banners/banner-neuropatia-vertical.png',
+    alt: 'Neuropatia — fórmula personalizada Desafio Diabetes',
+  },
+  {
+    id: 'omega3',
+    horizontal: '/banners/banner-omega3-horizontal.png',
+    vertical: '/banners/banner-omega3-vertical.png',
+    alt: 'Ômega 3 Desafio Diabetes',
+  },
+  {
+    id: 'berberina',
+    horizontal: '/banners/banner-berberina-horizontal.png',
+    vertical: '/banners/banner-berberina-vertical.png',
+    alt: 'Berberina Desafio Diabetes',
+  },
+  {
+    id: 'resistencia-insulina',
+    horizontal: '/banners/banner-resistencia-insulina-horizontal.png',
+    vertical: '/banners/banner-resistencia-insulina-vertical.png',
+    alt: 'Resistência à Insulina Desafio Diabetes',
+  },
+  {
+    id: 'polivitaminico',
+    horizontal: '/banners/banner-polivitaminico-horizontal.png',
+    vertical: '/banners/banner-polivitaminico-vertical.png',
+    alt: 'Polivitamínico Desafio Diabetes',
+  },
 ]
 
 export default function BannerCarousel() {
@@ -82,7 +107,11 @@ export default function BannerCarousel() {
         </button>
       </div>
 
-      <div className="mt-4 flex items-center justify-center gap-2" role="tablist" aria-label="Banners">
+      <div
+        className="mt-4 flex items-center justify-center gap-2"
+        role="tablist"
+        aria-label="Banners"
+      >
         {banners.map((item, index) => (
           <button
             key={item.id}
@@ -92,7 +121,9 @@ export default function BannerCarousel() {
             aria-label={`Ir para banner ${index + 1}: ${item.alt}`}
             onClick={() => goTo(index)}
             className={`h-2.5 w-2.5 rounded-full transition ${
-              index === currentIndex ? 'bg-[#13244f]' : 'bg-[#13244f]/20 hover:bg-[#13244f]/40'
+              index === currentIndex
+                ? 'bg-[#13244f]'
+                : 'bg-[#13244f]/20 hover:bg-[#13244f]/40'
             }`}
           />
         ))}

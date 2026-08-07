@@ -48,7 +48,7 @@ export function CuponsClient({ coupons: initialCoupons }: Props) {
         throw new Error(data.error ?? 'Erro ao criar')
       }
       const { coupon } = await res.json()
-      setCoupons(prev => [coupon, ...prev])
+      setCoupons((prev) => [coupon, ...prev])
       setCode('')
       setValue('')
       setExpiresAt('')
@@ -71,7 +71,9 @@ export function CuponsClient({ coupons: initialCoupons }: Props) {
         body: JSON.stringify({ is_active: !current }),
       })
       if (!res.ok) throw new Error()
-      setCoupons(prev => prev.map(c => c.id === id ? { ...c, is_active: !current } : c))
+      setCoupons((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, is_active: !current } : c)),
+      )
       toast.success(!current ? 'Cupom ativado.' : 'Cupom desativado.')
     } catch {
       toast.error('Erro ao atualizar cupom.')
@@ -85,12 +87,13 @@ export function CuponsClient({ coupons: initialCoupons }: Props) {
     return `R$ ${coupon.value.toFixed(2).replace('.', ',')}`
   }
 
-  const inputClass = 'border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#13244f] focus:outline-none focus:ring-2 focus:ring-[#13244f]/20 bg-white'
-  const labelClass = 'block text-xs font-semibold text-[#13244f]/60 uppercase tracking-wide mb-1'
+  const inputClass =
+    'border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#13244f] focus:outline-none focus:ring-2 focus:ring-[#13244f]/20 bg-white'
+  const labelClass =
+    'block text-xs font-semibold text-[#13244f]/60 uppercase tracking-wide mb-1'
 
   return (
     <div className="space-y-4">
-
       {!showForm && (
         <button
           onClick={() => setShowForm(true)}
@@ -101,8 +104,13 @@ export function CuponsClient({ coupons: initialCoupons }: Props) {
       )}
 
       {showForm && (
-        <form onSubmit={handleCreate} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
-          <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">Novo cupom</p>
+        <form
+          onSubmit={handleCreate}
+          className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4"
+        >
+          <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">
+            Novo cupom
+          </p>
 
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <div>
@@ -110,7 +118,7 @@ export function CuponsClient({ coupons: initialCoupons }: Props) {
               <input
                 type="text"
                 value={code}
-                onChange={e => setCode(e.target.value.toUpperCase())}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
                 placeholder="EX: DESCONTO10"
                 className={inputClass + ' w-full uppercase'}
                 required
@@ -120,7 +128,9 @@ export function CuponsClient({ coupons: initialCoupons }: Props) {
               <label className={labelClass}>Tipo</label>
               <select
                 value={type}
-                onChange={e => setType(e.target.value as 'percentage' | 'fixed')}
+                onChange={(e) =>
+                  setType(e.target.value as 'percentage' | 'fixed')
+                }
                 className={inputClass + ' w-full'}
               >
                 <option value="percentage">Percentual (%)</option>
@@ -128,11 +138,13 @@ export function CuponsClient({ coupons: initialCoupons }: Props) {
               </select>
             </div>
             <div>
-              <label className={labelClass}>{type === 'percentage' ? 'Valor (%)' : 'Valor (R$)'}</label>
+              <label className={labelClass}>
+                {type === 'percentage' ? 'Valor (%)' : 'Valor (R$)'}
+              </label>
               <input
                 type="number"
                 value={value}
-                onChange={e => setValue(e.target.value)}
+                onChange={(e) => setValue(e.target.value)}
                 min="0"
                 max={type === 'percentage' ? 100 : undefined}
                 step="0.01"
@@ -146,7 +158,7 @@ export function CuponsClient({ coupons: initialCoupons }: Props) {
               <input
                 type="number"
                 value={maxUses}
-                onChange={e => setMaxUses(e.target.value)}
+                onChange={(e) => setMaxUses(e.target.value)}
                 min="1"
                 placeholder="Ilimitado"
                 className={inputClass + ' w-full'}
@@ -160,7 +172,7 @@ export function CuponsClient({ coupons: initialCoupons }: Props) {
               <input
                 type="date"
                 value={expiresAt}
-                onChange={e => setExpiresAt(e.target.value)}
+                onChange={(e) => setExpiresAt(e.target.value)}
                 className={inputClass + ' w-full'}
               />
             </div>
@@ -189,29 +201,51 @@ export function CuponsClient({ coupons: initialCoupons }: Props) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100">
-              <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">Código</th>
-              <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">Tipo</th>
-              <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">Valor</th>
-              <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">Usos</th>
-              <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">Validade</th>
-              <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">Status</th>
+              <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">
+                Código
+              </th>
+              <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">
+                Tipo
+              </th>
+              <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">
+                Valor
+              </th>
+              <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">
+                Usos
+              </th>
+              <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">
+                Validade
+              </th>
+              <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">
+                Status
+              </th>
             </tr>
           </thead>
           <tbody>
             {coupons.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-5 py-8 text-center text-sm text-gray-400">
+                <td
+                  colSpan={6}
+                  className="px-5 py-8 text-center text-sm text-gray-400"
+                >
                   Nenhum cupom cadastrado.
                 </td>
               </tr>
             )}
-            {coupons.map(coupon => (
-              <tr key={coupon.id} className="border-b border-gray-50 hover:bg-[#f5f0eb]/50 transition-colors">
-                <td className="px-5 py-4 font-mono font-bold text-[#13244f]">{coupon.code}</td>
+            {coupons.map((coupon) => (
+              <tr
+                key={coupon.id}
+                className="border-b border-gray-50 hover:bg-[#f5f0eb]/50 transition-colors"
+              >
+                <td className="px-5 py-4 font-mono font-bold text-[#13244f]">
+                  {coupon.code}
+                </td>
                 <td className="px-5 py-4 text-gray-500">
                   {coupon.type === 'percentage' ? 'Percentual' : 'Valor fixo'}
                 </td>
-                <td className="px-5 py-4 font-semibold text-[#13244f]">{formatValue(coupon)}</td>
+                <td className="px-5 py-4 font-semibold text-[#13244f]">
+                  {formatValue(coupon)}
+                </td>
                 <td className="px-5 py-4 text-gray-500">
                   {coupon.used_count} / {coupon.max_uses ?? '∞'}
                 </td>
@@ -230,7 +264,11 @@ export function CuponsClient({ coupons: initialCoupons }: Props) {
                         : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
                     }`}
                   >
-                    {toggling === coupon.id ? '...' : coupon.is_active ? 'Ativo' : 'Inativo'}
+                    {toggling === coupon.id
+                      ? '...'
+                      : coupon.is_active
+                        ? 'Ativo'
+                        : 'Inativo'}
                   </button>
                 </td>
               </tr>

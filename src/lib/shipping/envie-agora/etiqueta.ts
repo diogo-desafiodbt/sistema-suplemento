@@ -1,5 +1,4 @@
 import { getSenderAddress } from '@/lib/shipping/sender-region'
-import { envieAgoraFetch } from './client'
 import type {
   AdicionarEtiquetaRequest,
   AdicionarEtiquetaResponse,
@@ -7,6 +6,7 @@ import type {
   PdfEtiquetaRequest,
   PdfEtiquetaResponse,
 } from '@/types/shipping'
+import { envieAgoraFetch } from './client'
 
 type OrderForLabel = {
   id: string
@@ -49,7 +49,7 @@ export async function criarEtiqueta(params: {
 }): Promise<AdicionarEtiquetaResponse> {
   const user = params.order.users
   const address =
-    user.addresses?.find(a => a.is_default) ?? user.addresses?.[0]
+    user.addresses?.find((a) => a.is_default) ?? user.addresses?.[0]
 
   if (!address) {
     throw new Error(`Pedido ${params.order.id} sem endereço`)
@@ -96,13 +96,13 @@ export async function criarEtiqueta(params: {
 
   return (await envieAgoraFetch(
     '/adicionaretiqueta',
-    body
+    body,
   )) as AdicionarEtiquetaResponse
 }
 
 export async function getPdfEtiqueta(
   id_requisicao: string,
-  tipo_impressao?: string
+  tipo_impressao?: string,
 ): Promise<PdfEtiquetaResponse> {
   const body: PdfEtiquetaRequest = { id_requisicao }
   if (tipo_impressao) body.tipo_impressao = tipo_impressao

@@ -1,12 +1,14 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { DashboardNav } from '@/components/patient/DashboardNav'
 import { ProfileForm } from '@/components/patient/ProfileForm'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 
 export default async function PerfilPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   const admin = createAdminClient()
@@ -27,9 +29,18 @@ export default async function PerfilPage() {
   return (
     <div className="min-h-screen bg-[#f5f0eb]">
       <header className="bg-white border-b border-gray-100 px-4 md:px-6 py-4 flex items-center justify-between">
-        <img src="/logo-azul.png" alt="Desafio Diabetes" className="h-7 w-auto" />
+        <img
+          src="/logo-azul.png"
+          alt="Desafio Diabetes"
+          className="h-7 w-auto"
+        />
         <form action="/api/auth/signout" method="POST">
-          <button type="submit" className="text-sm text-[#f4001e] font-medium hover:underline">Sair</button>
+          <button
+            type="submit"
+            className="text-sm text-[#f4001e] font-medium hover:underline"
+          >
+            Sair
+          </button>
         </form>
       </header>
 
@@ -37,7 +48,9 @@ export default async function PerfilPage() {
 
       <main className="max-w-3xl mx-auto px-4 py-8 space-y-5">
         <div>
-          <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-1">Sua conta</p>
+          <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-1">
+            Sua conta
+          </p>
           <h1 className="text-2xl font-bold text-[#13244f]">Meu Perfil</h1>
         </div>
 

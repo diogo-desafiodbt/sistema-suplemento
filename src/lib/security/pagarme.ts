@@ -1,5 +1,7 @@
 /** Remove dados sensíveis de payloads Pagar.me antes de log/DB. */
-export function summarizePagarmePayload(data: unknown): Record<string, unknown> {
+export function summarizePagarmePayload(
+  data: unknown,
+): Record<string, unknown> {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
     return { raw_type: typeof data }
   }

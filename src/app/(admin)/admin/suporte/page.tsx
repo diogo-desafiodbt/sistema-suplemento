@@ -1,10 +1,10 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 import {
   SupportThreadPanel,
   type SupportThreadView,
 } from '@/components/admin/SupportThreadPanel'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 
 const THREAD_SELECT = `
   id, from_email, subject, status, user_id, db_facts, suggested_reply,

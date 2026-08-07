@@ -1,10 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import {
-  getThreadReplyHeaders,
-  sendSupportEmail,
-} from '@/lib/support/mailer'
+import { createClient } from '@/lib/supabase/server'
+import { getThreadReplyHeaders, sendSupportEmail } from '@/lib/support/mailer'
 
 async function requireAdmin() {
   const supabase = await createClient()
@@ -26,7 +23,7 @@ async function requireAdmin() {
 
 export async function POST(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const auth = await requireAdmin()
@@ -38,7 +35,10 @@ export async function POST(
     const body = (await request.json()) as { body_text?: string }
     const bodyText = body.body_text?.trim()
     if (!bodyText) {
-      return NextResponse.json({ error: 'Texto da resposta obrigatório' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Texto da resposta obrigatório' },
+        { status: 400 },
+      )
     }
 
     const { data: thread } = await auth.admin
@@ -48,11 +48,17 @@ export async function POST(
       .maybeSingle()
 
     if (!thread) {
-      return NextResponse.json({ error: 'Thread não encontrada' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Thread não encontrada' },
+        { status: 404 },
+      )
     }
 
     if (thread.status === 'respondido') {
-      return NextResponse.json({ error: 'Thread já respondida' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Thread já respondida' },
+        { status: 400 },
+      )
     }
 
     const headers = await getThreadReplyHeaders(id)
@@ -80,7 +86,7 @@ export async function POST(
     console.error('admin suporte responder error:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Erro interno' },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }

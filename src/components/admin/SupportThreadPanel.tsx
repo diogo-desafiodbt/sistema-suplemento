@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import type { SupportDbFacts } from '@/lib/support/facts'
 
-export type SupportMessageView = {
+type SupportMessageView = {
   id: string
   direction: 'inbound' | 'outbound'
   from_email: string | null
@@ -45,7 +45,7 @@ function formatFacts(facts: SupportDbFacts | null): string[] {
     if (facts.frete.last_event) {
       const ev = facts.frete.last_event
       lines.push(
-        `Último evento: ${ev.descricao ?? '—'} (${[ev.cidade, ev.local].filter(Boolean).join(' / ') || '—'})`
+        `Último evento: ${ev.descricao ?? '—'} (${[ev.cidade, ev.local].filter(Boolean).join(' / ') || '—'})`,
       )
       if (ev.datahora) lines.push(`Data do evento: ${formatDate(ev.datahora)}`)
     } else {
@@ -56,7 +56,7 @@ function formatFacts(facts: SupportDbFacts | null): string[] {
         facts.frete.estimated_delivery
           ? formatDate(facts.frete.estimated_delivery)
           : '—'
-      }`
+      }`,
     )
   }
 
@@ -74,7 +74,7 @@ function formatFacts(facts: SupportDbFacts | null): string[] {
               currency: 'BRL',
             })
           : '—'
-      }`
+      }`,
     )
     lines.push(`Plano: ${facts.pagamento.plan_type ?? '—'}`)
     lines.push(`Assinatura: ${facts.pagamento.subscription_status ?? '—'}`)
@@ -83,17 +83,21 @@ function formatFacts(facts: SupportDbFacts | null): string[] {
         facts.pagamento.next_billing_at
           ? formatDate(facts.pagamento.next_billing_at)
           : '—'
-      }`
+      }`,
     )
     lines.push(
       `Expira em: ${
-        facts.pagamento.expires_at ? formatDate(facts.pagamento.expires_at) : '—'
-      }`
+        facts.pagamento.expires_at
+          ? formatDate(facts.pagamento.expires_at)
+          : '—'
+      }`,
     )
   }
 
   if (facts.category === 'fora_de_escopo') {
-    lines.push('Fora de escopo — sem consulta ao banco. Escreva a resposta manualmente.')
+    lines.push(
+      'Fora de escopo — sem consulta ao banco. Escreva a resposta manualmente.',
+    )
   }
 
   return lines
@@ -124,9 +128,13 @@ function ThreadCard({
   const [text, setText] = useState(thread.suggested_reply ?? '')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const factLines = useMemo(() => formatFacts(thread.db_facts), [thread.db_facts])
+  const factLines = useMemo(
+    () => formatFacts(thread.db_facts),
+    [thread.db_facts],
+  )
   const messages = [...(thread.support_messages ?? [])].sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    (a, b) =>
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
   )
 
   async function handleSend() {
@@ -257,7 +265,9 @@ export function SupportThreadPanel({
           </h2>
         </div>
         {visiblePending.length === 0 ? (
-          <p className="text-sm text-gray-500">Nenhuma conversa aguardando ação.</p>
+          <p className="text-sm text-gray-500">
+            Nenhuma conversa aguardando ação.
+          </p>
         ) : (
           visiblePending.map((thread) => (
             <ThreadCard
@@ -275,12 +285,16 @@ export function SupportThreadPanel({
           onClick={() => setShowHistory((v) => !v)}
           className="text-sm font-medium text-[#13244f]/70 hover:text-[#13244f]"
         >
-          {showHistory ? 'Ocultar histórico' : `Ver histórico (${history.length})`}
+          {showHistory
+            ? 'Ocultar histórico'
+            : `Ver histórico (${history.length})`}
         </button>
         {showHistory && (
           <div className="mt-4 space-y-4">
             {history.length === 0 ? (
-              <p className="text-sm text-gray-500">Nenhuma thread respondida ainda.</p>
+              <p className="text-sm text-gray-500">
+                Nenhuma thread respondida ainda.
+              </p>
             ) : (
               history.map((thread) => (
                 <ThreadCard key={thread.id} thread={thread} onSent={() => {}} />

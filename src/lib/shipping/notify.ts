@@ -1,7 +1,7 @@
 import { Resend } from 'resend'
-import type { createAdminClient } from '@/lib/supabase/admin'
+import { claimOnce, markClaimCompleted, releaseClaim } from '@/lib/idempotency'
 import { trackingEventKey } from '@/lib/shipping/create-label'
-import { claimOnce, releaseClaim, markClaimCompleted } from '@/lib/idempotency'
+import type { createAdminClient } from '@/lib/supabase/admin'
 import type { RastreamentoEvento } from '@/types/shipping'
 
 type AdminClient = ReturnType<typeof createAdminClient>
@@ -29,10 +29,12 @@ function getAppBaseUrl(): string {
 /** Eventos do payload que ainda não estavam em `orders.shipping_json.eventos`. */
 export function getNewTrackingEvents(
   existingJson: unknown,
-  incoming: RastreamentoEvento[]
+  incoming: RastreamentoEvento[],
 ): RastreamentoEvento[] {
   const base =
-    existingJson && typeof existingJson === 'object' && !Array.isArray(existingJson)
+    existingJson &&
+    typeof existingJson === 'object' &&
+    !Array.isArray(existingJson)
       ? (existingJson as Record<string, unknown>)
       : {}
 
@@ -49,15 +51,14 @@ export function getNewTrackingEvents(
     })
     .slice()
     .sort(
-      (a, b) =>
-        new Date(a.datahora).getTime() - new Date(b.datahora).getTime()
+      (a, b) => new Date(a.datahora).getTime() - new Date(b.datahora).getTime(),
     )
 }
 
 async function logNotification(
   admin: AdminClient,
   userId: string,
-  status: 'sent' | 'failed'
+  status: 'sent' | 'failed',
 ): Promise<void> {
   const { error } = await admin.from('notification_logs').insert({
     user_id: userId,
@@ -66,13 +67,16 @@ async function logNotification(
     status,
   })
   if (error) {
-    console.error('Erro ao registrar notification_logs (tracking_update):', error)
+    console.error(
+      'Erro ao registrar notification_logs (tracking_update):',
+      error,
+    )
   }
 }
 
 async function markShippingEmailSent(
   admin: AdminClient,
-  claimKeys: { order_id: string; event_id: string }
+  claimKeys: { order_id: string; event_id: string },
 ): Promise<void> {
   const { error } = await admin
     .from('shipping_notification_logs')
@@ -81,7 +85,7 @@ async function markShippingEmailSent(
     .eq('event_id', claimKeys.event_id)
   if (error) {
     throw new Error(
-      `notifyShippingUpdate: falha ao gravar email_sent_at: ${error.message}`
+      `notifyShippingUpdate: falha ao gravar email_sent_at: ${error.message}`,
     )
   }
 }
@@ -89,7 +93,7 @@ async function markShippingEmailSent(
 /** Se o e-mail já saiu (email_sent_at na claim) ou completed_at, completa e retorna true. */
 async function healShippingClaimIfSent(
   admin: AdminClient,
-  claimKeys: { order_id: string; event_id: string }
+  claimKeys: { order_id: string; event_id: string },
 ): Promise<boolean> {
   const { data: existingClaim } = await admin
     .from('shipping_notification_logs')
@@ -107,7 +111,7 @@ async function healShippingClaimIfSent(
     'shipping_notification_logs',
     claimKeys,
     undefined,
-    'completed_at'
+    'completed_at',
   )
   return true
 }
@@ -227,7 +231,7 @@ export async function notifyShippingUpdate(
     descricao?: string | null
     local?: string | null
     cidade?: string | null
-  }
+  },
 ): Promise<void> {
   try {
     const { data: order } = await admin
@@ -270,7 +274,7 @@ export async function notifyShippingUpdate(
       admin,
       'shipping_notification_logs',
       claimKeys,
-      shippingClaimOpts
+      shippingClaimOpts,
     )
 
     let claimed = won
@@ -287,12 +291,12 @@ export async function notifyShippingUpdate(
         admin,
         'shipping_notification_logs',
         claimKeys,
-        shippingClaimOpts
+        shippingClaimOpts,
       )
       if (!retry.won) {
         if (await healShippingClaimIfSent(admin, claimKeys)) return
         throw new Error(
-          `notifyShippingUpdate: claim incompleta após espera para order ${params.orderId} event ${params.eventId}`
+          `notifyShippingUpdate: claim incompleta após espera para order ${params.orderId} event ${params.eventId}`,
         )
       }
       // Reclaim só acontece sem email_sent_at (protectColumns).
@@ -346,12 +350,12 @@ export async function notifyShippingUpdate(
           'shipping_notification_logs',
           claimKeys,
           undefined,
-          'completed_at'
+          'completed_at',
         )
       } catch (stampError) {
         console.error(
           'notifyShippingUpdate: falha ao stamp após e-mail (email_sent_at também falhou):',
-          stampError
+          stampError,
         )
       }
       throw emailSentError
@@ -361,7 +365,7 @@ export async function notifyShippingUpdate(
       'shipping_notification_logs',
       claimKeys,
       undefined,
-      'completed_at'
+      'completed_at',
     )
     await logNotification(admin, order.user_id, 'sent')
   } catch (error) {
@@ -374,7 +378,7 @@ export async function notifyShippingUpdate(
 export async function notifyNewTrackingEvents(
   admin: AdminClient,
   orderId: string,
-  newEvents: RastreamentoEvento[]
+  newEvents: RastreamentoEvento[],
 ): Promise<void> {
   for (const evento of newEvents) {
     if (evento.finalizado === 1) {

@@ -17,11 +17,13 @@ function extractText(content: Anthropic.Message['content']): string {
 }
 
 export async function classifySupportThread(
-  threadText: string
+  threadText: string,
 ): Promise<SupportCategory> {
   const client = getClient()
   if (!client) {
-    console.warn('ANTHROPIC_API_KEY ausente — classificação padrão fora_de_escopo')
+    console.warn(
+      'ANTHROPIC_API_KEY ausente — classificação padrão fora_de_escopo',
+    )
     return 'fora_de_escopo'
   }
 

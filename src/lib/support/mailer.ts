@@ -41,7 +41,8 @@ export async function sendSupportEmail(params: {
     .eq('id', params.threadId)
     .maybeSingle()
 
-  const originalSubject = thread?.subject?.trim() || params.subject.trim() || 'Suporte'
+  const originalSubject =
+    thread?.subject?.trim() || params.subject.trim() || 'Suporte'
   const useReplySubject =
     params.useReplySubject ?? Boolean(params.inReplyToMessageId)
   const subject = useReplySubject
@@ -74,7 +75,10 @@ export async function sendSupportEmail(params: {
     inReplyTo: params.inReplyToMessageId
       ? wrapMessageId(params.inReplyToMessageId)
       : undefined,
-    references: uniqueRefs.length > 0 ? uniqueRefs.map(wrapMessageId).join(' ') : undefined,
+    references:
+      uniqueRefs.length > 0
+        ? uniqueRefs.map(wrapMessageId).join(' ')
+        : undefined,
   })
 
   const outboundId =
@@ -118,7 +122,8 @@ export async function getThreadReplyHeaders(threadId: string): Promise<{
     .find((m) => m.direction === 'inbound')
 
   return {
-    inReplyToMessageId: normalizeMessageId(lastInbound?.message_id) ?? undefined,
+    inReplyToMessageId:
+      normalizeMessageId(lastInbound?.message_id) ?? undefined,
     referencesMessageIds: allIds,
   }
 }

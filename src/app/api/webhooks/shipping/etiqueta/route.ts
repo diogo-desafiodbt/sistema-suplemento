@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { notifyShippingUpdate } from '@/lib/shipping/notify'
+import { type NextRequest, NextResponse } from 'next/server'
 import { isBearerOrQueryTokenAuthorized } from '@/lib/security/token'
 import { summarizeShippingWebhookPayload } from '@/lib/security/webhook-payload'
+import { notifyShippingUpdate } from '@/lib/shipping/notify'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { WebhookEtiquetaPayload } from '@/types/shipping'
 
 export async function POST(request: NextRequest) {
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     if (!idReq) {
       console.error(
         'webhook etiqueta sem id_requisicao',
-        summarizeShippingWebhookPayload(payload)
+        summarizeShippingWebhookPayload(payload),
       )
       return NextResponse.json({ ok: true })
     }
@@ -75,7 +75,10 @@ export async function POST(request: NextRequest) {
     })
 
     if (log?.id) {
-      await admin.from('webhook_logs').update({ processed: true }).eq('id', log.id)
+      await admin
+        .from('webhook_logs')
+        .update({ processed: true })
+        .eq('id', log.id)
     }
 
     return NextResponse.json({ ok: true })
@@ -83,7 +86,7 @@ export async function POST(request: NextRequest) {
     console.error('webhook shipping/etiqueta error:', error)
     return NextResponse.json(
       { error: 'Webhook processing failed' },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }

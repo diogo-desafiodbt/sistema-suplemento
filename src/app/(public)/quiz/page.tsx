@@ -1,31 +1,30 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { trackFunnelEvent } from '@/lib/funnel/track'
 import {
   ALL_PRODUCT_KEYS,
-  PRODUCT_NAME_BY_KEY,
+  birthDateFromAge,
   blockReasonForProduct,
-  computeTriage,
   cheapestSuggestion,
-  defaultSuggestion,
-  productKeyFromName,
+  computeTriage,
   type DiagnosisType,
+  defaultSuggestion,
   type HepaticCondition,
+  PRODUCT_NAME_BY_KEY,
   type ProductKey,
+  productKeyFromName,
   type RenalCondition,
   type Sex,
   type TriageAnswers,
 } from '@/lib/protocol/triage'
 import { findSupplementImageByProductName } from '@/lib/supplements-content'
-import { trackFunnelEvent } from '@/lib/funnel/track'
-import { Calendar } from '@/components/ui/calendar'
-import { ptBR } from 'date-fns/locale'
 
 type TriageForm = {
   full_name: string
-  birth_date: string
+  age: string
   sex: Sex | null
   is_pregnant_or_breastfeeding: boolean | null
   renal_conditions: RenalCondition[]
@@ -62,8 +61,14 @@ type ProductRow = {
 
 const RENAL_OPTIONS: Array<{ value: RenalCondition; label: string }> = [
   { value: 'hemodialise', label: 'Faço hemodiálise' },
-  { value: 'insuficiencia_renal_aguda', label: 'Tenho Insuficiência Renal Aguda' },
-  { value: 'tfg_menor_30', label: 'Minha Taxa de Filtração Glomerular (TFG) é menor que 30' },
+  {
+    value: 'insuficiencia_renal_aguda',
+    label: 'Tenho Insuficiência Renal Aguda',
+  },
+  {
+    value: 'tfg_menor_30',
+    label: 'Minha Taxa de Filtração Glomerular (TFG) é menor que 30',
+  },
 ]
 
 const HEPATIC_OPTIONS: Array<{ value: HepaticCondition; label: string }> = [
@@ -124,7 +129,7 @@ const MEDICATION_OPTIONS: Array<{ value: string; label: string }> = [
 
 const initialForm: TriageForm = {
   full_name: '',
-  birth_date: '',
+  age: '',
   sex: null,
   is_pregnant_or_breastfeeding: null,
   renal_conditions: [],
@@ -137,7 +142,7 @@ const initialForm: TriageForm = {
 
 type StepId =
   | 'nome'
-  | 'nascimento'
+  | 'idade'
   | 'sexo'
   | 'gestacao'
   | 'renal'
@@ -157,7 +162,7 @@ export default function QuizPage() {
   }, [])
 
   const steps: StepId[] = useMemo(() => {
-    const base: StepId[] = ['nome', 'nascimento', 'sexo']
+    const base: StepId[] = ['nome', 'idade', 'sexo']
     if (form.sex === 'mulher') base.push('gestacao')
     base.push('renal', 'hepatica', 'diabetes', 'medicamentos')
     return base
@@ -167,11 +172,11 @@ export default function QuizPage() {
   const progress = ((stepIndex + 1) / steps.length) * 100
 
   function goNext() {
-    setStepIndex(s => Math.min(s + 1, steps.length - 1))
+    setStepIndex((s) => Math.min(s + 1, steps.length - 1))
   }
 
   function goBack() {
-    setStepIndex(s => Math.max(s - 1, 0))
+    setStepIndex((s) => Math.max(s - 1, 0))
   }
 
   function OptionButton({
@@ -230,7 +235,13 @@ export default function QuizPage() {
           }`}
         >
           {selected && (
-            <svg width="10" height="8" viewBox="0 0 10 8" fill="none" aria-hidden>
+            <svg
+              width="10"
+              height="8"
+              viewBox="0 0 10 8"
+              fill="none"
+              aria-hidden
+            >
               <path
                 d="M1 4l2.5 2.5L9 1"
                 stroke="white"
@@ -309,62 +320,69 @@ export default function QuizPage() {
   }
 
   function toggleRenal(value: RenalCondition) {
-    setForm(prev => {
+    setForm((prev) => {
       const has = prev.renal_conditions.includes(value)
       return {
         ...prev,
         renal_none: false,
         renal_conditions: has
-          ? prev.renal_conditions.filter(v => v !== value)
+          ? prev.renal_conditions.filter((v) => v !== value)
           : [...prev.renal_conditions, value],
       }
     })
   }
 
   function toggleHepatic(value: HepaticCondition) {
-    setForm(prev => {
+    setForm((prev) => {
       const has = prev.hepatic_conditions.includes(value)
       return {
         ...prev,
         hepatic_none: false,
         hepatic_conditions: has
-          ? prev.hepatic_conditions.filter(v => v !== value)
+          ? prev.hepatic_conditions.filter((v) => v !== value)
           : [...prev.hepatic_conditions, value],
       }
     })
   }
 
   function toggleMedication(value: string) {
-    setForm(prev => {
+    setForm((prev) => {
       if (value === 'nenhum') {
         return { ...prev, medications: ['nenhum'] }
       }
-      const withoutNone = prev.medications.filter(v => v !== 'nenhum')
+      const withoutNone = prev.medications.filter((v) => v !== 'nenhum')
       const has = withoutNone.includes(value)
       return {
         ...prev,
         medications: has
-          ? withoutNone.filter(v => v !== value)
+          ? withoutNone.filter((v) => v !== value)
           : [...withoutNone, value],
       }
     })
   }
 
   async function finishTriage() {
-    if (!form.sex || !form.diagnosis_type || !form.birth_date) {
+    const age = Number.parseInt(form.age, 10)
+    if (
+      !form.sex ||
+      !form.diagnosis_type ||
+      !Number.isFinite(age) ||
+      age < 1 ||
+      age > 120
+    ) {
       toast.error('Preencha todas as perguntas antes de continuar.')
       return
     }
 
     const answers: TriageAnswers = {
-      birth_date: form.birth_date,
+      age,
       sex: form.sex,
       is_pregnant_or_breastfeeding:
         form.sex === 'mulher' ? !!form.is_pregnant_or_breastfeeding : false,
       renal_conditions: form.renal_none ? [] : form.renal_conditions,
       hepatic_conditions: form.hepatic_none ? [] : form.hepatic_conditions,
       diagnosis_type: form.diagnosis_type,
-      medications: form.medications.filter(m => m !== 'nenhum'),
+      medications: form.medications.filter((m) => m !== 'nenhum'),
     }
 
     const result = computeTriage(answers)
@@ -381,7 +399,7 @@ export default function QuizPage() {
       if (!res.ok) throw new Error('products')
       const data = await res.json()
       const products: ProductRow[] = (data.products ?? []).filter(
-        (p: ProductRow) => p.is_active !== false
+        (p: ProductRow) => p.is_active !== false,
       )
 
       const productByKey = new Map<ProductKey, ProductRow>()
@@ -407,7 +425,7 @@ export default function QuizPage() {
         const product = productByKey.get(key)
         if (!product) {
           throw new Error(
-            `Produto sem match no catálogo: ${key} (${PRODUCT_NAME_BY_KEY[key]})`
+            `Produto sem match no catálogo: ${key} (${PRODUCT_NAME_BY_KEY[key]})`,
           )
         }
 
@@ -455,6 +473,8 @@ export default function QuizPage() {
       const triagemData = {
         ...answers,
         full_name: form.full_name.trim(),
+        // Persistência / checkout ainda usam birth_date (aprox. a partir da idade).
+        birth_date: birthDateFromAge(age),
       }
 
       sessionStorage.setItem('protocol_items', JSON.stringify(protocolItems))
@@ -480,13 +500,23 @@ export default function QuizPage() {
       <div className="min-h-screen bg-[#f5f0eb] flex flex-col">
         <header className="px-6 pt-5 pb-4">
           <div className="max-w-lg mx-auto">
-            <img src="/logo-azul.png" alt="Desafio Diabetes" className="h-7 w-auto" />
+            <img
+              src="/logo-azul.png"
+              alt="Desafio Diabetes"
+              className="h-7 w-auto"
+            />
           </div>
         </header>
         <main className="flex-1 flex items-center justify-center px-4 py-10">
           <div className="w-full max-w-lg bg-white rounded-2xl border border-amber-200 shadow-sm p-8 text-center space-y-4">
             <div className="mx-auto w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <svg
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden
+              >
                 <path
                   d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
                   stroke="#b45309"
@@ -496,8 +526,12 @@ export default function QuizPage() {
                 />
               </svg>
             </div>
-            <h1 className="font-display text-2xl text-[#13244f]">Não foi possível continuar</h1>
-            <p className="text-gray-600 text-sm leading-relaxed">{blockReason}</p>
+            <h1 className="font-display text-2xl text-[#13244f]">
+              Não foi possível continuar
+            </h1>
+            <p className="text-gray-600 text-sm leading-relaxed">
+              {blockReason}
+            </p>
             <a
               href="/"
               className="inline-flex mt-2 bg-[#13244f] text-white px-6 py-3 rounded-full text-sm font-semibold hover:bg-[#0d1a3a] transition"
@@ -523,7 +557,9 @@ export default function QuizPage() {
             <input
               type="text"
               value={form.full_name}
-              onChange={e => setForm(prev => ({ ...prev, full_name: e.target.value }))}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, full_name: e.target.value }))
+              }
               placeholder="Seu nome completo"
               className="w-full border border-gray-200 rounded-xl px-4 py-3.5 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
               autoFocus
@@ -531,52 +567,34 @@ export default function QuizPage() {
           </QuestionWrapper>
         )
 
-      case 'nascimento': {
-        // Trabalha com Y/M/D locais (não Date→toISOString) pra nunca sofrer
-        // desvio de fuso horário na conversão ISO ↔ Date.
-        function parseIsoDateLocal(value: string): Date | undefined {
-          if (!value) return undefined
-          const [y, m, d] = value.split('-').map(Number)
-          if (!y || !m || !d) return undefined
-          return new Date(y, m - 1, d)
-        }
-
-        function toIsoDateLocal(date: Date): string {
-          const y = date.getFullYear()
-          const m = String(date.getMonth() + 1).padStart(2, '0')
-          const d = String(date.getDate()).padStart(2, '0')
-          return `${y}-${m}-${d}`
-        }
-
-        const today = new Date()
-        const hundredYearsAgo = new Date(today.getFullYear() - 100, 0, 1)
+      case 'idade': {
+        const ageNum = Number.parseInt(form.age, 10)
+        const ageValid = Number.isFinite(ageNum) && ageNum >= 1 && ageNum <= 120
 
         return (
           <QuestionWrapper
             category="DADOS BÁSICOS"
-            title="Qual é a sua data de nascimento?"
+            title="Qual é a sua idade?"
             showContinue
-            continueDisabled={!form.birth_date}
+            continueDisabled={!ageValid}
           >
-            <div className="flex justify-center">
-              <Calendar
-                mode="single"
-                locale={ptBR}
-                selected={parseIsoDateLocal(form.birth_date)}
-                onSelect={(date) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    birth_date: date ? toIsoDateLocal(date) : '',
-                  }))
-                }
-                captionLayout="dropdown"
-                startMonth={hundredYearsAgo}
-                endMonth={today}
-                disabled={{ after: today }}
-                defaultMonth={parseIsoDateLocal(form.birth_date) ?? new Date(today.getFullYear() - 30, today.getMonth())}
-                className="rounded-2xl border border-gray-200 bg-white shadow-sm"
-              />
-            </div>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={120}
+              value={form.age}
+              onChange={(e) => {
+                const raw = e.target.value.replace(/[^\d]/g, '')
+                setForm((prev) => ({ ...prev, age: raw }))
+              }}
+              placeholder="Ex.: 45"
+              className="w-full border border-gray-200 rounded-xl px-4 py-3.5 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+              autoFocus
+            />
+            <p className="text-xs text-gray-500 mt-2">
+              Informe apenas o número (anos completos).
+            </p>
           </QuestionWrapper>
         )
       }
@@ -589,17 +607,19 @@ export default function QuizPage() {
                 { value: 'homem' as Sex, label: 'Homem' },
                 { value: 'mulher' as Sex, label: 'Mulher' },
               ] as const
-            ).map(opt => (
+            ).map((opt) => (
               <OptionButton
                 key={opt.value}
                 label={opt.label}
                 selected={form.sex === opt.value}
                 onClick={() => {
-                  setForm(prev => ({
+                  setForm((prev) => ({
                     ...prev,
                     sex: opt.value,
                     is_pregnant_or_breastfeeding:
-                      opt.value === 'homem' ? false : prev.is_pregnant_or_breastfeeding,
+                      opt.value === 'homem'
+                        ? false
+                        : prev.is_pregnant_or_breastfeeding,
                   }))
                   setTimeout(goNext, 120)
                 }}
@@ -617,13 +637,13 @@ export default function QuizPage() {
             {[
               { value: true, label: 'Sim' },
               { value: false, label: 'Não' },
-            ].map(opt => (
+            ].map((opt) => (
               <OptionButton
                 key={String(opt.value)}
                 label={opt.label}
                 selected={form.is_pregnant_or_breastfeeding === opt.value}
                 onClick={() => {
-                  setForm(prev => ({
+                  setForm((prev) => ({
                     ...prev,
                     is_pregnant_or_breastfeeding: opt.value,
                   }))
@@ -641,9 +661,11 @@ export default function QuizPage() {
             title="Você tem alguma condição renal?"
             subtitle="Pode marcar mais de uma, ou nenhuma"
             showContinue
-            continueDisabled={!form.renal_none && form.renal_conditions.length === 0}
+            continueDisabled={
+              !form.renal_none && form.renal_conditions.length === 0
+            }
           >
-            {RENAL_OPTIONS.map(opt => (
+            {RENAL_OPTIONS.map((opt) => (
               <CheckOption
                 key={opt.value}
                 label={opt.label}
@@ -655,7 +677,7 @@ export default function QuizPage() {
               label="Nenhuma das anteriores"
               selected={form.renal_none}
               onClick={() =>
-                setForm(prev => ({
+                setForm((prev) => ({
                   ...prev,
                   renal_none: true,
                   renal_conditions: [],
@@ -672,9 +694,11 @@ export default function QuizPage() {
             title="Você tem alguma condição hepática?"
             subtitle="Pode marcar mais de uma, ou nenhuma"
             showContinue
-            continueDisabled={!form.hepatic_none && form.hepatic_conditions.length === 0}
+            continueDisabled={
+              !form.hepatic_none && form.hepatic_conditions.length === 0
+            }
           >
-            {HEPATIC_OPTIONS.map(opt => (
+            {HEPATIC_OPTIONS.map((opt) => (
               <CheckOption
                 key={opt.value}
                 label={opt.label}
@@ -686,7 +710,7 @@ export default function QuizPage() {
               label="Nenhuma das anteriores"
               selected={form.hepatic_none}
               onClick={() =>
-                setForm(prev => ({
+                setForm((prev) => ({
                   ...prev,
                   hepatic_none: true,
                   hepatic_conditions: [],
@@ -698,14 +722,17 @@ export default function QuizPage() {
 
       case 'diabetes':
         return (
-          <QuestionWrapper category="DIABETES" title="Qual é o seu tipo de diabetes?">
-            {DIAGNOSIS_OPTIONS.map(opt => (
+          <QuestionWrapper
+            category="DIABETES"
+            title="Qual é o seu tipo de diabetes?"
+          >
+            {DIAGNOSIS_OPTIONS.map((opt) => (
               <OptionButton
                 key={opt.value}
                 label={opt.label}
                 selected={form.diagnosis_type === opt.value}
                 onClick={() => {
-                  setForm(prev => ({ ...prev, diagnosis_type: opt.value }))
+                  setForm((prev) => ({ ...prev, diagnosis_type: opt.value }))
                   setTimeout(goNext, 120)
                 }}
               />
@@ -723,7 +750,7 @@ export default function QuizPage() {
             continueDisabled={form.medications.length === 0}
             onContinue={finishTriage}
           >
-            {MEDICATION_OPTIONS.map(opt => (
+            {MEDICATION_OPTIONS.map((opt) => (
               <CheckOption
                 key={opt.value}
                 label={opt.label}
@@ -743,7 +770,11 @@ export default function QuizPage() {
     <div className="min-h-screen bg-[#f5f0eb] flex flex-col">
       <header className="px-6 pt-5 pb-2">
         <div className="max-w-lg mx-auto flex items-center justify-between">
-          <img src="/logo-azul.png" alt="Desafio Diabetes" className="h-7 w-auto" />
+          <img
+            src="/logo-azul.png"
+            alt="Desafio Diabetes"
+            className="h-7 w-auto"
+          />
           <span className="text-xs text-[#13244f]/50 font-medium">
             {stepIndex + 1} / {steps.length}
           </span>

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 
@@ -20,7 +20,9 @@ const bodySchema = z.object({
 export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
@@ -46,7 +48,10 @@ export async function PATCH(request: NextRequest) {
 
     if (userError) {
       console.error('Erro ao atualizar usuário:', userError)
-      return NextResponse.json({ error: 'Erro ao salvar dados pessoais' }, { status: 500 })
+      return NextResponse.json(
+        { error: 'Erro ao salvar dados pessoais' },
+        { status: 500 },
+      )
     }
 
     const { data: existingAddress } = await supabase
@@ -72,26 +77,30 @@ export async function PATCH(request: NextRequest) {
 
       if (addrError) {
         console.error('Erro ao atualizar endereço:', addrError)
-        return NextResponse.json({ error: 'Erro ao salvar endereço' }, { status: 500 })
+        return NextResponse.json(
+          { error: 'Erro ao salvar endereço' },
+          { status: 500 },
+        )
       }
     } else {
-      const { error: addrError } = await supabase
-        .from('addresses')
-        .insert({
-          user_id: user.id,
-          zip_code: address.zip_code,
-          street: address.street,
-          number: address.number,
-          complement: address.complement ?? null,
-          neighborhood: address.neighborhood,
-          city: address.city,
-          state: address.state,
-          is_default: true,
-        })
+      const { error: addrError } = await supabase.from('addresses').insert({
+        user_id: user.id,
+        zip_code: address.zip_code,
+        street: address.street,
+        number: address.number,
+        complement: address.complement ?? null,
+        neighborhood: address.neighborhood,
+        city: address.city,
+        state: address.state,
+        is_default: true,
+      })
 
       if (addrError) {
         console.error('Erro ao inserir endereço:', addrError)
-        return NextResponse.json({ error: 'Erro ao salvar endereço' }, { status: 500 })
+        return NextResponse.json(
+          { error: 'Erro ao salvar endereço' },
+          { status: 500 },
+        )
       }
     }
 

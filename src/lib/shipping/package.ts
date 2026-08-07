@@ -3,7 +3,12 @@ import type { PackageDimensions } from '@/types/shipping'
 
 export type PackageItem = { box_type: 'R80' | 'R110'; quantity: number }
 
-type BoxDims = { altura: number; largura: number; comprimento: number; peso: number }
+type BoxDims = {
+  altura: number
+  largura: number
+  comprimento: number
+  peso: number
+}
 
 async function loadBoxConfig(): Promise<Record<'R80' | 'R110', BoxDims>> {
   const admin = createAdminClient()
@@ -21,7 +26,7 @@ async function loadBoxConfig(): Promise<Record<'R80' | 'R110', BoxDims>> {
       'shipping_box_r110_peso',
     ])
 
-  const map = Object.fromEntries((configs ?? []).map(c => [c.key, c.value]))
+  const map = Object.fromEntries((configs ?? []).map((c) => [c.key, c.value]))
 
   return {
     R80: {
@@ -40,14 +45,17 @@ async function loadBoxConfig(): Promise<Record<'R80' | 'R110', BoxDims>> {
 }
 
 export async function computePackageDimensions(
-  items: PackageItem[]
+  items: PackageItem[],
 ): Promise<PackageDimensions> {
   const boxes = await loadBoxConfig()
 
   const grouped = new Map<'R80' | 'R110', number>()
   for (const item of items) {
     if (item.box_type !== 'R80' && item.box_type !== 'R110') continue
-    grouped.set(item.box_type, (grouped.get(item.box_type) ?? 0) + item.quantity)
+    grouped.set(
+      item.box_type,
+      (grouped.get(item.box_type) ?? 0) + item.quantity,
+    )
   }
 
   if (grouped.size === 0) {

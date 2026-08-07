@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { notFound, useParams } from 'next/navigation'
-import Header from '@/components/Header'
+import { useState } from 'react'
 import Footer from '@/components/Footer'
+import Header from '@/components/Header'
 import { getSupplementBySlug, supplements } from '@/lib/supplements-content'
 
 const testimonials = [
@@ -44,7 +44,11 @@ export default function SupplementPage() {
     {
       id: 'descricao',
       title: 'Descrição',
-      body: <p className="text-sm text-gray-600 leading-relaxed">{content.description}</p>,
+      body: (
+        <p className="text-sm text-gray-600 leading-relaxed">
+          {content.description}
+        </p>
+      ),
     },
     ...(content.composition.length > 0
       ? [
@@ -59,8 +63,12 @@ export default function SupplementPage() {
                       key={row.ativo}
                       className="flex items-start justify-between gap-4 px-4 py-3 text-sm"
                     >
-                      <span className="text-[#13244f] font-medium">{row.ativo}</span>
-                      <span className="text-gray-500 whitespace-nowrap">{row.dose}</span>
+                      <span className="text-[#13244f] font-medium">
+                        {row.ativo}
+                      </span>
+                      <span className="text-gray-500 whitespace-nowrap">
+                        {row.dose}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -77,7 +85,9 @@ export default function SupplementPage() {
     {
       id: 'modo-de-uso',
       title: 'Modo de uso',
-      body: <p className="text-sm text-gray-600 leading-relaxed">{content.usage}</p>,
+      body: (
+        <p className="text-sm text-gray-600 leading-relaxed">{content.usage}</p>
+      ),
     },
   ]
 
@@ -138,7 +148,9 @@ export default function SupplementPage() {
                         strokeLinejoin="round"
                       />
                     </svg>
-                    <p className="text-sm text-amber-800 leading-relaxed">{content.warningNote}</p>
+                    <p className="text-sm text-amber-800 leading-relaxed">
+                      {content.warningNote}
+                    </p>
                   </div>
                 )}
               </div>
@@ -146,8 +158,8 @@ export default function SupplementPage() {
               <div className="border-t border-[#ececec] pt-5 flex flex-col gap-4">
                 <p className="text-sm text-gray-600 leading-relaxed">
                   Esta página é informativa. A inclusão deste item no seu
-                  protocolo depende da avaliação clínica pelo questionário —
-                  não é possível comprar diretamente pela vitrine.
+                  protocolo depende da avaliação clínica pelo questionário — não
+                  é possível comprar diretamente pela vitrine.
                 </p>
 
                 <Link
@@ -159,21 +171,63 @@ export default function SupplementPage() {
 
                 <div className="grid grid-cols-3 gap-2 text-center text-[11px] text-gray-500">
                   <div className="flex flex-col items-center gap-1.5 px-1">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      aria-hidden
+                    >
+                      <path
+                        d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinejoin="round"
+                      />
                     </svg>
                     <span>Farmácia credenciada ANVISA</span>
                   </div>
                   <div className="flex flex-col items-center gap-1.5 px-1">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-                      <rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="2"/>
-                      <path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      aria-hidden
+                    >
+                      <rect
+                        x="3"
+                        y="11"
+                        width="18"
+                        height="11"
+                        rx="2"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      />
+                      <path
+                        d="M7 11V7a5 5 0 0110 0v4"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
                     </svg>
                     <span>Pagamento seguro</span>
                   </div>
                   <div className="flex flex-col items-center gap-1.5 px-1">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-                      <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      aria-hidden
+                    >
+                      <path
+                        d="M5 13l4 4L19 7"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
                     </svg>
                     <span>Cancele quando quiser</span>
                   </div>
@@ -191,7 +245,9 @@ export default function SupplementPage() {
                         className="w-full flex items-center justify-between gap-4 py-4 text-left"
                         aria-expanded={open}
                       >
-                        <span className="font-semibold text-[#13244f] text-sm">{item.title}</span>
+                        <span className="font-semibold text-[#13244f] text-sm">
+                          {item.title}
+                        </span>
                         <svg
                           width="18"
                           height="18"
@@ -200,12 +256,19 @@ export default function SupplementPage() {
                           className={`flex-shrink-0 text-[#13244f] transition-transform duration-300 ${open ? 'rotate-180' : ''}`}
                           aria-hidden
                         >
-                          <path d="M5 8.5L12 15.5L19 8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                          <path
+                            d="M5 8.5L12 15.5L19 8.5"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                          />
                         </svg>
                       </button>
                       <div
                         className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                          open ? 'max-h-[32rem] opacity-100 pb-4' : 'max-h-0 opacity-0'
+                          open
+                            ? 'max-h-[32rem] opacity-100 pb-4'
+                            : 'max-h-0 opacity-0'
                         }`}
                       >
                         {item.body}
@@ -225,24 +288,51 @@ export default function SupplementPage() {
                       key={i}
                       className="bg-white rounded-2xl p-5 flex flex-col gap-3 shadow-sm border border-gray-100"
                     >
-                      <svg width="32" height="24" viewBox="0 0 32 24" fill="none" className="flex-shrink-0 opacity-20" aria-hidden>
-                        <path d="M0 24V14.4C0 6.4 4.8 1.6 14.4 0L16 3.2C11.2 4.267 8.533 7.2 8 12H14.4V24H0ZM17.6 24V14.4C17.6 6.4 22.4 1.6 32 0L33.6 3.2C28.8 4.267 26.133 7.2 25.6 12H32V24H17.6Z" fill="#13244f"/>
+                      <svg
+                        width="32"
+                        height="24"
+                        viewBox="0 0 32 24"
+                        fill="none"
+                        className="flex-shrink-0 opacity-20"
+                        aria-hidden
+                      >
+                        <path
+                          d="M0 24V14.4C0 6.4 4.8 1.6 14.4 0L16 3.2C11.2 4.267 8.533 7.2 8 12H14.4V24H0ZM17.6 24V14.4C17.6 6.4 22.4 1.6 32 0L33.6 3.2C28.8 4.267 26.133 7.2 25.6 12H32V24H17.6Z"
+                          fill="#13244f"
+                        />
                       </svg>
                       <p className="font-bold text-[#13244f] text-sm leading-snug">
                         &ldquo;{t.title}&rdquo;
                       </p>
-                      <p className="text-sm text-gray-600 leading-relaxed flex-1">{t.text}</p>
+                      <p className="text-sm text-gray-600 leading-relaxed flex-1">
+                        {t.text}
+                      </p>
                       <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                         <div>
-                          <p className="text-sm font-bold text-[#13244f]">{t.name}</p>
+                          <p className="text-sm font-bold text-[#13244f]">
+                            {t.name}
+                          </p>
                           <p className="text-xs text-gray-400">{t.plan}</p>
                         </div>
                         <div className="flex items-center gap-1.5 bg-green-50 px-2.5 py-1 rounded-full">
-                          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden>
-                            <circle cx="7" cy="7" r="7" fill="#22c55e"/>
-                            <path d="M4 7l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                          <svg
+                            width="12"
+                            height="12"
+                            viewBox="0 0 14 14"
+                            fill="none"
+                            aria-hidden
+                          >
+                            <circle cx="7" cy="7" r="7" fill="#22c55e" />
+                            <path
+                              d="M4 7l2 2 4-4"
+                              stroke="white"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                            />
                           </svg>
-                          <span className="text-xs text-green-700 font-medium">Verificado</span>
+                          <span className="text-xs text-green-700 font-medium">
+                            Verificado
+                          </span>
                         </div>
                       </div>
                     </div>

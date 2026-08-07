@@ -1,7 +1,7 @@
-import { inngest } from '../client'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { createShippingLabelForOrder } from '@/lib/shipping/create-label'
 import { addBusinessDays } from '@/lib/shipping/estimate'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { inngest } from '../client'
 
 const PICKUP_DAYS_AFTER_PURCHASE = 2
 
@@ -18,7 +18,9 @@ export const createShippingLabel = inngest.createFunction(
     }
 
     if (!subscription_id || !user_id) {
-      throw new Error('Evento pagamento/confirmado sem subscription_id ou user_id')
+      throw new Error(
+        'Evento pagamento/confirmado sem subscription_id ou user_id',
+      )
     }
 
     const pickupDateIso = await step.run('calcular-data-retirada', async () => {
@@ -32,13 +34,13 @@ export const createShippingLabel = inngest.createFunction(
 
       if (error || !sub?.created_at) {
         throw new Error(
-          `Assinatura sem created_at: ${error?.message ?? subscription_id}`
+          `Assinatura sem created_at: ${error?.message ?? subscription_id}`,
         )
       }
 
       const pickup = addBusinessDays(
         new Date(sub.created_at),
-        PICKUP_DAYS_AFTER_PURCHASE
+        PICKUP_DAYS_AFTER_PURCHASE,
       )
       return pickup.toISOString()
     })
@@ -58,7 +60,7 @@ export const createShippingLabel = inngest.createFunction(
 
         if (error || !order) {
           throw new Error(
-            `Pedido não encontrado para subscription ${subscription_id}: ${error?.message ?? 'empty'}`
+            `Pedido não encontrado para subscription ${subscription_id}: ${error?.message ?? 'empty'}`,
           )
         }
 
@@ -69,7 +71,7 @@ export const createShippingLabel = inngest.createFunction(
     } catch (error) {
       console.error(
         `[create-shipping-label] Falha na subscription ${subscription_id}:`,
-        error
+        error,
       )
       return {
         ok: false,
@@ -77,5 +79,5 @@ export const createShippingLabel = inngest.createFunction(
         error: error instanceof Error ? error.message : String(error),
       }
     }
-  }
+  },
 )

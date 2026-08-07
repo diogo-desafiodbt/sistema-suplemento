@@ -1,13 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { type NextRequest, NextResponse } from 'next/server'
 import { isBearerOrQueryTokenAuthorized } from '@/lib/security/token'
 import { summarizePharmacyWebhookPayload } from '@/lib/security/webhook-payload'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function POST(request: NextRequest) {
   if (
     !isBearerOrQueryTokenAuthorized(
       request,
-      process.env.FARMACIA_WEBHOOK_TOKEN ?? process.env.FARMACIA_API_TOKEN
+      process.env.FARMACIA_WEBHOOK_TOKEN ?? process.env.FARMACIA_API_TOKEN,
     )
   ) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -17,12 +17,16 @@ export async function POST(request: NextRequest) {
     const payload = await request.json()
     const admin = createAdminClient()
 
-    const { data: webhookLog } = await admin.from('webhook_logs').insert({
-      source: 'pharmacy',
-      event_type: 'order.dispatched',
-      payload: summarizePharmacyWebhookPayload(payload),
-      processed: false,
-    }).select('id').single()
+    const { data: webhookLog } = await admin
+      .from('webhook_logs')
+      .insert({
+        source: 'pharmacy',
+        event_type: 'order.dispatched',
+        payload: summarizePharmacyWebhookPayload(payload),
+        processed: false,
+      })
+      .select('id')
+      .single()
 
     const { NumeroObjeto, CodigoPedido } = payload
 

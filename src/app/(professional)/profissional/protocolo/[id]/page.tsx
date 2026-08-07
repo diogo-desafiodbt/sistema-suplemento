@@ -1,8 +1,13 @@
-import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import {
+  calcAge,
+  DIAGNOSIS_LABELS,
+  HEPATIC_LABELS,
+  RENAL_LABELS,
+} from '@/lib/protocol/triage'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { calcAge, DIAGNOSIS_LABELS, RENAL_LABELS, HEPATIC_LABELS } from '@/lib/protocol/triage'
+import { createClient } from '@/lib/supabase/server'
 import { AssinarButton } from './AssinarButton'
 
 type ProtocolItem = {
@@ -52,7 +57,9 @@ export default async function ProtocoloPage({
 }) {
   const { id } = await params
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   if (!user) redirect('/login')
 
@@ -112,7 +119,7 @@ export default async function ProtocoloPage({
 
   const protocolData = protocol as unknown as ProtocolDetail
   const activeItems = protocolData.protocol_items?.filter(
-    item => !item.removed_by_patient
+    (item) => !item.removed_by_patient,
   )
 
   const quiz = protocolData.quiz_responses
@@ -139,22 +146,35 @@ export default async function ProtocoloPage({
     alertItems.push(`Hepática: ${HEPATIC_LABELS[c] ?? c}`)
   }
 
-  const statusBadge = protocolData.status === 'signed'
-    ? 'bg-green-100 text-green-700'
-    : 'bg-amber-100 text-amber-700'
+  const statusBadge =
+    protocolData.status === 'signed'
+      ? 'bg-green-100 text-green-700'
+      : 'bg-amber-100 text-amber-700'
 
   return (
     <div className="min-h-screen bg-[#f5f0eb]">
       <header className="bg-[#13244f] px-6 py-4">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/profissional/fila" className="text-white/60 hover:text-white text-sm transition">
+            <Link
+              href="/profissional/fila"
+              className="text-white/60 hover:text-white text-sm transition"
+            >
               ← Voltar
             </Link>
-            <img src="/logo-branca.png" alt="Desafio Diabetes" className="h-6 w-auto" />
+            <img
+              src="/logo-branca.png"
+              alt="Desafio Diabetes"
+              className="h-6 w-auto"
+            />
           </div>
           <form action="/api/auth/signout" method="POST">
-            <button type="submit" className="text-sm text-white/60 hover:text-white transition">Sair</button>
+            <button
+              type="submit"
+              className="text-sm text-white/60 hover:text-white transition"
+            >
+              Sair
+            </button>
           </form>
         </div>
       </header>
@@ -162,8 +182,12 @@ export default async function ProtocoloPage({
       <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-1">Revisão clínica</p>
-            <h1 className="text-2xl font-bold text-[#13244f]">{patient?.full_name}</h1>
+            <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-1">
+              Revisão clínica
+            </p>
+            <h1 className="text-2xl font-bold text-[#13244f]">
+              {patient?.full_name}
+            </h1>
             <span
               className={`inline-block mt-2 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full ${
                 protocolData.source === 'mini_quiz'
@@ -176,7 +200,9 @@ export default async function ProtocoloPage({
                 : 'Quiz completo'}
             </span>
           </div>
-          <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${statusBadge}`}>
+          <span
+            className={`text-xs font-bold px-3 py-1.5 rounded-full ${statusBadge}`}
+          >
             {protocolData.status === 'signed' ? 'Assinada' : 'Pendente'}
           </span>
         </div>
@@ -185,21 +211,35 @@ export default async function ProtocoloPage({
           <h2 className="font-bold text-[#13244f]">Dados do paciente</h2>
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Nome</p>
-              <p className="font-semibold text-[#13244f]">{patient?.full_name}</p>
+              <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">
+                Nome
+              </p>
+              <p className="font-semibold text-[#13244f]">
+                {patient?.full_name}
+              </p>
             </div>
             <div>
-              <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Email</p>
+              <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">
+                Email
+              </p>
               <p className="font-semibold text-[#13244f]">{patient?.email}</p>
             </div>
             <div>
-              <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Código do cliente</p>
-              <p className="font-semibold text-[#13244f] font-mono">{patient?.client_code}</p>
+              <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">
+                Código do cliente
+              </p>
+              <p className="font-semibold text-[#13244f] font-mono">
+                {patient?.client_code}
+              </p>
             </div>
             <div>
-              <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Protocolo gerado em</p>
+              <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">
+                Protocolo gerado em
+              </p>
               <p className="font-semibold text-[#13244f]">
-                {new Date(protocolData.generated_at).toLocaleDateString('pt-BR')}
+                {new Date(protocolData.generated_at).toLocaleDateString(
+                  'pt-BR',
+                )}
               </p>
             </div>
           </div>
@@ -207,7 +247,9 @@ export default async function ProtocoloPage({
 
         {showClinicalAlert && (
           <div className="rounded-2xl border border-amber-300 bg-amber-50 p-5 space-y-2">
-            <p className="text-sm font-bold text-amber-900">Atenção clínica — condições que restringem produtos</p>
+            <p className="text-sm font-bold text-amber-900">
+              Atenção clínica — condições que restringem produtos
+            </p>
             <ul className="text-sm text-amber-900/90 list-disc pl-5 space-y-1">
               {alertItems.map((item) => (
                 <li key={item}>{item}</li>
@@ -223,29 +265,45 @@ export default async function ProtocoloPage({
           {isLegacyQuiz ? (
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Diagnóstico</p>
-                <p className="font-semibold text-[#13244f]">{DIAGNOSIS_LABELS[quiz?.diagnosis_type ?? ''] ?? '-'}</p>
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">
+                  Diagnóstico
+                </p>
+                <p className="font-semibold text-[#13244f]">
+                  {DIAGNOSIS_LABELS[quiz?.diagnosis_type ?? ''] ?? '-'}
+                </p>
               </div>
               <div>
-                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Tempo de diagnóstico</p>
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">
+                  Tempo de diagnóstico
+                </p>
                 <p className="font-semibold text-[#13244f]">
                   {protocolData.source === 'mini_quiz'
-                    ? (quiz?.allergies?.startsWith('idade:')
+                    ? quiz?.allergies?.startsWith('idade:')
                       ? `Não informado — idade ${quiz.allergies.replace('idade:', '')} anos`
-                      : 'Não informado (compra direta)')
+                      : 'Não informado (compra direta)'
                     : (quiz?.years_diagnosed ?? '-')}
                 </p>
               </div>
               <div>
-                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">HbA1c</p>
-                <p className="font-semibold text-[#13244f]">{quiz?.hba1c_range ?? 'Não informado'}</p>
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">
+                  HbA1c
+                </p>
+                <p className="font-semibold text-[#13244f]">
+                  {quiz?.hba1c_range ?? 'Não informado'}
+                </p>
               </div>
               <div>
-                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Glicemia em jejum</p>
-                <p className="font-semibold text-[#13244f]">{quiz?.fasting_glucose ?? 'Não informado'}</p>
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">
+                  Glicemia em jejum
+                </p>
+                <p className="font-semibold text-[#13244f]">
+                  {quiz?.fasting_glucose ?? 'Não informado'}
+                </p>
               </div>
               <div>
-                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Medicamentos</p>
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">
+                  Medicamentos
+                </p>
                 <p className="font-semibold text-[#13244f]">
                   {quiz?.medications && quiz.medications.length > 0
                     ? quiz.medications.join(', ')
@@ -253,52 +311,82 @@ export default async function ProtocoloPage({
                 </p>
               </div>
               <div>
-                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Sintomas</p>
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">
+                  Sintomas
+                </p>
                 <p className="font-semibold text-[#13244f]">
                   {quiz?.symptoms && quiz.symptoms.length > 0
                     ? quiz.symptoms.join(', ')
                     : 'Nenhum'}
                 </p>
               </div>
-              {quiz?.conditions_serious && quiz.conditions_serious.length > 0 && (
-                <div className="col-span-2">
-                  <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Condições sérias</p>
-                  <p className="font-semibold text-red-600">{quiz.conditions_serious.join(', ')}</p>
-                </div>
-              )}
-              {quiz?.allergies && quiz.allergies !== 'nao' && quiz.allergies !== 'nao_sei' && !quiz.allergies.startsWith('idade:') && (
-                <div className="col-span-2">
-                  <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Alergias</p>
-                  <p className="font-semibold text-amber-600">{quiz.allergies}</p>
-                </div>
-              )}
+              {quiz?.conditions_serious &&
+                quiz.conditions_serious.length > 0 && (
+                  <div className="col-span-2">
+                    <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">
+                      Condições sérias
+                    </p>
+                    <p className="font-semibold text-red-600">
+                      {quiz.conditions_serious.join(', ')}
+                    </p>
+                  </div>
+                )}
+              {quiz?.allergies &&
+                quiz.allergies !== 'nao' &&
+                quiz.allergies !== 'nao_sei' &&
+                !quiz.allergies.startsWith('idade:') && (
+                  <div className="col-span-2">
+                    <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">
+                      Alergias
+                    </p>
+                    <p className="font-semibold text-amber-600">
+                      {quiz.allergies}
+                    </p>
+                  </div>
+                )}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Diagnóstico</p>
-                <p className="font-semibold text-[#13244f]">{DIAGNOSIS_LABELS[quiz?.diagnosis_type ?? ''] ?? '-'}</p>
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">
+                  Diagnóstico
+                </p>
+                <p className="font-semibold text-[#13244f]">
+                  {DIAGNOSIS_LABELS[quiz?.diagnosis_type ?? ''] ?? '-'}
+                </p>
               </div>
               <div>
-                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Idade</p>
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">
+                  Idade
+                </p>
                 <p className="font-semibold text-[#13244f]">
                   {age != null ? `${age} anos` : '—'}
                 </p>
               </div>
               <div>
-                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Sexo</p>
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">
+                  Sexo
+                </p>
                 <p className="font-semibold text-[#13244f]">
-                  {quiz?.sex === 'mulher' ? 'Mulher' : quiz?.sex === 'homem' ? 'Homem' : '—'}
+                  {quiz?.sex === 'mulher'
+                    ? 'Mulher'
+                    : quiz?.sex === 'homem'
+                      ? 'Homem'
+                      : '—'}
                 </p>
               </div>
               <div>
-                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Gravidez / amamentação</p>
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">
+                  Gravidez / amamentação
+                </p>
                 <p className="font-semibold text-[#13244f]">
                   {quiz?.sex === 'mulher' ? (pregnant ? 'Sim' : 'Não') : '—'}
                 </p>
               </div>
               <div>
-                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Condições renais</p>
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">
+                  Condições renais
+                </p>
                 <p className="font-semibold text-[#13244f]">
                   {renal.length > 0
                     ? renal.map((c) => RENAL_LABELS[c] ?? c).join(', ')
@@ -306,7 +394,9 @@ export default async function ProtocoloPage({
                 </p>
               </div>
               <div>
-                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Condições hepáticas</p>
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">
+                  Condições hepáticas
+                </p>
                 <p className="font-semibold text-[#13244f]">
                   {hepatic.length > 0
                     ? hepatic.map((c) => HEPATIC_LABELS[c] ?? c).join(', ')
@@ -314,7 +404,9 @@ export default async function ProtocoloPage({
                 </p>
               </div>
               <div className="col-span-2">
-                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">Medicamentos</p>
+                <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">
+                  Medicamentos
+                </p>
                 <p className="font-semibold text-[#13244f]">
                   {quiz?.medications && quiz.medications.length > 0
                     ? quiz.medications.join(', ')
@@ -328,16 +420,25 @@ export default async function ProtocoloPage({
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
           <h2 className="font-bold text-[#13244f]">Protocolo prescrito</h2>
           <div className="space-y-3">
-            {activeItems?.map(item => (
-              <div key={item.id} className="flex items-start justify-between gap-4 py-3 border-b border-gray-50 last:border-0 last:pb-0">
+            {activeItems?.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-start justify-between gap-4 py-3 border-b border-gray-50 last:border-0 last:pb-0"
+              >
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-sm text-[#13244f]">{item.products?.name}</span>
+                    <span className="font-semibold text-sm text-[#13244f]">
+                      {item.products?.name}
+                    </span>
                     {item.is_required && (
-                      <span className="text-[10px] bg-[#13244f]/10 text-[#13244f] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Principal</span>
+                      <span className="text-[10px] bg-[#13244f]/10 text-[#13244f] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+                        Principal
+                      </span>
                     )}
                   </div>
-                  <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{item.activation_reason}</p>
+                  <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+                    {item.activation_reason}
+                  </p>
                 </div>
               </div>
             ))}

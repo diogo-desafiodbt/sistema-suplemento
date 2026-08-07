@@ -9,11 +9,20 @@ export default function AdminLayout({
     <div className="min-h-screen bg-[#f5f0eb]">
       <header className="bg-[#13244f] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-6">
-          <img src="/logo-branca.png" alt="Desafio Diabetes" className="h-7 w-auto" />
+          <img
+            src="/logo-branca.png"
+            alt="Desafio Diabetes"
+            className="h-7 w-auto"
+          />
           <span className="text-white/40 text-sm">Admin</span>
         </div>
         <form action="/api/auth/signout" method="POST">
-          <button type="submit" className="text-sm text-white/60 hover:text-white transition">Sair</button>
+          <button
+            type="submit"
+            className="text-sm text-white/60 hover:text-white transition"
+          >
+            Sair
+          </button>
         </form>
       </header>
 

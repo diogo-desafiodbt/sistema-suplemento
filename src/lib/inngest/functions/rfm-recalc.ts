@@ -1,10 +1,10 @@
-import { inngest } from '../client'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { inngest } from '../client'
 
 function calcRecencyScore(lastLoginAt: string | null): number {
   if (!lastLoginAt) return 0
   const days = Math.floor(
-    (Date.now() - new Date(lastLoginAt).getTime()) / (1000 * 60 * 60 * 24)
+    (Date.now() - new Date(lastLoginAt).getTime()) / (1000 * 60 * 60 * 24),
   )
   if (days <= 7) return 100
   if (days <= 14) return 85
@@ -25,7 +25,7 @@ function calcFrequencyScore(loginCount: number): number {
 }
 
 function calcMonetaryScore(
-  sub: { plan_type: string; status: string } | null
+  sub: { plan_type: string; status: string } | null,
 ): number {
   if (!sub) return 5
   const { plan_type, status } = sub
@@ -52,7 +52,11 @@ function calcTier(score: number): string {
 }
 
 export const rfmRecalc = inngest.createFunction(
-  { id: 'rfm-recalc', name: 'Recalcular scores RFM', triggers: [{ cron: '0 * * * *' }] },
+  {
+    id: 'rfm-recalc',
+    name: 'Recalcular scores RFM',
+    triggers: [{ cron: '0 * * * *' }],
+  },
   async ({ step }) => {
     const result = await step.run('recalcular-rfm', async () => {
       const admin = createAdminClient()
@@ -60,7 +64,11 @@ export const rfmRecalc = inngest.createFunction(
 
       const { data: job } = await admin
         .from('background_jobs')
-        .insert({ job_type: 'rfm_recalc', status: 'running', started_at: startedAt })
+        .insert({
+          job_type: 'rfm_recalc',
+          status: 'running',
+          started_at: startedAt,
+        })
         .select('id')
         .single()
 
@@ -83,10 +91,10 @@ export const rfmRecalc = inngest.createFunction(
         return { recalculated: 0 }
       }
 
-      const userIds = users.map(u => u.id)
+      const userIds = users.map((u) => u.id)
       const now = new Date()
       const ninetyDaysAgo = new Date(
-        now.getTime() - 90 * 24 * 60 * 60 * 1000
+        now.getTime() - 90 * 24 * 60 * 60 * 1000,
       ).toISOString()
       let processed = 0
 
@@ -114,11 +122,13 @@ export const rfmRecalc = inngest.createFunction(
             .limit(1)
             .maybeSingle()
 
-          const recencyScore = calcRecencyScore(lastLoginData?.logged_at ?? null)
+          const recencyScore = calcRecencyScore(
+            lastLoginData?.logged_at ?? null,
+          )
           const frequencyScore = calcFrequencyScore(loginCount ?? 0)
           const monetaryScore = calcMonetaryScore(subscription)
           const finalScore = Math.round(
-            recencyScore * 0.4 + frequencyScore * 0.3 + monetaryScore * 0.3
+            recencyScore * 0.4 + frequencyScore * 0.3 + monetaryScore * 0.3,
           )
           const tier = calcTier(finalScore)
 
@@ -139,7 +149,7 @@ export const rfmRecalc = inngest.createFunction(
               previous_tier: currentRfm?.tier ?? null,
               calculated_at: now.toISOString(),
             },
-            { onConflict: 'user_id' }
+            { onConflict: 'user_id' },
           )
 
           processed++
@@ -168,5 +178,5 @@ export const rfmRecalc = inngest.createFunction(
     })
 
     return result
-  }
+  },
 )

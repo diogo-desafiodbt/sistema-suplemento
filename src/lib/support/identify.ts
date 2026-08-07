@@ -3,24 +3,24 @@ import { createAdminClient } from '@/lib/supabase/admin'
 const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g
 const CPF_RE = /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g
 
-export function digitsOnly(value: string): string {
+function digitsOnly(value: string): string {
   return value.replace(/\D/g, '')
 }
 
 /** Escapa `%`, `_` e `\` pra uso seguro em padrões LIKE/ILIKE. */
-export function escapeLikePattern(value: string): string {
+function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, (c) => `\\${c}`)
 }
 
-export function extractEmails(text: string): string[] {
+function extractEmails(text: string): string[] {
   const matches = text.match(EMAIL_RE) ?? []
   return Array.from(new Set(matches.map((e) => e.toLowerCase())))
 }
 
-export function extractCpfs(text: string): string[] {
+function extractCpfs(text: string): string[] {
   const matches = text.match(CPF_RE) ?? []
   return Array.from(
-    new Set(matches.map(digitsOnly).filter((c) => c.length === 11))
+    new Set(matches.map(digitsOnly).filter((c) => c.length === 11)),
   )
 }
 
@@ -32,7 +32,7 @@ export async function identifySupportUser(params: {
   const admin = createAdminClient()
   const combined = [params.fromEmail, ...params.bodyTexts].join('\n')
   const emails = Array.from(
-    new Set([params.fromEmail.toLowerCase(), ...extractEmails(combined)])
+    new Set([params.fromEmail.toLowerCase(), ...extractEmails(combined)]),
   )
   const cpfs = extractCpfs(combined)
 

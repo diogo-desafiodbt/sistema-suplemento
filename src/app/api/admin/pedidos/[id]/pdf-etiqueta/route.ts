@@ -1,11 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { type NextRequest, NextResponse } from 'next/server'
 import { getPdfEtiqueta } from '@/lib/shipping/envie-agora/etiqueta'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 
 async function requireAdmin() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) return null
   const admin = createAdminClient()
   const { data: profile } = await admin
@@ -19,7 +21,7 @@ async function requireAdmin() {
 
 export async function POST(
   _request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const admin = await requireAdmin()
@@ -37,15 +39,18 @@ export async function POST(
     if (!order?.shipping_request_id) {
       return NextResponse.json(
         { error: 'Pedido sem shipping_request_id' },
-        { status: 400 }
+        { status: 400 },
       )
     }
 
     const pdf = await getPdfEtiqueta(order.shipping_request_id)
     if (!pdf?.url) {
       return NextResponse.json(
-        { error: 'PDF ainda não disponível (pode exigir autorização especial da Envie Agora)' },
-        { status: 502 }
+        {
+          error:
+            'PDF ainda não disponível (pode exigir autorização especial da Envie Agora)',
+        },
+        { status: 502 },
       )
     }
 
@@ -59,7 +64,7 @@ export async function POST(
             ? error.message
             : 'Erro ao obter PDF (verifique autorização especial na Envie Agora)',
       },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }

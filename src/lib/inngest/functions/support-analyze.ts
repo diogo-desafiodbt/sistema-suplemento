@@ -1,16 +1,10 @@
-import { inngest } from '../client'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { identifySupportUser } from '@/lib/support/identify'
-import {
-  fetchSupportFacts,
-  hasRelevantFacts,
-} from '@/lib/support/facts'
-import { classifySupportThread, draftSupportReply } from '@/lib/support/ai'
-import {
-  getThreadReplyHeaders,
-  sendSupportEmail,
-} from '@/lib/support/mailer'
 import { claimByFlag, releaseFlag } from '@/lib/idempotency'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { classifySupportThread, draftSupportReply } from '@/lib/support/ai'
+import { fetchSupportFacts, hasRelevantFacts } from '@/lib/support/facts'
+import { identifySupportUser } from '@/lib/support/identify'
+import { getThreadReplyHeaders, sendSupportEmail } from '@/lib/support/mailer'
+import { inngest } from '../client'
 
 const AUTO_ACK_BODY = `Olá! Recebemos sua mensagem e nossa equipe já vai analisar. Pra agilizar e garantir que encontramos seu cadastro certinho, pode confirmar seu CPF e o e-mail usado na compra, por favor?
 
@@ -24,15 +18,14 @@ export const supportAnalyze = inngest.createFunction(
   },
   async ({ event }) => {
     const threadId = (event.data as { thread_id?: string }).thread_id
-    if (!threadId) throw new Error('Evento suporte/email-recebido sem thread_id')
+    if (!threadId)
+      throw new Error('Evento suporte/email-recebido sem thread_id')
 
     const admin = createAdminClient()
 
     const { data: thread } = await admin
       .from('support_threads')
-      .select(
-        'id, from_email, subject, user_id, auto_ack_sent_at, status'
-      )
+      .select('id, from_email, subject, user_id, auto_ack_sent_at, status')
       .eq('id', threadId)
       .maybeSingle()
 
@@ -46,7 +39,7 @@ export const supportAnalyze = inngest.createFunction(
       'support_threads',
       threadId,
       'auto_ack_sent_at',
-      false
+      false,
     )
 
     if (claimed) {
@@ -63,7 +56,12 @@ export const supportAnalyze = inngest.createFunction(
         })
       } catch (error) {
         console.error('Falha ao enviar auto-ack de suporte:', error)
-        await releaseFlag(admin, 'support_threads', threadId, 'auto_ack_sent_at')
+        await releaseFlag(
+          admin,
+          'support_threads',
+          threadId,
+          'auto_ack_sent_at',
+        )
       }
     }
 
@@ -105,9 +103,8 @@ export const supportAnalyze = inngest.createFunction(
     }
 
     const threadText = (messages ?? [])
-      .map(
-        (m) =>
-          `[${m.direction}] ${m.from_email ?? ''}\n${m.body_text ?? ''}`.trim()
+      .map((m) =>
+        `[${m.direction}] ${m.from_email ?? ''}\n${m.body_text ?? ''}`.trim(),
       )
       .join('\n\n---\n\n')
 
@@ -145,5 +142,5 @@ export const supportAnalyze = inngest.createFunction(
       .eq('id', threadId)
 
     return { ok: true, status: 'aguardando_revisao', category }
-  }
+  },
 )

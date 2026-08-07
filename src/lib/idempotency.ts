@@ -41,7 +41,7 @@ export async function claimOnce(
   admin: AdminClient,
   table: string,
   claimRow: Record<string, unknown>,
-  options?: ClaimOnceOptions
+  options?: ClaimOnceOptions,
 ): Promise<ClaimOnceResult> {
   const staleAfterMs = options?.staleAfterMs ?? DEFAULT_STALE_CLAIM_MS
   const timestampColumn = options?.timestampColumn ?? 'created_at'
@@ -66,7 +66,7 @@ export async function claimOnce(
       v !== undefined &&
       v !== null &&
       key !== completedColumn &&
-      !protectColumns.includes(key)
+      !protectColumns.includes(key),
   )
   if (entries.length === 0) return { won: false }
 
@@ -105,7 +105,7 @@ export async function claimOnce(
   if (deleteError) {
     console.error(
       `claimOnce(${table}): falha ao apagar claim stale:`,
-      deleteError
+      deleteError,
     )
   }
 
@@ -121,7 +121,7 @@ export async function releaseClaim(
   admin: AdminClient,
   table: string,
   keyColumnOrFilters: string | Record<string, unknown>,
-  keyValue?: string
+  keyValue?: string,
 ): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const from = (admin.from as any).bind(admin)
@@ -131,9 +131,7 @@ export async function releaseClaim(
       .delete()
       .eq(keyColumnOrFilters, keyValue)
     if (error) {
-      throw new Error(
-        `releaseClaim(${table}) falhou: ${error.message}`
-      )
+      throw new Error(`releaseClaim(${table}) falhou: ${error.message}`)
     }
     return
   }
@@ -160,7 +158,7 @@ export async function markClaimCompleted(
   table: string,
   keyColumnOrFilters: string | Record<string, unknown>,
   keyValue?: string,
-  completedColumn = 'completed_at'
+  completedColumn = 'completed_at',
 ): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const from = (admin.from as any).bind(admin)
@@ -171,9 +169,7 @@ export async function markClaimCompleted(
       .update(stamp)
       .eq(keyColumnOrFilters, keyValue)
     if (error) {
-      throw new Error(
-        `markClaimCompleted(${table}) falhou: ${error.message}`
-      )
+      throw new Error(`markClaimCompleted(${table}) falhou: ${error.message}`)
     }
     return
   }
@@ -203,7 +199,7 @@ export async function claimByFlag(
   table: string,
   id: string,
   flagColumn: string,
-  staleAfterMs: number | false = DEFAULT_STALE_CLAIM_MS
+  staleAfterMs: number | false = DEFAULT_STALE_CLAIM_MS,
 ): Promise<boolean> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const from = (admin.from as any).bind(admin)
@@ -234,7 +230,9 @@ export async function claimByFlag(
   const ageMs = Date.now() - new Date(flaggedAt).getTime()
   if (Number.isNaN(ageMs) || ageMs < staleAfterMs) return false
 
-  await from(table).update({ [flagColumn]: null }).eq('id', id)
+  await from(table)
+    .update({ [flagColumn]: null })
+    .eq('id', id)
   return tryClaim()
 }
 
@@ -243,7 +241,7 @@ export async function releaseFlag(
   admin: AdminClient,
   table: string,
   id: string,
-  flagColumn: string
+  flagColumn: string,
 ): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (admin.from as any)(table)

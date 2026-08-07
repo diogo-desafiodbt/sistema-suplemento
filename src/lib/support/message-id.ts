@@ -1,5 +1,7 @@
 /** Normaliza Message-ID removendo <> e espaços. */
-export function normalizeMessageId(raw: string | null | undefined): string | null {
+export function normalizeMessageId(
+  raw: string | null | undefined,
+): string | null {
   if (!raw) return null
   const trimmed = raw.trim()
   if (!trimmed) return null

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const VALID_TYPES = [
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       .from('funnel_events')
       .upsert(
         { session_id, event_type },
-        { onConflict: 'session_id,event_type', ignoreDuplicates: true }
+        { onConflict: 'session_id,event_type', ignoreDuplicates: true },
       )
 
     return NextResponse.json({ ok: true })

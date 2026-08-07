@@ -6,10 +6,10 @@ export type PurchasePlanType = (typeof PURCHASE_PLAN_TYPES)[number]
 
 export const DEFAULT_PURCHASE_PLAN: PurchasePlanType = '1mes'
 
-export const SUBSCRIPTION_DISCOUNT_3M = 0.1
-export const SUBSCRIPTION_DISCOUNT_6M = 0.15
+const SUBSCRIPTION_DISCOUNT_3M = 0.1
+const SUBSCRIPTION_DISCOUNT_6M = 0.15
 /** Legado — clientes com assinatura_mensal ativa. */
-export const SUBSCRIPTION_DISCOUNT = 0.1
+const SUBSCRIPTION_DISCOUNT = 0.1
 
 export const PLAN_LABELS: Record<string, string> = {
   '1mes': 'Compra única',
@@ -33,7 +33,8 @@ export const PLAN_BADGE: Record<PurchasePlanType, string> = {
 
 export const PLAN_HINT: Record<PurchasePlanType, string> = {
   '1mes': 'Compra única — à vista no Pix ou no cartão',
-  '3meses': 'Compra única — parcelado em 3x no cartão, sem renovação automática',
+  '3meses':
+    'Compra única — parcelado em 3x no cartão, sem renovação automática',
   '6meses':
     'Compra única — parcelado em 6x no cartão, sem renovação automática · Maior desconto',
 }
@@ -52,7 +53,7 @@ export function isRecurringPlan(planType: string): boolean {
  */
 export function canCancelRecurringBilling(
   planType: string,
-  pagarmeSubId: string | null | undefined
+  pagarmeSubId: string | null | undefined,
 ): boolean {
   return isRecurringPlan(planType) || Boolean(pagarmeSubId)
 }
@@ -85,7 +86,7 @@ export function getPlanInstallmentCount(planType: string): number {
 /** Valor de cada parcela (total do ciclo ÷ N). */
 export function getInstallmentPrice(
   priceMonthly: number,
-  planType: string
+  planType: string,
 ): number {
   const count = getPlanInstallmentCount(planType)
   if (count <= 1) return getChargePrice(priceMonthly, planType)
@@ -99,7 +100,7 @@ export function formatBRL(value: number): string {
 /** Economia vs. pagar o ciclo cheio sem desconto (só planos novos com desconto). */
 export function getSubscriptionDiscountAmount(
   priceMonthly: number,
-  planType: string = '1mes'
+  planType: string = '1mes',
 ): number {
   if (planType === '3meses') {
     return roundMoney(priceMonthly * 3 * SUBSCRIPTION_DISCOUNT_3M)
@@ -123,7 +124,7 @@ export function roundMoney(value: number): number {
  * (ver getPharmacyCycleMultiplier). Pode mudar após validação com a Miligrama.
  */
 export function getPharmacySkuKey(
-  planType: string
+  planType: string,
 ): 'pharmacy_sku_monthly' | 'pharmacy_sku_quarterly' | 'pharmacy_sku_yearly' {
   if (planType === '1ano') return 'pharmacy_sku_yearly'
   // Legado trimestral antigo no cadastro de produtos (raro).
@@ -148,7 +149,7 @@ export function getUnitPriceFromProduct(
     price_quarterly: number | null
     price_yearly: number | null
   } | null,
-  planType: string
+  planType: string,
 ): number {
   if (!product) return 0
   const monthly = product.price_monthly ?? 0
@@ -189,6 +190,6 @@ export function addPlanPeriod(from: Date, planType: string): Date {
   return d
 }
 
-export function asPlanType(value: string): PlanType {
+function asPlanType(value: string): PlanType {
   return value as PlanType
 }

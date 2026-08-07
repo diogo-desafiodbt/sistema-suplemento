@@ -1,15 +1,15 @@
 import { ImapFlow } from 'imapflow'
 import { simpleParser } from 'mailparser'
-import { inngest } from '../client'
+import { claimOnce, markClaimCompleted, releaseClaim } from '@/lib/idempotency'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { normalizeMessageId } from '@/lib/support/message-id'
-import { claimOnce, releaseClaim, markClaimCompleted } from '@/lib/idempotency'
+import { inngest } from '../client'
 
 function imapConfigured(): boolean {
   return Boolean(
     process.env.SUPPORT_IMAP_HOST &&
       process.env.SUPPORT_IMAP_USER &&
-      process.env.SUPPORT_IMAP_PASSWORD
+      process.env.SUPPORT_IMAP_PASSWORD,
   )
 }
 
@@ -22,10 +22,7 @@ async function resolveThreadId(params: {
 }): Promise<string> {
   const admin = createAdminClient()
 
-  const candidates = [
-    params.inReplyTo,
-    ...params.references,
-  ]
+  const candidates = [params.inReplyTo, ...params.references]
     .map((id) => normalizeMessageId(id))
     .filter((id): id is string => Boolean(id))
 
@@ -96,7 +93,7 @@ export const supportInboxPoll = inngest.createFunction(
     try {
       for await (const message of client.fetch(
         { seen: false },
-        { uid: true, source: true }
+        { uid: true, source: true },
       )) {
         if (!message.source) continue
 
@@ -133,7 +130,7 @@ export const supportInboxPoll = inngest.createFunction(
             ? parsed.inReplyTo
             : Array.isArray(parsed.inReplyTo)
               ? parsed.inReplyTo[0]
-              : null
+              : null,
         )
 
         const referencesRaw = parsed.references
@@ -157,7 +154,9 @@ export const supportInboxPoll = inngest.createFunction(
 
         const toAddress = Array.isArray(parsed.to) ? parsed.to[0] : parsed.to
         const htmlBody =
-          typeof parsed.html === 'string' ? parsed.html.replace(/<[^>]+>/g, ' ') : null
+          typeof parsed.html === 'string'
+            ? parsed.html.replace(/<[^>]+>/g, ' ')
+            : null
 
         const messageRow = {
           message_id: messageId,
@@ -174,9 +173,14 @@ export const supportInboxPoll = inngest.createFunction(
 
         let won = false
         try {
-          const result = await claimOnce(admin, 'support_messages', messageRow, {
-            completedColumn: 'completed_at',
-          })
+          const result = await claimOnce(
+            admin,
+            'support_messages',
+            messageRow,
+            {
+              completedColumn: 'completed_at',
+            },
+          )
           won = result.won
         } catch (insertError) {
           console.error('Erro ao inserir support_messages:', insertError)
@@ -203,15 +207,20 @@ export const supportInboxPoll = inngest.createFunction(
             if (dispatchedError) {
               console.error(
                 'support-inbox-poll: falha ao gravar event_dispatched_at:',
-                dispatchedError
+                dispatchedError,
               )
             }
           } catch (processError) {
             console.error(
               'Erro ao processar support message após claim:',
-              processError
+              processError,
             )
-            await releaseClaim(admin, 'support_messages', 'message_id', messageId)
+            await releaseClaim(
+              admin,
+              'support_messages',
+              'message_id',
+              messageId,
+            )
             // Não marca \\Seen — próximo poll tenta de novo.
           }
 
@@ -224,13 +233,13 @@ export const supportInboxPoll = inngest.createFunction(
                   'support_messages',
                   'message_id',
                   messageId,
-                  'completed_at'
+                  'completed_at',
                 )
                 stamped = true
               } catch (completeError) {
                 console.error(
                   `support-inbox-poll: falha ao marcar completed_at (tentativa ${attempt + 1}):`,
-                  completeError
+                  completeError,
                 )
                 if (attempt < 2) {
                   await new Promise((r) => setTimeout(r, 250 * (attempt + 1)))
@@ -239,7 +248,9 @@ export const supportInboxPoll = inngest.createFunction(
             }
             if (stamped) {
               processed += 1
-              await client.messageFlagsAdd(message.uid, ['\\Seen'], { uid: true })
+              await client.messageFlagsAdd(message.uid, ['\\Seen'], {
+                uid: true,
+              })
             }
           }
         } else {
@@ -279,13 +290,15 @@ export const supportInboxPoll = inngest.createFunction(
                 'support_messages',
                 'message_id',
                 messageId,
-                'completed_at'
+                'completed_at',
               )
-              await client.messageFlagsAdd(message.uid, ['\\Seen'], { uid: true })
+              await client.messageFlagsAdd(message.uid, ['\\Seen'], {
+                uid: true,
+              })
             } catch (healError) {
               console.error(
                 'support-inbox-poll: falha ao curar mensagem parcial:',
-                healError
+                healError,
               )
             }
           }
@@ -297,5 +310,5 @@ export const supportInboxPoll = inngest.createFunction(
     }
 
     return { ok: true, processed }
-  }
+  },
 )

@@ -1,11 +1,14 @@
-import { createAdminClient } from '@/lib/supabase/admin'
 import {
   getPharmacyCycleMultiplier,
   getUnitPriceFromProduct,
   roundMoney,
 } from '@/lib/plans'
-import { computePackageDimensions, type PackageItem } from '@/lib/shipping/package'
 import { getCotacao } from '@/lib/shipping/envie-agora/cotacao'
+import {
+  computePackageDimensions,
+  type PackageItem,
+} from '@/lib/shipping/package'
+import type { createAdminClient } from '@/lib/supabase/admin'
 import type { ShippingSelection } from '@/types/shipping'
 
 type AdminClient = ReturnType<typeof createAdminClient>
@@ -37,11 +40,13 @@ export async function computeServerCheckoutTotal(
     shipping: ShippingSelection
     address: { zip_code: string; state: string }
     includeShipping?: boolean
-  }
-): Promise<{ ok: true; priced: PricedCheckout } | { ok: false; error: string }> {
+  },
+): Promise<
+  { ok: true; priced: PricedCheckout } | { ok: false; error: string }
+> {
   const includeShipping = params.includeShipping !== false
   const activeItems = params.protocolItems.filter(
-    (i) => !i.removed && !i.blocked
+    (i) => !i.removed && !i.blocked,
   )
   if (activeItems.length === 0) {
     return { ok: false, error: 'Nenhum item ativo no protocolo' }
@@ -56,7 +61,7 @@ export async function computeServerCheckoutTotal(
   const { data: products, error } = await admin
     .from('products')
     .select(
-      'id, price_monthly, price_quarterly, price_yearly, box_type, is_active'
+      'id, price_monthly, price_quarterly, price_yearly, box_type, is_active',
     )
     .in('id', productIds)
 
@@ -128,9 +133,8 @@ export async function computeServerCheckoutTotal(
         (!params.shipping.transportadora ||
           q.transportadora === params.shipping.transportadora) &&
         (!params.shipping.nomeServico ||
-          q.nomeServico === params.shipping.nomeServico)
-    ) ??
-    quotes.find((q) => q.codigoServico === params.shipping.codigoServico)
+          q.nomeServico === params.shipping.nomeServico),
+    ) ?? quotes.find((q) => q.codigoServico === params.shipping.codigoServico)
 
   if (!match) {
     return { ok: false, error: 'Opção de frete inválida ou expirada' }

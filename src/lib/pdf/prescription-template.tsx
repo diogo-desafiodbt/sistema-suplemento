@@ -1,16 +1,10 @@
+import { Document, Page, StyleSheet, Text, View } from '@react-pdf/renderer'
 import React from 'react'
-import {
-  Document,
-  Page,
-  Text,
-  View,
-  StyleSheet,
-} from '@react-pdf/renderer'
 import {
   calcAge,
   DIAGNOSIS_LABELS,
-  RENAL_LABELS,
   HEPATIC_LABELS,
+  RENAL_LABELS,
 } from '@/lib/protocol/triage'
 
 const styles = StyleSheet.create({
@@ -133,13 +127,18 @@ type PrescriptionData = {
 export function PrescriptionDocument({ data }: { data: PrescriptionData }) {
   const isLegacyQuiz = !data.quiz.birth_date
   const age =
-    data.quiz.birth_date && !Number.isNaN(new Date(data.quiz.birth_date).getTime())
+    data.quiz.birth_date &&
+    !Number.isNaN(new Date(data.quiz.birth_date).getTime())
       ? calcAge(data.quiz.birth_date)
       : null
   const renal = data.quiz.renal_conditions ?? []
   const hepatic = data.quiz.hepatic_conditions ?? []
   const sexLabel =
-    data.quiz.sex === 'mulher' ? 'Mulher' : data.quiz.sex === 'homem' ? 'Homem' : '—'
+    data.quiz.sex === 'mulher'
+      ? 'Mulher'
+      : data.quiz.sex === 'homem'
+        ? 'Homem'
+        : '—'
 
   const legacyYearsLabel = data.quiz.allergies?.startsWith('idade:')
     ? `Não informado (idade: ${data.quiz.allergies.replace('idade:', '')} anos)`
@@ -148,10 +147,11 @@ export function PrescriptionDocument({ data }: { data: PrescriptionData }) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-
         <View style={styles.header}>
           <Text style={styles.title}>Desafio Diabetes</Text>
-          <Text style={styles.subtitle}>Prescrição Médica — Protocolo de Suplementação</Text>
+          <Text style={styles.subtitle}>
+            Prescrição Médica — Protocolo de Suplementação
+          </Text>
         </View>
 
         <View style={styles.section}>
@@ -166,7 +166,10 @@ export function PrescriptionDocument({ data }: { data: PrescriptionData }) {
           </View>
           <View style={styles.row}>
             <Text style={styles.label}>Diagnóstico:</Text>
-            <Text style={styles.value}>{DIAGNOSIS_LABELS[data.quiz.diagnosis_type] ?? data.quiz.diagnosis_type}</Text>
+            <Text style={styles.value}>
+              {DIAGNOSIS_LABELS[data.quiz.diagnosis_type] ??
+                data.quiz.diagnosis_type}
+            </Text>
           </View>
           {isLegacyQuiz ? (
             <>
@@ -193,7 +196,9 @@ export function PrescriptionDocument({ data }: { data: PrescriptionData }) {
               !data.quiz.allergies?.startsWith('idade:') ? (
                 <View style={styles.row}>
                   <Text style={styles.label}>Medicamentos em uso:</Text>
-                  <Text style={styles.value}>{data.quiz.medications.join(', ')}</Text>
+                  <Text style={styles.value}>
+                    {data.quiz.medications.join(', ')}
+                  </Text>
                 </View>
               ) : null}
             </>
@@ -201,7 +206,9 @@ export function PrescriptionDocument({ data }: { data: PrescriptionData }) {
             <>
               <View style={styles.row}>
                 <Text style={styles.label}>Idade:</Text>
-                <Text style={styles.value}>{age != null ? `${age} anos` : '—'}</Text>
+                <Text style={styles.value}>
+                  {age != null ? `${age} anos` : '—'}
+                </Text>
               </View>
               <View style={styles.row}>
                 <Text style={styles.label}>Sexo:</Text>
@@ -234,7 +241,9 @@ export function PrescriptionDocument({ data }: { data: PrescriptionData }) {
               {data.quiz.medications?.length > 0 ? (
                 <View style={styles.row}>
                   <Text style={styles.label}>Medicamentos em uso:</Text>
-                  <Text style={styles.value}>{data.quiz.medications.join(', ')}</Text>
+                  <Text style={styles.value}>
+                    {data.quiz.medications.join(', ')}
+                  </Text>
                 </View>
               ) : null}
             </>
@@ -246,7 +255,10 @@ export function PrescriptionDocument({ data }: { data: PrescriptionData }) {
           {data.items.map((item, index) => (
             <View key={index} style={styles.productItem}>
               <Text style={styles.productName}>
-                {item.name}{item.is_required ? ' (Tratamento principal)' : ' (Complementar)'}
+                {item.name}
+                {item.is_required
+                  ? ' (Tratamento principal)'
+                  : ' (Complementar)'}
               </Text>
               <Text style={styles.productDesc}>{item.activation_reason}</Text>
             </View>
@@ -269,18 +281,21 @@ export function PrescriptionDocument({ data }: { data: PrescriptionData }) {
         <View style={styles.footer}>
           <View style={styles.signatureBlock}>
             <View style={styles.signatureLine} />
-            <Text style={styles.signatureText}>{data.professional.full_name}</Text>
+            <Text style={styles.signatureText}>
+              {data.professional.full_name}
+            </Text>
             <Text style={styles.signatureText}>
               CRM {data.professional.crm}/{data.professional.crm_state}
             </Text>
-            <Text style={styles.signatureText}>{data.professional.specialty}</Text>
+            <Text style={styles.signatureText}>
+              {data.professional.specialty}
+            </Text>
           </View>
           <View style={styles.stamp}>
             <Text>Documento gerado digitalmente</Text>
             <Text>Desafio Diabetes — CNPJ 63.862.444/0001-56</Text>
           </View>
         </View>
-
       </Page>
     </Document>
   )

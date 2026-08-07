@@ -1,11 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { type NextRequest, NextResponse } from 'next/server'
 import { createShippingLabelForOrder } from '@/lib/shipping/create-label'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 
 async function requireAdmin() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) return null
   const admin = createAdminClient()
   const { data: profile } = await admin
@@ -19,7 +21,7 @@ async function requireAdmin() {
 
 export async function POST(
   _request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
     const admin = await requireAdmin()
@@ -35,7 +37,10 @@ export async function POST(
       .single()
 
     if (!order) {
-      return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Pedido não encontrado' },
+        { status: 404 },
+      )
     }
 
     if (order.shipping_request_id) {
@@ -52,7 +57,7 @@ export async function POST(
     console.error('gerar-etiqueta error:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Erro interno' },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }

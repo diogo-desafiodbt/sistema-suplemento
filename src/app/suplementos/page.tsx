@@ -1,14 +1,13 @@
 'use client'
 
 import Link from 'next/link'
-import Header from '@/components/Header'
 import Footer from '@/components/Footer'
+import Header from '@/components/Header'
 
 const benefits = [
   {
     title: 'Farmácia autorizada pela Anvisa',
-    detail:
-      'Elaborados e vendidos por farmácias de manipulação credenciadas.',
+    detail: 'Elaborados e vendidos por farmácias de manipulação credenciadas.',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
         <path
@@ -52,7 +51,8 @@ const benefits = [
   },
   {
     title: 'Baixo índice glicêmico',
-    detail: 'Formulados para não disparar o açúcar no sangue como suplementos comuns.',
+    detail:
+      'Formulados para não disparar o açúcar no sangue como suplementos comuns.',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
         <path
@@ -158,8 +158,8 @@ export default function SuplementosPage() {
             <div className="order-1 self-center flex flex-col items-center md:items-start justify-center gap-6 md:gap-8 text-center md:text-left md:px-4 lg:px-8">
               <h1 className="font-title-alt font-bold text-[2.15rem] sm:text-[2.6rem] md:text-[3.45rem] lg:text-[4.3rem] leading-tight text-white max-w-md md:max-w-lg">
                 Suplementação{' '}
-                <span className="italic text-[#a30000]">personalizada</span> para
-                diabéticos
+                <span className="italic text-[#a30000]">personalizada</span>{' '}
+                para diabéticos
               </h1>
               <Link
                 href="/quiz"
@@ -234,7 +234,9 @@ export default function SuplementosPage() {
                     {t.text}
                   </p>
                   <div className="flex items-center justify-between pt-3 border-t border-gray-200">
-                    <p className="text-base font-bold text-[#13244f]">{t.name}</p>
+                    <p className="text-base font-bold text-[#13244f]">
+                      {t.name}
+                    </p>
                     <span className="text-sm text-green-800 font-semibold bg-green-50 px-3 py-1.5 rounded-full">
                       Verificado
                     </span>
@@ -275,7 +277,10 @@ export default function SuplementosPage() {
                       key={item}
                       className="flex items-start gap-3 text-base md:text-lg text-[#13244f]"
                     >
-                      <span className="text-red-600 font-bold text-xl leading-none" aria-hidden>
+                      <span
+                        className="text-red-600 font-bold text-xl leading-none"
+                        aria-hidden
+                      >
                         ✕
                       </span>
                       {item}
@@ -299,7 +304,10 @@ export default function SuplementosPage() {
                       key={item}
                       className="flex items-start gap-3 text-base md:text-lg text-[#13244f]"
                     >
-                      <span className="text-[#13244f] font-bold text-xl leading-none" aria-hidden>
+                      <span
+                        className="text-[#13244f] font-bold text-xl leading-none"
+                        aria-hidden
+                      >
                         ✓
                       </span>
                       {item}

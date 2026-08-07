@@ -1,22 +1,22 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { supplements } from '@/lib/supplements-content'
+import { useEffect, useState } from 'react'
 import {
   DEFAULT_PURCHASE_PLAN,
-  PLAN_BADGE,
-  PLAN_HINT,
-  PLAN_TYPE_LABEL,
-  PURCHASE_PLAN_TYPES,
   formatBRL,
   getChargePrice,
   getInstallmentPrice,
   getPlanInstallmentCount,
   getSubscriptionDiscountAmount,
+  PLAN_BADGE,
+  PLAN_HINT,
+  PLAN_TYPE_LABEL,
+  PURCHASE_PLAN_TYPES,
   type PurchasePlanType,
 } from '@/lib/plans'
+import { supplements } from '@/lib/supplements-content'
 
 type LocalProtocolItem = {
   product_id: string
@@ -89,7 +89,7 @@ function markTwoCheapest(items: LocalProtocolItem[]): LocalProtocolItem[] {
     return priceA - priceB
   })
   const selectedIds = new Set(
-    ranked.slice(0, Math.min(2, ranked.length)).map((item) => item.product_id)
+    ranked.slice(0, Math.min(2, ranked.length)).map((item) => item.product_id),
   )
 
   return items.map((item) => {
@@ -110,8 +110,9 @@ export default function RecomendacoesPage() {
   const router = useRouter()
   const [items, setItems] = useState<LocalProtocolItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedPlan, setSelectedPlan] =
-    useState<PurchasePlanType>(DEFAULT_PURCHASE_PLAN)
+  const [selectedPlan, setSelectedPlan] = useState<PurchasePlanType>(
+    DEFAULT_PURCHASE_PLAN,
+  )
   const [openFaq, setOpenFaq] = useState<string | null>(null)
 
   useEffect(() => {
@@ -137,12 +138,12 @@ export default function RecomendacoesPage() {
           const product =
             products.find(
               (p: { name: string }) =>
-                p.name.toLowerCase() === item.product_name.toLowerCase()
+                p.name.toLowerCase() === item.product_name.toLowerCase(),
             ) ??
             products.find((p: { name: string }) =>
               p.name
                 .toLowerCase()
-                .includes(item.product_name.toLowerCase().split(' ')[0])
+                .includes(item.product_name.toLowerCase().split(' ')[0]),
             )
           return {
             ...item,
@@ -159,8 +160,8 @@ export default function RecomendacoesPage() {
             visible.map((item) => ({
               ...item,
               image: matchSupplementImage(item.product_name) ?? item.image,
-            }))
-          )
+            })),
+          ),
         )
       }
     } catch {
@@ -175,15 +176,16 @@ export default function RecomendacoesPage() {
       prev.map((item) =>
         item.product_id === productId
           ? { ...item, removed: !item.removed }
-          : item
-      )
+          : item,
+      ),
     )
   }
 
-  function getPrice(item: LocalProtocolItem, plan: PurchasePlanType = selectedPlan): number {
-    return (
-      getChargePrice(item.price_monthly ?? 0, plan) * (item.quantity ?? 1)
-    )
+  function getPrice(
+    item: LocalProtocolItem,
+    plan: PurchasePlanType = selectedPlan,
+  ): number {
+    return getChargePrice(item.price_monthly ?? 0, plan) * (item.quantity ?? 1)
   }
 
   function getActiveItems(): LocalProtocolItem[] {
@@ -217,7 +219,9 @@ export default function RecomendacoesPage() {
       return priceA - priceB
     })
     const requiredIds = new Set(
-      ranked.slice(0, Math.min(2, ranked.length)).map((item) => item.product_id)
+      ranked
+        .slice(0, Math.min(2, ranked.length))
+        .map((item) => item.product_id),
     )
 
     const synced = items.map((item) => ({
@@ -237,7 +241,9 @@ export default function RecomendacoesPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#f5f0eb] flex items-center justify-center">
-        <p className="text-[#13244f]/60 font-medium">Carregando seu protocolo...</p>
+        <p className="text-[#13244f]/60 font-medium">
+          Carregando seu protocolo...
+        </p>
       </div>
     )
   }
@@ -246,7 +252,7 @@ export default function RecomendacoesPage() {
 
   const activeItems = getActiveItems()
   const approvedNames = formatProductList(
-    activeItems.map((i) => i.product_name)
+    activeItems.map((i) => i.product_name),
   )
   const totalSavings = getTotalSavings()
   const installmentCount = getPlanInstallmentCount(selectedPlan)
@@ -343,13 +349,15 @@ export default function RecomendacoesPage() {
                 const discount =
                   getSubscriptionDiscountAmount(
                     item.price_monthly ?? 0,
-                    selectedPlan
+                    selectedPlan,
                   ) * qty
                 const itemInstallments = getPlanInstallmentCount(selectedPlan)
                 const itemInstallment =
                   itemInstallments > 1
-                    ? getInstallmentPrice(item.price_monthly ?? 0, selectedPlan) *
-                      qty
+                    ? getInstallmentPrice(
+                        item.price_monthly ?? 0,
+                        selectedPlan,
+                      ) * qty
                     : price
 
                 return (
@@ -560,7 +568,7 @@ export default function RecomendacoesPage() {
                         type="button"
                         onClick={() =>
                           setOpenFaq((current) =>
-                            current === item.id ? null : item.id
+                            current === item.id ? null : item.id,
                           )
                         }
                         className="w-full flex items-center justify-between gap-4 py-4 text-left"

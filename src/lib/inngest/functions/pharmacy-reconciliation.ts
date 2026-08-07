@@ -1,6 +1,6 @@
 import { Resend } from 'resend'
-import { inngest } from '../client'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { inngest } from '../client'
 
 const PHARMACY_EMAIL = 'diretorcomercialtk2@gmail.com'
 
@@ -47,7 +47,9 @@ export const pharmacyReconciliation = inngest.createFunction(
         .lt('created_at', range.lt)
 
       if (ordersError) {
-        throw new Error(`Erro ao buscar pedidos de ontem: ${ordersError.message}`)
+        throw new Error(
+          `Erro ao buscar pedidos de ontem: ${ordersError.message}`,
+        )
       }
 
       const { data: logs, error: logsError } = await admin
@@ -68,8 +70,8 @@ export const pharmacyReconciliation = inngest.createFunction(
         }
       }
 
-      const orderIds = (orders ?? []).map(o => o.id as string)
-      const missing = orderIds.filter(id => !pulledIds.has(id))
+      const orderIds = (orders ?? []).map((o) => o.id as string)
+      const missing = orderIds.filter((id) => !pulledIds.has(id))
       const hadCalls = (logs ?? []).length > 0
 
       return {
@@ -100,7 +102,9 @@ export const pharmacyReconciliation = inngest.createFunction(
     await step.run('enviar-email-reconciliacao', async () => {
       const resendApiKey = process.env.RESEND_API_KEY
       if (!resendApiKey) {
-        throw new Error('RESEND_API_KEY ausente — e-mail de reconciliação não enviado')
+        throw new Error(
+          'RESEND_API_KEY ausente — e-mail de reconciliação não enviado',
+        )
       }
 
       const dateBr = report.date.split('-').reverse().join('/')
@@ -121,7 +125,7 @@ export const pharmacyReconciliation = inngest.createFunction(
   <p style="color:#b00;">Nenhum pedido foi puxado. Verificar com a Miligrama.</p>`
       } else {
         const lista = report.missing
-          .map(id => `<li>${escapeHtml(id)}</li>`)
+          .map((id) => `<li>${escapeHtml(id)}</li>`)
           .join('\n')
         subject = `Reconciliação com pendência — ${dateBr}`
         bodyHtml = `
@@ -149,5 +153,5 @@ ${bodyHtml}
     })
 
     return report
-  }
+  },
 )

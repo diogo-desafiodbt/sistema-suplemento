@@ -5,8 +5,8 @@
  * Usage: node --input-type=module scripts/validate-deferred-protocol.mjs
  */
 import { createClient } from '@supabase/supabase-js'
-import { readFileSync } from 'fs'
 import { randomUUID } from 'crypto'
+import { readFileSync } from 'fs'
 
 const env = Object.fromEntries(
   readFileSync(new URL('../.env.local', import.meta.url), 'utf8')
@@ -15,12 +15,16 @@ const env = Object.fromEntries(
     .map((l) => {
       const i = l.indexOf('=')
       return [l.slice(0, i), l.slice(i + 1)]
-    })
+    }),
 )
 
-const admin = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false },
-})
+const admin = createClient(
+  env.NEXT_PUBLIC_SUPABASE_URL,
+  env.SUPABASE_SERVICE_ROLE_KEY,
+  {
+    auth: { persistSession: false, autoRefreshToken: false },
+  },
+)
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg)
@@ -35,12 +39,17 @@ async function ensureProtocolAfterPayment(subscriptionId, userId) {
     .eq('user_id', userId)
     .single()
 
-  if (subError || !subscription) throw new Error(`sub not found: ${subError?.message}`)
-  if (subscription.protocol_id) return { protocolId: subscription.protocol_id, created: false }
+  if (subError || !subscription)
+    throw new Error(`sub not found: ${subError?.message}`)
+  if (subscription.protocol_id)
+    return { protocolId: subscription.protocol_id, created: false }
 
   const pending = subscription.pending_checkout
   assert(pending?.quiz?.diagnosis_type, 'missing pending quiz')
-  assert(Array.isArray(pending.protocol_items) && pending.protocol_items.length > 0, 'missing items')
+  assert(
+    Array.isArray(pending.protocol_items) && pending.protocol_items.length > 0,
+    'missing items',
+  )
 
   const source = pending.source === 'mini_quiz' ? 'mini_quiz' : 'full_quiz'
   const quiz = pending.quiz
@@ -50,7 +59,8 @@ async function ensureProtocolAfterPayment(subscriptionId, userId) {
     .insert({
       user_id: userId,
       diagnosis_type: quiz.diagnosis_type,
-      years_diagnosed: source === 'mini_quiz' ? '<1ano' : (quiz.years_diagnosed ?? '<1ano'),
+      years_diagnosed:
+        source === 'mini_quiz' ? '<1ano' : (quiz.years_diagnosed ?? '<1ano'),
       hba1c_range: quiz.hba1c_range ?? null,
       fasting_glucose: quiz.fasting_glucose ?? null,
       medications: quiz.medications ?? [],
@@ -61,7 +71,10 @@ async function ensureProtocolAfterPayment(subscriptionId, userId) {
       weight_status: quiz.weight_status ?? null,
       exercise_freq: quiz.exercise_freq ?? null,
       diet_quality: quiz.diet_quality ?? null,
-      allergies: source === 'mini_quiz' ? `idade:${quiz.age ?? 40}` : (quiz.allergies ?? null),
+      allergies:
+        source === 'mini_quiz'
+          ? `idade:${quiz.age ?? 40}`
+          : (quiz.allergies ?? null),
       prior_treatment: quiz.prior_treatment ?? [],
       completed_at: new Date().toISOString(),
     })
@@ -82,7 +95,8 @@ async function ensureProtocolAfterPayment(subscriptionId, userId) {
     .select('id, source')
     .single()
 
-  if (protocolError) throw new Error(`protocol insert: ${protocolError.message}`)
+  if (protocolError)
+    throw new Error(`protocol insert: ${protocolError.message}`)
 
   const productId = pending.protocol_items[0].product_id
   if (productId) {
@@ -101,7 +115,12 @@ async function ensureProtocolAfterPayment(subscriptionId, userId) {
     .update({ protocol_id: protocol.id, pending_checkout: null })
     .eq('id', subscriptionId)
 
-  return { protocolId: protocol.id, source: protocol.source, created: true, quizResponseId: quizResponse.id }
+  return {
+    protocolId: protocol.id,
+    source: protocol.source,
+    created: true,
+    quizResponseId: quizResponse.id,
+  }
 }
 
 async function runCase(label, source, quiz) {
@@ -110,16 +129,22 @@ async function runCase(label, source, quiz) {
   const email = `validate-${source}-${Date.now()}@example.com`
   const password = 'Validate123!'
 
-  const { data: created, error: createErr } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { full_name: quiz.full_name ?? 'Validação Teste' },
-  })
+  const { data: created, error: createErr } = await admin.auth.admin.createUser(
+    {
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { full_name: quiz.full_name ?? 'Validação Teste' },
+    },
+  )
   if (createErr) throw new Error(`createUser: ${createErr.message}`)
   const userId = created.user.id
 
-  const { data: products } = await admin.from('products').select('id, name').eq('is_active', true).limit(1)
+  const { data: products } = await admin
+    .from('products')
+    .select('id, name')
+    .eq('is_active', true)
+    .limit(1)
   assert(products?.length, 'no products in DB')
 
   // BEFORE payment: subscription with null protocol_id + pending_checkout
@@ -132,7 +157,10 @@ async function runCase(label, source, quiz) {
         product_id: products[0].id,
         product_name: products[0].name,
         is_required: false,
-        activation_reason: source === 'mini_quiz' ? 'Selecionado por você no carrinho' : 'Recomendado',
+        activation_reason:
+          source === 'mini_quiz'
+            ? 'Selecionado por você no carrinho'
+            : 'Recomendado',
         quantity: 1,
       },
     ],
@@ -154,7 +182,8 @@ async function runCase(label, source, quiz) {
     .select('id, protocol_id, pending_checkout')
     .single()
 
-  if (subErr) throw new Error(`sub insert (null protocol_id): ${subErr.message}`)
+  if (subErr)
+    throw new Error(`sub insert (null protocol_id): ${subErr.message}`)
 
   assert(sub.protocol_id === null, 'protocol_id should be null BEFORE payment')
   assert(sub.pending_checkout?.source === source, 'pending_checkout not stored')
@@ -171,7 +200,10 @@ async function runCase(label, source, quiz) {
   // Simulate payment confirmation
   const result = await ensureProtocolAfterPayment(sub.id, userId)
   assert(result.created, 'protocol should be created on payment')
-  assert(result.source === source, `expected source=${source}, got ${result.source}`)
+  assert(
+    result.source === source,
+    `expected source=${source}, got ${result.source}`,
+  )
 
   const { data: subAfter } = await admin
     .from('subscriptions')
@@ -179,9 +211,14 @@ async function runCase(label, source, quiz) {
     .eq('id', sub.id)
     .single()
 
-  assert(subAfter.protocol_id === result.protocolId, 'subscription.protocol_id linked')
+  assert(
+    subAfter.protocol_id === result.protocolId,
+    'subscription.protocol_id linked',
+  )
   assert(subAfter.pending_checkout === null, 'pending_checkout cleared')
-  console.log(`✓ AFTER payment: protocol created source=${result.source}, pending cleared`)
+  console.log(
+    `✓ AFTER payment: protocol created source=${result.source}, pending cleared`,
+  )
 
   // Idempotency
   const again = await ensureProtocolAfterPayment(sub.id, userId)
@@ -190,10 +227,14 @@ async function runCase(label, source, quiz) {
   console.log('✓ Idempotent on second ensureProtocolAfterPayment')
 
   // Cleanup
-  await admin.from('protocol_items').delete().eq('protocol_id', result.protocolId)
+  await admin
+    .from('protocol_items')
+    .delete()
+    .eq('protocol_id', result.protocolId)
   await admin.from('subscriptions').delete().eq('id', sub.id)
   await admin.from('protocols').delete().eq('id', result.protocolId)
-  if (result.quizResponseId) await admin.from('quiz_responses').delete().eq('id', result.quizResponseId)
+  if (result.quizResponseId)
+    await admin.from('quiz_responses').delete().eq('id', result.quizResponseId)
   await admin.from('users').delete().eq('id', userId).maybeSingle?.()
   await admin.auth.admin.deleteUser(userId)
   console.log('✓ cleanup done')
@@ -209,13 +250,19 @@ async function main() {
   })
   const openapi = await res.json()
   const subReq = openapi?.definitions?.subscriptions?.required ?? []
-  const pending = openapi?.definitions?.subscriptions?.properties?.pending_checkout
+  const pending =
+    openapi?.definitions?.subscriptions?.properties?.pending_checkout
   const source = openapi?.definitions?.protocols?.properties?.source
 
-  assert(!subReq.includes('protocol_id'), 'protocol_id still required in OpenAPI')
+  assert(
+    !subReq.includes('protocol_id'),
+    'protocol_id still required in OpenAPI',
+  )
   assert(pending?.format === 'jsonb', 'pending_checkout missing/not jsonb')
   assert(source?.default === 'full_quiz', 'protocols.source default missing')
-  console.log('✓ Schema: protocol_id nullable, pending_checkout jsonb, source default full_quiz')
+  console.log(
+    '✓ Schema: protocol_id nullable, pending_checkout jsonb, source default full_quiz',
+  )
 
   await runCase('Compra direta (mini_quiz)', 'mini_quiz', {
     diagnosis_type: 'type2',

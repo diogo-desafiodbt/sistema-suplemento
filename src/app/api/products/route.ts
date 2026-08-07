@@ -6,7 +6,9 @@ export async function GET() {
     const admin = createAdminClient()
     const { data: products, error } = await admin
       .from('products')
-      .select('id, name, price_monthly, price_quarterly, price_yearly, is_fixed, is_active')
+      .select(
+        'id, name, price_monthly, price_quarterly, price_yearly, is_fixed, is_active',
+      )
       .eq('is_active', true)
       .order('is_fixed', { ascending: false })
 

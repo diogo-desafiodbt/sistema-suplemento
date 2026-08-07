@@ -5,11 +5,12 @@
  *   INNGEST_DEV=1 node scripts/validate-regua-cobranca.mjs cancel # Cenário A — cancelamento manual
  *   INNGEST_DEV=1 node scripts/validate-regua-cobranca.mjs b    # Cenário B — regularização
  */
-import { readFileSync } from 'fs'
-import { resolve, dirname } from 'path'
-import { fileURLToPath } from 'url'
+
 import { createClient } from '@supabase/supabase-js'
+import { readFileSync } from 'fs'
 import { Inngest } from 'inngest'
+import { dirname, resolve } from 'path'
+import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = resolve(__dirname, '..')
@@ -33,14 +34,17 @@ loadEnv()
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY,
-  { auth: { autoRefreshToken: false, persistSession: false } }
+  { auth: { autoRefreshToken: false, persistSession: false } },
 )
 
-const inngest = new Inngest({ id: 'desafio-diabetes', name: 'Desafio Diabetes' })
+const inngest = new Inngest({
+  id: 'desafio-diabetes',
+  name: 'Desafio Diabetes',
+})
 const INNGEST_DEV_URL = process.env.INNGEST_DEV_URL ?? 'http://127.0.0.1:8288'
 
 function sleep(ms) {
-  return new Promise(r => setTimeout(r, ms))
+  return new Promise((r) => setTimeout(r, ms))
 }
 
 async function assinaturaAtiva(subscriptionId) {
@@ -55,7 +59,9 @@ async function assinaturaAtiva(subscriptionId) {
 async function getSubscription(id) {
   const { data, error } = await supabase
     .from('subscriptions')
-    .select('id, user_id, plan_type, status, grace_period_ends_at, pagarme_sub_id')
+    .select(
+      'id, user_id, plan_type, status, grace_period_ends_at, pagarme_sub_id',
+    )
     .eq('id', id)
     .single()
   if (error) throw error
@@ -165,7 +171,11 @@ async function prepareSubscription(suffix) {
     })
   }
 
-  return { subscription_id: subId, user_id: userId, pagarme_sub_id: fakePagarmeId }
+  return {
+    subscription_id: subId,
+    user_id: userId,
+    pagarme_sub_id: fakePagarmeId,
+  }
 }
 
 async function sendPagamentoFalhou(subscriptionId, userId) {
@@ -201,7 +211,7 @@ async function cancelPagarmeSubscription(pagarmeSubId) {
   const pagarmeAuth = `Basic ${Buffer.from(`${apiKey}:`).toString('base64')}`
   const res = await fetch(
     `https://api.pagar.me/core/v5/subscriptions/${pagarmeSubId}`,
-    { method: 'DELETE', headers: { Authorization: pagarmeAuth } }
+    { method: 'DELETE', headers: { Authorization: pagarmeAuth } },
   )
   if (res.ok || res.status === 404) return { ok: true, status: res.status }
   const body = await res.text()
@@ -211,13 +221,19 @@ async function cancelPagarmeSubscription(pagarmeSubId) {
 function printResults(title, results) {
   console.log(`\n--- ${title} ---`)
   for (const r of results) {
-    console.log(`${r.ok ? '✅' : '❌'} ${r.check}${r.detail ? ` — ${r.detail}` : ''}`)
+    console.log(
+      `${r.ok ? '✅' : '❌'} ${r.check}${r.detail ? ` — ${r.detail}` : ''}`,
+    )
   }
 }
 
 async function checkServers() {
-  const inngestOk = await fetch(`${INNGEST_DEV_URL}/health`).then(r => r.ok).catch(() => false)
-  const nextOk = await fetch('http://localhost:3000/api/inngest').then(r => r.ok).catch(() => false)
+  const inngestOk = await fetch(`${INNGEST_DEV_URL}/health`)
+    .then((r) => r.ok)
+    .catch(() => false)
+  const nextOk = await fetch('http://localhost:3000/api/inngest')
+    .then((r) => r.ok)
+    .catch(() => false)
   return { inngestOk, nextOk }
 }
 
@@ -225,7 +241,9 @@ async function runD0() {
   const results = []
   const { inngestOk, nextOk } = await checkServers()
   if (!inngestOk || !nextOk) {
-    console.error('❌ Servidores não disponíveis (Next.js + Inngest dev com INNGEST_DEV=1)')
+    console.error(
+      '❌ Servidores não disponíveis (Next.js + Inngest dev com INNGEST_DEV=1)',
+    )
     process.exit(1)
   }
 
@@ -245,7 +263,9 @@ async function runD0() {
   })
   results.push({
     check: 'D+0: grace_period_ends_at ~20 dias',
-    ok: sub.grace_period_ends_at ? daysFromNow(sub.grace_period_ends_at, 20) < 48 : false,
+    ok: sub.grace_period_ends_at
+      ? daysFromNow(sub.grace_period_ends_at, 20) < 48
+      : false,
     detail: sub.grace_period_ends_at,
   })
   results.push({
@@ -302,8 +322,8 @@ async function runCancel() {
 
   const sub = await getSubscription(test.subscription_id)
   const ents = await getEntitlements(test.user_id)
-  const treatment = ents.find(e => e.product_key === 'treatment')
-  const guide = ents.find(e => e.product_key === 'guide')
+  const treatment = ents.find((e) => e.product_key === 'treatment')
+  const guide = ents.find((e) => e.product_key === 'guide')
 
   results.push({
     check: 'D+20: status = canceled',
@@ -318,7 +338,9 @@ async function runCancel() {
   results.push({
     check: 'D+20: guide permanente não tocado',
     ok: guide?.status === 'active' && guide?.is_permanent === true,
-    detail: guide ? `${guide.status} permanent=${guide.is_permanent}` : 'sem guide',
+    detail: guide
+      ? `${guide.status} permanent=${guide.is_permanent}`
+      : 'sem guide',
   })
 
   printResults('Cenário A — cancelamento (lógica D+20)', results)
@@ -366,7 +388,7 @@ async function runB() {
   })
 
   const ents = await getEntitlements(test.user_id)
-  const treatment = ents.find(e => e.product_key === 'treatment')
+  const treatment = ents.find((e) => e.product_key === 'treatment')
   results.push({
     check: 'Entitlement treatment ainda active (não revogado)',
     ok: treatment?.status === 'active',

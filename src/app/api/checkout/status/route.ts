@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     if (!subscriptionId) {
       return NextResponse.json(
         { error: 'subscription_id obrigatório' },
-        { status: 400 }
+        { status: 400 },
       )
     }
 
@@ -43,7 +43,10 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('checkout/status error:', error)
-      return NextResponse.json({ error: 'Erro ao consultar status' }, { status: 500 })
+      return NextResponse.json(
+        { error: 'Erro ao consultar status' },
+        { status: 500 },
+      )
     }
 
     const raw = payment?.status ?? 'pending'

@@ -1,5 +1,5 @@
-import { createClient } from './server'
 import { createAdminClient } from './admin'
+import { createClient } from './server'
 
 export type UserProfile = {
   full_name: string | null
@@ -7,7 +7,9 @@ export type UserProfile = {
   client_code: string | null
 }
 
-export async function getUserProfile(userId: string): Promise<UserProfile | null> {
+export async function getUserProfile(
+  userId: string,
+): Promise<UserProfile | null> {
   const supabase = await createClient()
 
   const { data, error } = await supabase

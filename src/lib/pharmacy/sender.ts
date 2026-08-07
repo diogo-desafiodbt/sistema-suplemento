@@ -1,5 +1,5 @@
 import { Resend } from 'resend'
-import { PharmacyOrder } from '@/types/pharmacy'
+import type { PharmacyOrder } from '@/types/pharmacy'
 
 const PHARMACY_EMAIL = 'diretorcomercialtk2@gmail.com'
 
@@ -22,7 +22,7 @@ async function sendPharmacyOrderEmail(json: PharmacyOrder): Promise<void> {
   const resendApiKey = process.env.RESEND_API_KEY
   if (!resendApiKey) {
     console.error(
-      '[pharmacy-order] RESEND_API_KEY ausente — pedido NÃO enviado para farmácia'
+      '[pharmacy-order] RESEND_API_KEY ausente — pedido NÃO enviado para farmácia',
     )
     throw new Error('RESEND_API_KEY ausente — pedido não enviado para farmácia')
   }
@@ -30,11 +30,11 @@ async function sendPharmacyOrderEmail(json: PharmacyOrder): Promise<void> {
   const cliente = escapeHtml(json.EntregaNome)
   const codigo = escapeHtml(String(json.ClienteCodigo))
   const endereco = escapeHtml(
-    `${json.EntregaLogradouro}, ${json.EntregaLogradouroNumero}${json.EntregaLogradouroComplemento ? ` — ${json.EntregaLogradouroComplemento}` : ''} — ${json.EntregaBairro}, ${json.EntregaMunicipioNome}/${json.EntregaUnidadeFederativa} — CEP ${json.EntregaCEP}`
+    `${json.EntregaLogradouro}, ${json.EntregaLogradouroNumero}${json.EntregaLogradouroComplemento ? ` — ${json.EntregaLogradouroComplemento}` : ''} — ${json.EntregaBairro}, ${json.EntregaMunicipioNome}/${json.EntregaUnidadeFederativa} — CEP ${json.EntregaCEP}`,
   )
   const itens = json.Itens.map(
-    item =>
-      `• ${item.ItemNome} | SKU ${item.ProdutoReferencia} | Cód ${item.ProdutoCodigo} | Qtd ${item.Quantidade}`
+    (item) =>
+      `• ${item.ItemNome} | SKU ${item.ProdutoReferencia} | Cód ${item.ProdutoCodigo} | Qtd ${item.Quantidade}`,
   ).join('\n')
   const jsonFormatted = escapeHtml(JSON.stringify(json, null, 2))
 
@@ -65,12 +65,15 @@ async function sendPharmacyOrderEmail(json: PharmacyOrder): Promise<void> {
       attachments: [jsonAttachment(json)],
     })
   } catch (error) {
-    console.error('[pharmacy-order] Falha ao enviar email para farmácia:', error)
+    console.error(
+      '[pharmacy-order] Falha ao enviar email para farmácia:',
+      error,
+    )
     throw error
   }
 }
 
-export async function sendToPharmacy(json: PharmacyOrder): Promise<void> {
+async function sendToPharmacy(json: PharmacyOrder): Promise<void> {
   const url = process.env.PHARMACY_API_URL
 
   if (!url) {
@@ -96,24 +99,26 @@ export async function sendToPharmacy(json: PharmacyOrder): Promise<void> {
 
 export async function sendToPharmacyWithPdf(
   json: PharmacyOrder,
-  pdfBuffer: Buffer
+  pdfBuffer: Buffer,
 ): Promise<void> {
   const resendApiKey = process.env.RESEND_API_KEY
   if (!resendApiKey) {
     console.error(
-      '[pharmacy-pdf] RESEND_API_KEY ausente — prescrição NÃO enviada para farmácia'
+      '[pharmacy-pdf] RESEND_API_KEY ausente — prescrição NÃO enviada para farmácia',
     )
-    throw new Error('RESEND_API_KEY ausente — prescrição não enviada para farmácia')
+    throw new Error(
+      'RESEND_API_KEY ausente — prescrição não enviada para farmácia',
+    )
   }
 
   const cliente = escapeHtml(json.EntregaNome)
   const codigo = escapeHtml(String(json.ClienteCodigo))
   const endereco = escapeHtml(
-    `${json.EntregaLogradouro}, ${json.EntregaLogradouroNumero}${json.EntregaLogradouroComplemento ? ` — ${json.EntregaLogradouroComplemento}` : ''} — ${json.EntregaBairro}, ${json.EntregaMunicipioNome}/${json.EntregaUnidadeFederativa} — CEP ${json.EntregaCEP}`
+    `${json.EntregaLogradouro}, ${json.EntregaLogradouroNumero}${json.EntregaLogradouroComplemento ? ` — ${json.EntregaLogradouroComplemento}` : ''} — ${json.EntregaBairro}, ${json.EntregaMunicipioNome}/${json.EntregaUnidadeFederativa} — CEP ${json.EntregaCEP}`,
   )
   const itens = json.Itens.map(
-    item =>
-      `• ${item.ItemNome} | SKU ${item.ProdutoReferencia} | Cód ${item.ProdutoCodigo} | Qtd ${item.Quantidade}`
+    (item) =>
+      `• ${item.ItemNome} | SKU ${item.ProdutoReferencia} | Cód ${item.ProdutoCodigo} | Qtd ${item.Quantidade}`,
   ).join('\n')
   const jsonFormatted = escapeHtml(JSON.stringify(json, null, 2))
 
@@ -153,7 +158,7 @@ export async function sendToPharmacyWithPdf(
   } catch (error) {
     console.error(
       '[pharmacy-pdf] Falha ao enviar email com prescrição para farmácia:',
-      error
+      error,
     )
     throw error
   }

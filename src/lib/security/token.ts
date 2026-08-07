@@ -2,7 +2,7 @@ import { timingSafeEqual } from 'crypto'
 import type { NextRequest } from 'next/server'
 
 /** Compara secrets de tamanho variável sem vazamento por timing. */
-export function safeEqualString(a: string, b: string): boolean {
+function safeEqualString(a: string, b: string): boolean {
   const bufA = Buffer.from(a)
   const bufB = Buffer.from(b)
   if (bufA.length !== bufB.length) {
@@ -20,7 +20,7 @@ export function safeEqualString(a: string, b: string): boolean {
 export function isBearerOrQueryTokenAuthorized(
   request: NextRequest,
   expectedEnvValue: string | undefined,
-  options?: { allowQueryToken?: boolean }
+  options?: { allowQueryToken?: boolean },
 ): boolean {
   if (!expectedEnvValue) return false
 
@@ -39,7 +39,7 @@ export function isBearerOrQueryTokenAuthorized(
 /** Preferido para webhooks novos — só header Authorization. */
 export function isBearerTokenAuthorized(
   request: NextRequest,
-  expectedEnvValue: string | undefined
+  expectedEnvValue: string | undefined,
 ): boolean {
   return isBearerOrQueryTokenAuthorized(request, expectedEnvValue, {
     allowQueryToken: false,

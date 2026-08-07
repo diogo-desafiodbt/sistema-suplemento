@@ -39,7 +39,7 @@ export function PedidosActions({ orders }: { orders: OrderRow[] }) {
   async function callAction(
     orderId: string,
     path: string,
-    opts?: { openUrl?: boolean }
+    opts?: { openUrl?: boolean },
   ) {
     setBusyId(orderId)
     try {
@@ -70,29 +70,50 @@ export function PedidosActions({ orders }: { orders: OrderRow[] }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-100">
-            <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">Paciente</th>
-            <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">Status</th>
-            <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">Valor</th>
-            <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">Rastreio</th>
-            <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">Data</th>
-            <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">Ações</th>
+            <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">
+              Paciente
+            </th>
+            <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">
+              Status
+            </th>
+            <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">
+              Valor
+            </th>
+            <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">
+              Rastreio
+            </th>
+            <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">
+              Data
+            </th>
+            <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">
+              Ações
+            </th>
           </tr>
         </thead>
         <tbody>
-          {orders.map(order => {
+          {orders.map((order) => {
             const busy = busyId === order.id
             const canGenerate =
               order.status === 'sent_to_pharmacy' && !order.shipping_request_id
             const hasLabel = !!order.shipping_request_id
 
             return (
-              <tr key={order.id} className="border-b border-gray-50 hover:bg-[#f5f0eb]/50 transition-colors">
+              <tr
+                key={order.id}
+                className="border-b border-gray-50 hover:bg-[#f5f0eb]/50 transition-colors"
+              >
                 <td className="px-5 py-4">
-                  <p className="font-semibold text-[#13244f]">{order.users?.full_name}</p>
-                  <p className="text-gray-400 text-xs mt-0.5">{order.users?.client_code}</p>
+                  <p className="font-semibold text-[#13244f]">
+                    {order.users?.full_name}
+                  </p>
+                  <p className="text-gray-400 text-xs mt-0.5">
+                    {order.users?.client_code}
+                  </p>
                 </td>
                 <td className="px-5 py-4">
-                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${statusColor[order.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                  <span
+                    className={`text-xs font-bold px-2.5 py-1 rounded-full ${statusColor[order.status] ?? 'bg-gray-100 text-gray-600'}`}
+                  >
                     {statusLabel[order.status] ?? order.status}
                   </span>
                 </td>
@@ -122,7 +143,9 @@ export function PedidosActions({ orders }: { orders: OrderRow[] }) {
                         <button
                           type="button"
                           disabled={busy}
-                          onClick={() => callAction(order.id, 'atualizar-rastreio')}
+                          onClick={() =>
+                            callAction(order.id, 'atualizar-rastreio')
+                          }
                           className="text-xs font-semibold text-[#13244f] border border-[#13244f]/30 hover:bg-[#13244f]/5 rounded-full px-3 py-1.5 disabled:opacity-50"
                         >
                           Atualizar rastreio agora
@@ -131,7 +154,9 @@ export function PedidosActions({ orders }: { orders: OrderRow[] }) {
                           type="button"
                           disabled={busy}
                           onClick={() =>
-                            callAction(order.id, 'pdf-etiqueta', { openUrl: true })
+                            callAction(order.id, 'pdf-etiqueta', {
+                              openUrl: true,
+                            })
                           }
                           className="text-xs font-semibold text-[#f4001e] border border-[#f4001e]/30 hover:bg-[#f4001e]/5 rounded-full px-3 py-1.5 disabled:opacity-50"
                         >

@@ -13,7 +13,7 @@ export function ProfessionalNav() {
 
   return (
     <nav className="flex gap-1">
-      {tabs.map(tab => (
+      {tabs.map((tab) => (
         <Link
           key={tab.href}
           href={tab.href}

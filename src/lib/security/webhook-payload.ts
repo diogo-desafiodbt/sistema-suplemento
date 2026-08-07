@@ -1,7 +1,7 @@
 /** Resumos seguros pra webhook_logs — evita PII/endereço em claro. */
 
 export function summarizeShippingWebhookPayload(
-  data: unknown
+  data: unknown,
 ): Record<string, unknown> {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
     return { raw_type: typeof data }
@@ -29,7 +29,7 @@ export function summarizeShippingWebhookPayload(
 }
 
 export function summarizePharmacyWebhookPayload(
-  data: unknown
+  data: unknown,
 ): Record<string, unknown> {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
     return { raw_type: typeof data }

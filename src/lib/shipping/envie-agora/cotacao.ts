@@ -1,11 +1,11 @@
 import { getSenderAddress } from '@/lib/shipping/sender-region'
-import { envieAgoraFetch } from './client'
 import type {
   CotacaoRequest,
   CotacaoResponse,
   PackageDimensions,
   PrecoPrazoItem,
 } from '@/types/shipping'
+import { envieAgoraFetch } from './client'
 
 export async function getCotacao(params: {
   cepdestino: string

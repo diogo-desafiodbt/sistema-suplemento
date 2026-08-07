@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { quizSchema } from '@/lib/quiz/schema'
+import { createClient } from '@/lib/supabase/server'
 
 /**
  * Legacy endpoint. Protocols are created only after payment confirmation
@@ -9,7 +9,9 @@ import { quizSchema } from '@/lib/quiz/schema'
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
@@ -22,7 +24,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json(
         { error: 'Dados inválidos', details: parsed.error.flatten() },
-        { status: 400 }
+        { status: 400 },
       )
     }
 

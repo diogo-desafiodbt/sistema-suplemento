@@ -1,6 +1,6 @@
 import { Resend } from 'resend'
-import { inngest } from '../client'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { inngest } from '../client'
 
 // TODO: trocar pelo link de autoatendimento (/dashboard/assinatura) quando essa página existir
 const WHATSAPP_SUPORTE_URL =
@@ -29,7 +29,7 @@ async function assinaturaAtiva(subscriptionId: string): Promise<boolean> {
 
 async function logNotification(
   userId: string,
-  status: 'sent' | 'failed'
+  status: 'sent' | 'failed',
 ): Promise<void> {
   try {
     const admin = createAdminClient()
@@ -159,7 +159,7 @@ function buildPaymentFailedEmailHtml(params: {
 
 async function sendPaymentFailedEmail(
   userId: string,
-  kind: ReminderKind
+  kind: ReminderKind,
 ): Promise<void> {
   const resendApiKey = process.env.RESEND_API_KEY
   if (!resendApiKey) {
@@ -210,7 +210,7 @@ async function cancelPagarmeSubscription(pagarmeSubId: string): Promise<void> {
     {
       method: 'DELETE',
       headers: { Authorization: pagarmeAuth },
-    }
+    },
   )
 
   if (res.ok || res.status === 404) return
@@ -224,7 +224,7 @@ async function cancelPagarmeSubscription(pagarmeSubId: string): Promise<void> {
   if (alreadyCanceled) return
 
   throw new Error(
-    `Erro ao cancelar assinatura no Pagar.me: ${res.status} ${body}`
+    `Erro ao cancelar assinatura no Pagar.me: ${res.status} ${body}`,
   )
 }
 
@@ -291,7 +291,9 @@ export const paymentRetry = inngest.createFunction(
 
     // D+20: fim do grace period (11d após D+9)
     await step.sleep('aguardar-fim-grace', '11d')
-    if (await step.run('checar-fim-grace', () => assinaturaAtiva(subscription_id))) {
+    if (
+      await step.run('checar-fim-grace', () => assinaturaAtiva(subscription_id))
+    ) {
       return { stopped: 'resolvido-antes-fim-grace' }
     }
 
@@ -305,7 +307,7 @@ export const paymentRetry = inngest.createFunction(
 
       if (!sub?.pagarme_sub_id) {
         console.warn(
-          `Assinatura ${subscription_id} sem pagarme_sub_id — cancelamento Pagar.me ignorado`
+          `Assinatura ${subscription_id} sem pagarme_sub_id — cancelamento Pagar.me ignorado`,
         )
         return
       }
@@ -331,5 +333,5 @@ export const paymentRetry = inngest.createFunction(
     })
 
     return { result: 'canceled' }
-  }
+  },
 )

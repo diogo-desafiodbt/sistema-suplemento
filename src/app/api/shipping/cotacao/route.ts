@@ -1,10 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { computePackageDimensions, type PackageItem } from '@/lib/shipping/package'
 import { getCotacao } from '@/lib/shipping/envie-agora/cotacao'
-import { shippingQuoteKey, type ShippingOptionPublic } from '@/types/shipping'
+import {
+  computePackageDimensions,
+  type PackageItem,
+} from '@/lib/shipping/package'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
+import { type ShippingOptionPublic, shippingQuoteKey } from '@/types/shipping'
 
 const bodySchema = z.object({
   cepdestino: z.string().min(8),
@@ -15,7 +18,7 @@ const bodySchema = z.object({
       z.object({
         product_id: z.string().uuid(),
         quantity: z.number().int().min(1).max(20).default(1),
-      })
+      }),
     )
     .min(1),
 })
@@ -34,20 +37,22 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json(
         { options: [], erro: true, details: parsed.error.flatten() },
-        { status: 200 }
+        { status: 200 },
       )
     }
 
     const { cepdestino, uf, valordeclarado, protocol_items } = parsed.data
     const admin = createAdminClient()
-    const productIds = protocol_items.map(i => i.product_id)
+    const productIds = protocol_items.map((i) => i.product_id)
 
     const { data: products } = await admin
       .from('products')
       .select('id, box_type')
       .in('id', productIds)
 
-    const byId = new Map((products ?? []).map(p => [p.id, p.box_type as string | null]))
+    const byId = new Map(
+      (products ?? []).map((p) => [p.id, p.box_type as string | null]),
+    )
 
     const packageItems: PackageItem[] = []
     for (const item of protocol_items) {

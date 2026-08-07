@@ -17,7 +17,7 @@ export function DashboardNav() {
 
   return (
     <nav className="flex gap-1 overflow-x-auto scrollbar-hide border-b border-gray-200 bg-white px-4 md:px-6">
-      {tabs.map(tab => {
+      {tabs.map((tab) => {
         const isActive =
           tab.href === '/dashboard'
             ? pathname === '/dashboard' || pathname === '/dashboard/protocolo'
