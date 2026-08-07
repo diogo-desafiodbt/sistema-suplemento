@@ -25,5 +25,3 @@ export const quizSchema = z.object({
     .enum(['1mes', '3meses', '6meses', 'assinatura_mensal', '1ano'])
     .default('1mes'),
 })
-
-type QuizFormData = z.infer<typeof quizSchema>

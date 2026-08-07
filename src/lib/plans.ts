@@ -1,5 +1,3 @@
-import type { PlanType } from '@/types/protocol'
-
 /** Planos oferecidos em novas compras. */
 export const PURCHASE_PLAN_TYPES = ['1mes', '3meses', '6meses'] as const
 export type PurchasePlanType = (typeof PURCHASE_PLAN_TYPES)[number]
@@ -188,8 +186,4 @@ export function addPlanPeriod(from: Date, planType: string): Date {
   // 1mes e assinatura_mensal: +1 mês
   d.setMonth(d.getMonth() + 1)
   return d
-}
-
-function asPlanType(value: string): PlanType {
-  return value as PlanType
 }

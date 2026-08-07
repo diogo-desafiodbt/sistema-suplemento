@@ -32,36 +32,3 @@ export const gobold = localFont({
   variable: '--font-gobold',
   display: 'swap',
 })
-
-const moucha = localFont({
-  src: [
-    {
-      path: '../fonts/moucha/Moucha-Light.otf',
-      weight: '300',
-      style: 'normal',
-    },
-    {
-      path: '../fonts/moucha/Moucha-Regular.otf',
-      weight: '400',
-      style: 'normal',
-    },
-    {
-      path: '../fonts/moucha/Moucha-Medium.ttf',
-      weight: '500',
-      style: 'normal',
-    },
-    { path: '../fonts/moucha/Moucha-Bold.otf', weight: '700', style: 'normal' },
-    {
-      path: '../fonts/moucha/Moucha-BoldItalic.otf',
-      weight: '700',
-      style: 'italic',
-    },
-    {
-      path: '../fonts/moucha/Moucha-Black.otf',
-      weight: '900',
-      style: 'normal',
-    },
-  ],
-  variable: '--font-moucha',
-  display: 'swap',
-})
