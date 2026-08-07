@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
+  getPharmacyCycleMultiplier,
   getUnitPriceFromProduct,
   roundMoney,
 } from '@/lib/plans'
@@ -25,6 +26,8 @@ export type PricedCheckout = {
 /**
  * Recalcula total a partir do DB + cotação fresca.
  * Não confia em total_amount / shipping.valor / price_* do cliente.
+ *
+ * `includeShipping: false` → shipping.valor = 0 (subtotal só de produtos).
  */
 export async function computeServerCheckoutTotal(
   admin: AdminClient,
@@ -33,8 +36,10 @@ export async function computeServerCheckoutTotal(
     protocolItems: ProtocolItemInput[]
     shipping: ShippingSelection
     address: { zip_code: string; state: string }
+    includeShipping?: boolean
   }
 ): Promise<{ ok: true; priced: PricedCheckout } | { ok: false; error: string }> {
+  const includeShipping = params.includeShipping !== false
   const activeItems = params.protocolItems.filter(
     (i) => !i.removed && !i.blocked
   )
@@ -62,6 +67,9 @@ export async function computeServerCheckoutTotal(
   const byId = new Map((products ?? []).map((p) => [p.id, p]))
   let productsSubtotal = 0
   const packageItems: PackageItem[] = []
+  // Peso/volume físico: 3meses/6meses despacham N× o pacote mensal.
+  // TODO(Miligrama): validar multiplicador operacional.
+  const cycleMult = getPharmacyCycleMultiplier(params.planType)
 
   for (const item of activeItems) {
     const product = byId.get(item.product_id as string)
@@ -78,11 +86,28 @@ export async function computeServerCheckoutTotal(
     const qty = qtyRaw ?? 1
     productsSubtotal += getUnitPriceFromProduct(product, params.planType) * qty
     if (product.box_type === 'R80' || product.box_type === 'R110') {
-      packageItems.push({ box_type: product.box_type, quantity: qty })
+      packageItems.push({
+        box_type: product.box_type,
+        quantity: qty * cycleMult,
+      })
     }
   }
 
   productsSubtotal = roundMoney(productsSubtotal)
+
+  if (!includeShipping) {
+    return {
+      ok: true,
+      priced: {
+        serverTotal: productsSubtotal,
+        productsSubtotal,
+        shipping: {
+          ...params.shipping,
+          valor: 0,
+        },
+      },
+    }
+  }
 
   const dimensions = await computePackageDimensions(packageItems)
   const quotes = await getCotacao({

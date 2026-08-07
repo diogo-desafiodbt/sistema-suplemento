@@ -1,24 +1,17 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { ShoppingCart } from 'lucide-react'
 import PromoBar from '@/components/PromoBar'
-import CartDrawer from '@/components/CartDrawer'
-import { useCart } from '@/lib/use-cart'
 
 const menuItems = [
   { label: 'Suplementos', href: '/suplementos' },
-  { label: 'Quem somos', href: '/institucional#quem-somos' },
   { label: 'Termos de Uso', href: '/termos-de-uso' },
   { label: 'Entrar', href: '/login' },
 ] as const
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false)
-  const [cartOpen, setCartOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
-  const { items } = useCart()
-  const cartCount = items.reduce((sum, i) => sum + i.quantity, 0)
 
   useEffect(() => {
     if (!menuOpen) return
@@ -59,21 +52,13 @@ export default function Header() {
             <img src="/logo-principal.png" alt="Desafio Diabetes" className="h-12 sm:h-14 w-auto" />
           </a>
 
-          <div className="relative z-10 flex items-center gap-1" ref={menuRef}>
-            <button
-              type="button"
-              className="relative inline-flex h-10 w-10 items-center justify-center rounded-md text-[#13244f] transition-colors hover:bg-[#ececec]"
-              aria-label="Abrir carrinho"
-              onClick={() => setCartOpen(true)}
+          <div className="relative z-10 flex items-center gap-2 sm:gap-3" ref={menuRef}>
+            <a
+              href="/quiz"
+              className="hidden sm:inline-flex items-center justify-center min-h-11 px-5 py-2.5 rounded-full bg-[#f4001e] text-white text-sm font-bold hover:bg-[#a30000] transition focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-[#13244f]"
             >
-              <ShoppingCart className="h-5 w-5" aria-hidden />
-              {cartCount > 0 && (
-                <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#f4001e] px-1 text-[10px] font-bold text-white leading-none">
-                  {cartCount}
-                </span>
-              )}
-            </button>
-
+              Começar avaliação
+            </a>
             <button
               type="button"
               className="inline-flex h-10 w-10 items-center justify-center rounded-md text-[#13244f] transition-colors hover:bg-[#ececec]"
@@ -100,6 +85,14 @@ export default function Header() {
                 role="menu"
                 className="absolute right-0 top-full mt-2 w-56 bg-white rounded-lg shadow-lg border border-[#ececec] divide-y divide-[#ececec] overflow-hidden"
               >
+                <a
+                  href="/quiz"
+                  role="menuitem"
+                  className="block px-4 py-3 text-sm font-bold text-[#f4001e] hover:bg-[#ececec] transition sm:hidden"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Começar avaliação
+                </a>
                 {menuItems.map((item) => (
                   <a
                     key={item.href}
@@ -116,8 +109,6 @@ export default function Header() {
           </div>
         </div>
       </header>
-
-      <CartDrawer open={cartOpen} onOpenChange={setCartOpen} />
     </>
   )
 }

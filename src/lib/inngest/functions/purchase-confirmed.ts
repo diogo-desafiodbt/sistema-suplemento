@@ -15,15 +15,17 @@ function formatPlanLabel(planType: string | null | undefined): string {
   switch (planType) {
     case '3meses':
       return 'Trimestral'
+    case '6meses':
+      return 'Semestral'
     case '1ano':
       return 'Anual'
     case 'avulso':
     case '1mes':
-      return 'Avulso'
+      return 'Compra única'
     case 'assinatura_mensal':
       return 'Assinatura mensal'
     default:
-      return planType ?? '—'
+      return planType ?? ''
   }
 }
 

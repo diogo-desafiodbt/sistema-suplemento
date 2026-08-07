@@ -159,7 +159,29 @@ export function computeTriage(answers: TriageAnswers): TriageResult {
   }
 }
 
-/** Sugestão automática para carrinho vazio, a partir do `allowed` da triagem. */
+/** Sugestão automática: os N produtos liberados com menor preço mensal. */
+export function cheapestSuggestion(
+  allowed: ProductKey[],
+  monthlyPriceByKey: Partial<Record<ProductKey, number>>,
+  count = 2
+): ProductKey[] {
+  if (allowed.length === 0) return []
+
+  const ranked = [...allowed].sort((a, b) => {
+    const priceA = monthlyPriceByKey[a]
+    const priceB = monthlyPriceByKey[b]
+    const valueA = typeof priceA === 'number' ? priceA : Number.POSITIVE_INFINITY
+    const valueB = typeof priceB === 'number' ? priceB : Number.POSITIVE_INFINITY
+    return valueA - valueB
+  })
+
+  return ranked.slice(0, Math.max(1, count))
+}
+
+/**
+ * Fallback legado (sem preços). Preferir `cheapestSuggestion` no funil.
+ * @deprecated use cheapestSuggestion
+ */
 export function defaultSuggestion(allowed: ProductKey[]): ProductKey[] {
   if (sameSet(allowed, ALL_PRODUCT_KEYS)) return ['berberina']
   if (sameSet(allowed, ['omega3'])) return ['omega3']
@@ -169,7 +191,7 @@ export function defaultSuggestion(allowed: ProductKey[]): ProductKey[] {
   if (sameSet(allowed, ['neuropatia', 'polivitaminico', 'omega3'])) {
     return ['neuropatia']
   }
-  return [...allowed]
+  return allowed.length > 0 ? [allowed[0]] : []
 }
 
 /** Casa nome de produto da tabela `products` com ProductKey. */

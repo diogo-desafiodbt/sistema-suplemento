@@ -1,35 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { notFound, useParams, useRouter } from 'next/navigation'
+import { notFound, useParams } from 'next/navigation'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
-import AddedToCartDialog from '@/components/AddedToCartDialog'
 import { getSupplementBySlug, supplements } from '@/lib/supplements-content'
-import { useCart } from '@/lib/use-cart'
-import {
-  DEFAULT_PURCHASE_PLAN,
-  PLAN_BADGE,
-  PLAN_HINT,
-  PLAN_LABELS,
-  PLAN_TYPE_LABEL,
-  PURCHASE_PLAN_TYPES,
-  getChargePrice,
-  getSubscriptionDiscountAmount,
-  type PurchasePlanType,
-} from '@/lib/plans'
-
-type Product = {
-  id: string
-  name: string
-  price_monthly: number
-  price_quarterly: number
-  price_yearly: number
-  is_fixed: boolean
-  is_active: boolean
-}
 
 const testimonials = [
   {
@@ -46,135 +23,22 @@ const testimonials = [
   },
 ]
 
-function formatPrice(value: number) {
-  return value.toLocaleString('pt-BR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
-}
-
-function matchProduct(products: Product[], name: string): Product | undefined {
-  const needle = name.toLowerCase()
-  const firstWord = needle.split(' ')[0]
-  return (
-    products.find((p) => p.name.toLowerCase() === needle) ??
-    products.find((p) => p.name.toLowerCase().includes(firstWord)) ??
-    products.find((p) => needle.includes(p.name.toLowerCase()))
-  )
-}
-
-function getPlanPrice(product: Product, plan: PurchasePlanType) {
-  return getChargePrice(product.price_monthly, plan)
-}
-
-function getSavings(product: Product, plan: PurchasePlanType) {
-  if (plan === '1mes') return 0
-  return getSubscriptionDiscountAmount(product.price_monthly)
-}
-
 export default function SupplementPage() {
   const params = useParams<{ slug: string }>()
   const slug = params.slug
   const content = getSupplementBySlug(slug)
-  const { items: cartItems, plan: cartPlan, addItem } = useCart()
-  const router = useRouter()
-
-  const [product, setProduct] = useState<Product | null>(null)
-  const [allProducts, setAllProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
-  const [plan, setPlan] = useState<PurchasePlanType>(DEFAULT_PURCHASE_PLAN)
   const [openSection, setOpenSection] = useState<string | null>('descricao')
-  const [showCartDialog, setShowCartDialog] = useState(false)
-
-  const oneTimeLocked = cartItems.length > 0 && cartPlan === 'assinatura_mensal'
-
-  useEffect(() => {
-    if (oneTimeLocked && plan === '1mes') {
-      setPlan('assinatura_mensal')
-    }
-  }, [oneTimeLocked, plan])
-
-  useEffect(() => {
-    if (!content) return
-    let cancelled = false
-    async function load() {
-      try {
-        const res = await fetch('/api/products')
-        if (!res.ok || !content) return
-        const data = await res.json()
-        const products: Product[] = data.products ?? []
-        const matched = matchProduct(products, content.name) ?? null
-        if (!cancelled) {
-          setAllProducts(products)
-          setProduct(matched)
-        }
-      } catch {
-        if (!cancelled) {
-          setAllProducts([])
-          setProduct(null)
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    load()
-    return () => {
-      cancelled = true
-    }
-  }, [content])
 
   if (!content) {
     notFound()
   }
 
   const related = supplements.filter((s) => s.slug !== content.slug)
-
-  const relatedWithProducts = related
-    .map((s) => ({ content: s, product: matchProduct(allProducts, s.name) }))
-    .filter((r): r is { content: (typeof related)[number]; product: Product } => !!r.product)
-
-  const bundleMonthly =
-    (product?.price_monthly ?? 0) +
-    relatedWithProducts.reduce((sum, r) => sum + r.product.price_monthly, 0)
-
-  const handleAddToCart = () => {
-    if (!product || !content) return
-    addItem({
-      product_id: product.id,
-      name: product.name,
-      price_monthly: product.price_monthly,
-      plan,
-      image: content.gallery[0],
-    })
-    setShowCartDialog(true)
-  }
-
-  const handleAddAllToCart = () => {
-    if (!product || !content) return
-    addItem({
-      product_id: product.id,
-      name: product.name,
-      price_monthly: product.price_monthly,
-      plan,
-      image: content.gallery[0],
-    })
-    for (const r of relatedWithProducts) {
-      addItem({
-        product_id: r.product.id,
-        name: r.product.name,
-        price_monthly: r.product.price_monthly,
-        plan,
-        image: r.content.gallery[0],
-      })
-    }
-    setShowCartDialog(true)
-  }
+  const primary = content.composition[0]
 
   const toggleSection = (id: string) => {
     setOpenSection((current) => (current === id ? null : id))
   }
-
-  const primary = content.composition[0]
 
   const accordionItems = [
     {
@@ -224,7 +88,6 @@ export default function SupplementPage() {
       <main className="bg-white">
         <section className="px-4 md:px-6 py-8 md:py-12">
           <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-8 md:gap-12 items-start">
-            {/* Galeria */}
             <div className="flex flex-col gap-4">
               {content.gallery.map((src, index) => (
                 <div
@@ -243,7 +106,6 @@ export default function SupplementPage() {
               ))}
             </div>
 
-            {/* Detalhes sticky */}
             <div className="md:sticky md:top-24 md:self-start flex flex-col gap-5">
               <div>
                 <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-2">
@@ -282,86 +144,18 @@ export default function SupplementPage() {
               </div>
 
               <div className="border-t border-[#ececec] pt-5 flex flex-col gap-4">
-                {loading ? (
-                  <p className="text-sm text-gray-500">Carregando preço…</p>
-                ) : product ? (
-                  <p className="text-lg font-semibold text-[#13244f]">
-                    {plan === '1mes'
-                      ? `R$ ${formatPrice(product.price_monthly)}`
-                      : `R$ ${formatPrice(getPlanPrice(product, plan))}/mês`}
-                    {plan === 'assinatura_mensal' && (
-                      <span className="block text-sm font-normal text-gray-500 mt-0.5">
-                        de R$ {formatPrice(product.price_monthly)}/mês · 10% off
-                      </span>
-                    )}
-                  </p>
-                ) : (
-                  <p className="text-lg font-semibold text-[#13244f]">Em breve</p>
-                )}
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Esta página é informativa. A inclusão deste item no seu
+                  protocolo depende da avaliação clínica pelo questionário —
+                  não é possível comprar diretamente pela vitrine.
+                </p>
 
-                <div>
-                  <h2 className="font-bold text-[#13244f] mb-3 text-sm">Escolha a forma de compra</h2>
-                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                    {PURCHASE_PLAN_TYPES.map((p) => {
-                      const isSelected = plan === p
-                      const savings = product ? getSavings(product, p) : 0
-                      const isLocked = p === '1mes' && oneTimeLocked
-                      return (
-                        <button
-                          key={p}
-                          type="button"
-                          disabled={isLocked}
-                          onClick={() => !isLocked && setPlan(p)}
-                          className={`relative rounded-2xl border p-2.5 sm:p-3 text-center transition-all ${
-                            isSelected
-                              ? 'border-[#13244f] bg-[#13244f] text-white shadow-md'
-                              : 'border-gray-200 bg-white text-[#13244f] hover:border-[#13244f]/40'
-                          }${isLocked ? ' opacity-40 cursor-not-allowed' : ''}`}
-                        >
-                          {PLAN_BADGE[p] && (
-                            <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#f4001e] text-white">
-                              {PLAN_BADGE[p]}
-                            </span>
-                          )}
-                          <div className={`text-[10px] sm:text-xs font-medium mb-0.5 mt-1 ${isSelected ? 'text-white/70' : 'text-gray-400'}`}>
-                            {PLAN_TYPE_LABEL[p]}
-                          </div>
-                          <div className="text-xs sm:text-sm font-bold">{PLAN_LABELS[p]}</div>
-                          {savings > 0 && (
-                            <div className={`text-[10px] sm:text-xs mt-1 font-medium ${isSelected ? 'text-green-300' : 'text-green-600'}`}>
-                              Economize R$ {formatPrice(savings)}/mês
-                            </div>
-                          )}
-                        </button>
-                      )
-                    })}
-                  </div>
-                  <p className="text-xs text-gray-400 mt-2 text-center">
-                    {oneTimeLocked
-                      ? 'Compra única indisponível — seu carrinho já tem um item em assinatura, e o pedido inteiro é cobrado no mesmo plano.'
-                      : PLAN_HINT[plan]}
-                  </p>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-3">
-                  {product ? (
-                    <button
-                      type="button"
-                      onClick={handleAddToCart}
-                      className="inline-flex justify-center items-center bg-[#f4001e] hover:bg-[#a30000] text-white rounded-md px-5 py-3 font-semibold text-sm transition"
-                    >
-                      Adicionar ao carrinho
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled
-                      className="inline-flex justify-center items-center bg-[#ececec] text-gray-500 rounded-md px-5 py-3 font-semibold text-sm cursor-not-allowed"
-                    >
-                      Em breve disponível
-                    </button>
-                  )}
-                </div>
+                <Link
+                  href="/quiz"
+                  className="inline-flex justify-center items-center bg-[#f4001e] hover:bg-[#a30000] text-white rounded-md px-5 py-3 font-semibold text-sm transition"
+                >
+                  Descubra sua suplementação ideal
+                </Link>
 
                 <div className="grid grid-cols-3 gap-2 text-center text-[11px] text-gray-500">
                   <div className="flex flex-col items-center gap-1.5 px-1">
@@ -386,7 +180,6 @@ export default function SupplementPage() {
                 </div>
               </div>
 
-              {/* Acordeão */}
               <div className="border-t border-[#ececec] divide-y divide-[#ececec]">
                 {accordionItems.map((item) => {
                   const open = openSection === item.id
@@ -422,7 +215,6 @@ export default function SupplementPage() {
                 })}
               </div>
 
-              {/* Reviews */}
               <div className="border-t border-[#ececec] pt-6">
                 <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-3">
                   RESULTADOS DA COMUNIDADE
@@ -461,7 +253,6 @@ export default function SupplementPage() {
           </div>
         </section>
 
-        {/* Você também pode gostar */}
         <section className="px-4 md:px-6 pb-14 md:pb-20 border-t border-[#ececec]">
           <div className="max-w-6xl mx-auto pt-10 md:pt-14">
             <h2 className="font-display text-2xl md:text-3xl text-[#13244f] mb-6 md:mb-8">
@@ -490,38 +281,22 @@ export default function SupplementPage() {
               ))}
             </div>
 
-            {product && relatedWithProducts.length > 0 && (
-              <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-[#ececec] bg-[#f5f5f0] px-5 py-4">
-                <p className="text-sm text-[#13244f] font-medium text-center sm:text-left">
-                  Leve todos juntos a partir de{' '}
-                  <span className="font-bold">R$ {formatPrice(bundleMonthly)}/mês</span>
-                </p>
-                <button
-                  type="button"
-                  onClick={handleAddAllToCart}
-                  className="inline-flex justify-center bg-[#f4001e] hover:bg-[#a30000] text-white rounded-full px-6 py-3 font-semibold text-sm transition whitespace-nowrap"
-                >
-                  Adicionar todos ao carrinho
-                </button>
-              </div>
-            )}
+            <div className="mt-10 rounded-2xl border border-[#ececec] bg-[#f5f5f0] px-5 py-6 text-center space-y-4">
+              <p className="text-sm md:text-base text-[#13244f] font-medium">
+                Quer saber quais suplementos fazem sentido para o seu perfil?
+              </p>
+              <Link
+                href="/quiz"
+                className="inline-flex justify-center bg-[#f4001e] hover:bg-[#a30000] text-white rounded-full px-8 py-3.5 font-semibold text-sm transition"
+              >
+                Descubra sua suplementação ideal
+              </Link>
+            </div>
           </div>
         </section>
       </main>
 
       <Footer />
-      <AddedToCartDialog
-        open={showCartDialog}
-        onOpenChange={setShowCartDialog}
-        productName={content.name}
-        productImage={content.gallery[0]}
-        productPrice={product?.price_monthly}
-        onFinish={() => router.push('/quiz')}
-        onContinue={() => {
-          setShowCartDialog(false)
-          router.push('/suplementos')
-        }}
-      />
     </>
   )
 }

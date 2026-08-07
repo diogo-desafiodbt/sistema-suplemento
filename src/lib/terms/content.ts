@@ -1,5 +1,5 @@
 /** Fonte única de verdade dos Termos de Uso — usada pela página pública e pelo hash de aceite. */
-export const TERMS_VERSION = '2026-07-31'
+export const TERMS_VERSION = '2026-08-07'
 
 export const TERMS_CONTENT = `# Termos e Condições Gerais de Uso
 
@@ -11,7 +11,7 @@ Um lembrete simples: aceitar este documento é um passo necessário para usar a 
 
 Obrigado por dedicar esse tempo!
 
-**ÚLTIMA ATUALIZAÇÃO:** 31.07.2026
+**ÚLTIMA ATUALIZAÇÃO:** 07.08.2026
 
 ## Do que trata este documento
 
@@ -147,12 +147,13 @@ Identificado uso consciente e voluntário de informações de forma fraudulenta 
 
 ## Modelos de contratação
 
-Dois formatos estão disponíveis no Desafio Diabetes:
+Três formatos estão disponíveis no Desafio Diabetes:
 
-- **Compra única** — cobrança isolada referente ao período contratado, sem renovação automática.
+- **Compra única (1 mês)** — cobrança isolada referente ao período contratado, à vista no Pix ou no cartão de crédito, sem renovação automática.
+- **Compra única parcelada (3 ou 6 meses)** — cobrança isolada referente ao período contratado (3 ou 6 meses de tratamento), autorizada uma única vez no cartão de crédito e dividida em 3 ou 6 parcelas na fatura, conforme o plano escolhido. Não é uma assinatura: não há renovação automática ao final do período, e por ser uma compra parcelada já autorizada integralmente no ato da compra, não é possível interromper o parcelamento depois — a regra é a mesma de qualquer compra parcelada em outro estabelecimento.
 - **Assinatura mensal recorrente** — com desconto no valor do plano, cobrança automática mensal no cartão cadastrado, renovando-se a cada mês até que você solicite o cancelamento.
 
-Cancelar a assinatura mensal é possível a qualquer momento, direto pela sua conta — ciclos futuros ainda não processados não geram cobrança.
+Cancelar é possível a qualquer momento, direto pela sua conta, exclusivamente no modelo de assinatura mensal recorrente — ciclos futuros ainda não processados não geram cobrança. Esse direito não se aplica à compra única parcelada (3 ou 6 meses), já autorizada integralmente no ato da compra.
 
 Um ciclo é considerado "processado" quando a cobrança já foi feita e o pedido já entrou no fluxo de compra junto à farmácia parceira. Cancelamentos solicitados depois disso só produzem efeito nos ciclos seguintes.
 

@@ -2,6 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isFarmaciaAuthorized, parseDateRange } from '@/lib/pharmacy/pull-api'
 
+type OrderRow = {
+  id: string
+  created_at: string
+  status: string
+  subscriptions: {
+    protocols: { status: string } | null
+  } | null
+}
+
+function isSignedProtocol(order: OrderRow): boolean {
+  const protocol = order.subscriptions?.protocols
+  return protocol?.status === 'signed'
+}
+
 export async function GET(request: NextRequest) {
   if (!isFarmaciaAuthorized(request)) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
@@ -16,7 +30,19 @@ export async function GET(request: NextRequest) {
     const admin = createAdminClient()
     let query = admin
       .from('orders')
-      .select('id, created_at, status')
+      .select(
+        `
+        id,
+        created_at,
+        status,
+        subscriptions!inner (
+          protocols!inner (
+            status
+          )
+        )
+      `
+      )
+      .eq('subscriptions.protocols.status', 'signed')
       .order('created_at', { ascending: true })
 
     if (range.gte) query = query.gte('created_at', range.gte)
@@ -28,7 +54,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Erro ao buscar pedidos' }, { status: 500 })
     }
 
-    const result = (orders ?? []).map(o => ({
+    // Defesa em profundidade: omitir não assinados (não é erro)
+    const signed = ((orders ?? []) as unknown as OrderRow[]).filter(
+      isSignedProtocol
+    )
+
+    const result = signed.map((o) => ({
       numero_pedido: o.id,
       data_compra: o.created_at,
       status: o.status,
@@ -37,7 +68,7 @@ export async function GET(request: NextRequest) {
     await admin.from('pharmacy_api_logs').insert({
       endpoint: 'listagem',
       query_params: range.params,
-      order_ids_returned: result.map(r => r.numero_pedido),
+      order_ids_returned: result.map((r) => r.numero_pedido),
     })
 
     return NextResponse.json(result)

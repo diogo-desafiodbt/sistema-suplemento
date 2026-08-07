@@ -1,7 +1,7 @@
 import { inngest } from '../client'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { buildPharmacyJson, buildPharmacyItem } from '@/lib/pharmacy/json-builder'
-import { getPharmacySkuKey, getUnitPriceFromProduct } from '@/lib/plans'
+import { getPharmacySkuKey, getUnitPriceFromProduct, getPharmacyCycleMultiplier } from '@/lib/plans'
 import { computePackageDimensions, type PackageItem } from '@/lib/shipping/package'
 import { claimOnce, releaseClaim, markClaimCompleted } from '@/lib/idempotency'
 import type { ShippingSelection } from '@/types/shipping'
@@ -9,6 +9,7 @@ import type { ShippingSelection } from '@/types/shipping'
 type ProtocolItemRow = {
   product_id: string
   removed_by_patient: boolean
+  quantity?: number | null
   products: {
     name: string
     pharmacy_sku_monthly: string
@@ -128,6 +129,7 @@ export const pharmacyOrder = inngest.createFunction(
           protocol_items (
             product_id,
             removed_by_patient,
+            quantity,
             products (
               name,
               pharmacy_sku_monthly,
@@ -239,11 +241,15 @@ export const pharmacyOrder = inngest.createFunction(
       (configs ?? []).map(c => [c.key, c.value])
     )
 
+    // TODO(Miligrama): 3meses/6meses = N× SKU mensal num único pedido — validar operacionalmente.
+    const cycleMult = getPharmacyCycleMultiplier(planType)
+
     const packageItems: PackageItem[] = activeItems
       .map(item => {
         const box = item.products?.box_type
         if (box !== 'R80' && box !== 'R110') return null
-        return { box_type: box, quantity: 1 }
+        const qty = item.quantity && item.quantity > 0 ? item.quantity : cycleMult
+        return { box_type: box, quantity: qty }
       })
       .filter((x): x is PackageItem => x !== null)
 
@@ -265,14 +271,19 @@ export const pharmacyOrder = inngest.createFunction(
       .limit(1)
       .maybeSingle()
 
-    const pharmacyItems = activeItems.map(item =>
-      buildPharmacyItem({
+    const pharmacyItems = activeItems.map(item => {
+      const qty = item.quantity && item.quantity > 0 ? item.quantity : cycleMult
+      const unitPrice = getUnitPriceFromProduct(item.products, planType)
+      // Preço unitário no JSON da farmácia = preço do ciclo / qty física, se qty > 1
+      const unitForPharmacy = qty > 1 ? unitPrice / qty : unitPrice
+      return buildPharmacyItem({
         sku: item.products?.[skuKey] ?? '',
         pharmacyCode: item.products?.pharmacy_code ?? 0,
         name: item.products?.name ?? '',
-        unitPrice: getUnitPriceFromProduct(item.products, planType),
+        unitPrice: unitForPharmacy,
+        quantity: qty,
       })
-    )
+    })
 
     // Claim só depois das leituras — se falhar depois, apaga pra o retry do Inngest funcionar.
     const { won, reclaimedStale } = await claimOnce(
@@ -417,13 +428,22 @@ export const pharmacyOrder = inngest.createFunction(
       }
 
       const { error: itemsError } = await admin.from('order_items').insert(
-        activeItems.map(item => ({
-          order_id: order.id,
-          product_id: item.product_id,
-          pharmacy_sku: item.products?.[skuKey] ?? '',
-          quantity: 1,
-          unit_price: getUnitPriceFromProduct(item.products, planType),
-        }))
+        activeItems.map(item => {
+          const qty =
+            item.quantity && item.quantity > 0
+              ? item.quantity
+              : getPharmacyCycleMultiplier(planType)
+          const cyclePrice = getUnitPriceFromProduct(item.products, planType)
+          // unit_price × quantity deve bater com o total do ciclo cobrado
+          const unitPrice = qty > 1 ? cyclePrice / qty : cyclePrice
+          return {
+            order_id: order.id,
+            product_id: item.product_id,
+            pharmacy_sku: item.products?.[skuKey] ?? '',
+            quantity: qty,
+            unit_price: unitPrice,
+          }
+        })
       )
 
       if (itemsError) {

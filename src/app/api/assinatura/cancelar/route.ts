@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { canCancelRecurringBilling } from '@/lib/plans'
 
 async function cancelPagarmeSubscription(pagarmeSubId: string): Promise<void> {
   const apiKey = process.env.PAGARME_API_KEY
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
 
     const { data: subscription } = await admin
       .from('subscriptions')
-      .select('id, status, expires_at, pagarme_sub_id')
+      .select('id, status, expires_at, pagarme_sub_id, plan_type')
       .eq('user_id', user.id)
       .in('status', ['active', 'past_due', 'grace_period'])
       .order('created_at', { ascending: false })
@@ -50,6 +51,13 @@ export async function POST(request: NextRequest) {
 
     if (!subscription) {
       return NextResponse.json({ error: 'Nenhuma assinatura ativa encontrada' }, { status: 404 })
+    }
+
+    if (!canCancelRecurringBilling(subscription.plan_type, subscription.pagarme_sub_id)) {
+      return NextResponse.json(
+        { error: 'Este plano foi pago integralmente e não pode ser cancelado.' },
+        { status: 400 }
+      )
     }
 
     if (subscription.pagarme_sub_id) {

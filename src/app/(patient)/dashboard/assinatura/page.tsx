@@ -13,7 +13,7 @@ export default async function AssinaturaPage() {
 
   const { data: subscription } = await admin
     .from('subscriptions')
-    .select('id, plan_type, status, expires_at, grace_period_ends_at')
+    .select('id, plan_type, status, expires_at, grace_period_ends_at, pagarme_sub_id')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(1)

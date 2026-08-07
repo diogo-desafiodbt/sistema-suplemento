@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { productKeyFromName } from '@/lib/protocol/triage'
 import { claimOnce, releaseClaim } from '@/lib/idempotency'
+import { getPharmacyCycleMultiplier } from '@/lib/plans'
 
 export type CheckoutSource = 'full_quiz' | 'mini_quiz'
 
@@ -16,7 +17,7 @@ export type PendingProtocolItem = {
 
 export type PendingCheckoutPayload = {
   source: CheckoutSource
-  plan_type: '1mes' | 'assinatura_mensal' | '3meses' | '1ano'
+  plan_type: '1mes' | 'assinatura_mensal' | '3meses' | '6meses' | '1ano'
   shipping?: {
     tipo: 'economica' | 'expressa' | 'padrao'
     valor: number
@@ -102,6 +103,9 @@ async function insertProtocolItemsFromPending(
   const withIds = activeItems.filter((item) => item.product_id)
   const withoutIds = activeItems.filter((item) => !item.product_id)
 
+  // TODO(Miligrama): quantity física = qty × ciclo (3/6). Pode mudar após validação.
+  const cycleMult = getPharmacyCycleMultiplier(pending.plan_type)
+
   const itemsToInsert: Array<{
     protocol_id: string
     product_id: string
@@ -116,7 +120,7 @@ async function insertProtocolItemsFromPending(
     removed_by_patient: false,
     activation_reason:
       item.activation_reason ?? 'Selecionado após triagem clínica',
-    quantity: item.quantity ?? 1,
+    quantity: (item.quantity ?? 1) * cycleMult,
   }))
 
   if (withoutIds.length > 0) {
@@ -138,7 +142,7 @@ async function insertProtocolItemsFromPending(
         removed_by_patient: false,
         activation_reason:
           item.activation_reason ?? 'Selecionado após triagem clínica',
-        quantity: item.quantity ?? 1,
+        quantity: (item.quantity ?? 1) * cycleMult,
       })
     }
   }

@@ -111,21 +111,59 @@ async function shouldDispatchPharmacy(
 
   if (!triggersPharmacy) return false
 
+  const { data: sub } = await admin
+    .from('subscriptions')
+    .select('id, protocol_id, pending_checkout')
+    .eq('id', subscriptionId)
+    .maybeSingle()
+
+  // Flags legado (carrinho misto antigo) — manter para segurança em rows antigas.
+  const pending = sub?.pending_checkout as
+    | {
+        skip_pharmacy_webhook?: boolean
+        shipping_payment_pending?: boolean
+      }
+    | null
+  if (pending?.skip_pharmacy_webhook) {
+    console.log(
+      `Farmácia não disparada — subscription ${subscriptionId} marcada skip_pharmacy_webhook`
+    )
+    return false
+  }
+  if (pending?.shipping_payment_pending) {
+    console.log(
+      `Farmácia não disparada — frete ainda pendente na subscription ${subscriptionId}`
+    )
+    return false
+  }
+
   const since = new Date()
   since.setHours(since.getHours() - 24)
 
+  const subscriptionIds = new Set<string>([subscriptionId])
+  if (sub?.protocol_id) {
+    const { data: siblings } = await admin
+      .from('subscriptions')
+      .select('id')
+      .eq('protocol_id', sub.protocol_id)
+    for (const s of siblings ?? []) {
+      if (s.id) subscriptionIds.add(s.id as string)
+    }
+  }
+
+  const ids = [...subscriptionIds]
   const { data: recentOrder } = await admin
     .from('orders')
     .select('id')
-    .eq('subscription_id', subscriptionId)
-    .not('pharmacy_sent_at', 'is', null)
-    .gte('pharmacy_sent_at', since.toISOString())
+    .in('subscription_id', ids)
+    .or('pharmacy_sent_at.not.is.null,pharmacy_json.not.is.null')
+    .gte('created_at', since.toISOString())
     .limit(1)
     .maybeSingle()
 
   if (recentOrder) {
     console.log(
-      `Farmácia não disparada — pedido recente já existe para subscription ${subscriptionId}`
+      `Farmácia não disparada — pedido recente já existe para protocol/subscription (${ids.join(', ')})`
     )
     return false
   }

@@ -1,6 +1,6 @@
 export type DiagnosisType = 'type2' | 'prediabetes' | 'undiagnosed'
-/** Novos planos: 1mes | assinatura_mensal. Legado: 3meses | 1ano (só dados antigos). */
-export type PlanType = '1mes' | 'assinatura_mensal' | '3meses' | '1ano'
+/** Novos planos: 1mes | 3meses | 6meses. Legado: assinatura_mensal | 1ano. */
+export type PlanType = '1mes' | '3meses' | '6meses' | 'assinatura_mensal' | '1ano'
 export type ProtocolStatus = 'pending_signature' | 'signed' | 'rejected'
 export type RfmTier =
   | '1_campiao'

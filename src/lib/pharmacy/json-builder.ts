@@ -120,21 +120,24 @@ export function buildPharmacyItem(params: {
   pharmacyCode: number
   name: string
   unitPrice: number
+  quantity?: number
 }): PharmacyOrderItem {
-  const price = money(params.unitPrice)
+  const qty = params.quantity && params.quantity > 0 ? params.quantity : 1
+  const unit = money(params.unitPrice)
+  const line = money(params.unitPrice * qty)
   return {
     Codigo: 0,
     ProdutoReferencia: params.sku,
     ProdutoCodigo: params.pharmacyCode,
     ItemNome: params.name,
-    PrecoUnitarioVenda: price,
+    PrecoUnitarioVenda: unit,
     PrecoUnitarioCusto: '0.00',
-    Quantidade: '1.00',
+    Quantidade: qty.toFixed(2),
     ItemDescontoPercentual: '0.00',
     ItemDescontoValor: '0.00',
     ItemDescontoValorTotal: '0.00',
-    ItemValorBruto: price,
-    ItemValorLiquido: price,
+    ItemValorBruto: line,
+    ItemValorLiquido: line,
     Servico: false,
     Movimentacao: [],
   }

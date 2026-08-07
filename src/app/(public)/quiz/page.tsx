@@ -3,12 +3,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { useCart } from '@/lib/use-cart'
 import {
   ALL_PRODUCT_KEYS,
   PRODUCT_NAME_BY_KEY,
   blockReasonForProduct,
   computeTriage,
+  cheapestSuggestion,
   defaultSuggestion,
   productKeyFromName,
   type DiagnosisType,
@@ -147,30 +147,13 @@ type StepId =
 
 export default function QuizPage() {
   const router = useRouter()
-  const { items: cartItems, plan: cartPlan, clearCart } = useCart()
   const [stepIndex, setStepIndex] = useState(0)
   const [form, setForm] = useState<TriageForm>(initialForm)
   const [loading, setLoading] = useState(false)
   const [blockReason, setBlockReason] = useState<string | null>(null)
-  const [hadCartOnEntry, setHadCartOnEntry] = useState(false)
-  const [cartSnapshot, setCartSnapshot] = useState<
-    Array<{ product_id: string; name: string; quantity: number }>
-  >([])
 
   useEffect(() => {
     trackFunnelEvent('quiz_started')
-    // Captura o estado do carrinho uma vez após a hidratação do useCart
-    if (cartItems.length > 0) {
-      setHadCartOnEntry(true)
-      setCartSnapshot(
-        cartItems.map(i => ({
-          product_id: i.product_id,
-          name: i.name,
-          quantity: i.quantity,
-        }))
-      )
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const steps: StepId[] = useMemo(() => {
@@ -407,18 +390,15 @@ export default function QuizPage() {
         if (key && !productByKey.has(key)) productByKey.set(key, product)
       }
 
-      const cartKeys = new Set<ProductKey>()
-      const cartQtyByKey = new Map<ProductKey, number>()
-      for (const item of cartSnapshot) {
-        const key = productKeyFromName(item.name)
-        if (!key) continue
-        cartKeys.add(key)
-        cartQtyByKey.set(key, (cartQtyByKey.get(key) ?? 0) + (item.quantity ?? 1))
+      const monthlyPriceByKey: Partial<Record<ProductKey, number>> = {}
+      for (const [key, product] of productByKey) {
+        monthlyPriceByKey[key] = product.price_monthly
       }
 
-      const suggestion = hadCartOnEntry
-        ? []
-        : defaultSuggestion(result.allowed)
+      const suggestion =
+        result.allowed.length > 0
+          ? cheapestSuggestion(result.allowed, monthlyPriceByKey)
+          : defaultSuggestion(result.allowed)
       const suggestionSet = new Set(suggestion)
 
       const protocolItems: ProtocolItemBuilt[] = []
@@ -437,7 +417,7 @@ export default function QuizPage() {
           product_id: product.id,
           product_name: name,
           pharmacy_sku: '',
-          quantity: cartQtyByKey.get(key) ?? 1,
+          quantity: 1,
           price_monthly: product.price_monthly,
           price_quarterly: product.price_quarterly,
           price_yearly: product.price_yearly,
@@ -455,35 +435,12 @@ export default function QuizPage() {
           continue
         }
 
-        if (hadCartOnEntry) {
-          if (cartKeys.has(key)) {
-            protocolItems.push({
-              ...base,
-              is_required: false,
-              removed: false,
-              activation_reason: 'Selecionado por você no carrinho',
-            })
-          } else {
-            protocolItems.push({
-              ...base,
-              is_required: false,
-              removed: true,
-              activation_reason: 'Disponível — adicione se quiser',
-            })
-          }
-          continue
-        }
-
-        // Carrinho vazio — sugestão automática
         if (suggestionSet.has(key)) {
-          const isPrimary = suggestion[0] === key
           protocolItems.push({
             ...base,
-            is_required: isPrimary,
+            is_required: true,
             removed: false,
-            activation_reason: isPrimary
-              ? 'Sugestão principal para o seu perfil'
-              : 'Sugerido para o seu perfil',
+            activation_reason: 'Sugestão principal para o seu perfil',
           })
         } else {
           protocolItems.push({
@@ -502,25 +459,12 @@ export default function QuizPage() {
 
       sessionStorage.setItem('protocol_items', JSON.stringify(protocolItems))
       sessionStorage.setItem('triagem_data', JSON.stringify(triagemData))
-      sessionStorage.setItem(
-        'checkout_source',
-        hadCartOnEntry ? 'mini_quiz' : 'full_quiz'
-      )
+      sessionStorage.setItem('checkout_source', 'full_quiz')
       sessionStorage.removeItem('quiz_data')
       sessionStorage.removeItem('mini_quiz_data')
       sessionStorage.removeItem('protocol_id')
       sessionStorage.removeItem('cart_locked_plan')
-
-      if (hadCartOnEntry && cartPlan) {
-        sessionStorage.setItem('cart_locked_plan', cartPlan)
-      }
-
-      // Carrinho já foi convertido em protocol_items; limpa pra não misturar depois
-      try {
-        clearCart()
-      } catch {
-        /* useCart pode não expor clearCart em alguns builds — ignore */
-      }
+      sessionStorage.removeItem('selected_plan')
 
       router.push('/recomendacoes')
     } catch {

@@ -1,18 +1,20 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { supplements } from '@/lib/supplements-content'
 import {
   DEFAULT_PURCHASE_PLAN,
   PLAN_BADGE,
   PLAN_HINT,
-  PLAN_LABELS,
   PLAN_TYPE_LABEL,
   PURCHASE_PLAN_TYPES,
+  formatBRL,
   getChargePrice,
+  getInstallmentPrice,
+  getPlanInstallmentCount,
   getSubscriptionDiscountAmount,
-  isPurchasePlanType,
   type PurchasePlanType,
 } from '@/lib/plans'
 
@@ -31,6 +33,34 @@ type LocalProtocolItem = {
   image?: string
 }
 
+const FAQ_ITEMS = [
+  {
+    id: 'assinatura',
+    q: 'Isso é uma assinatura?',
+    a: 'Não. Toda compra é única — à vista (1 mês) ou parcelada no cartão (3 ou 6 meses). Não existe cobrança automática depois que o pedido é pago.',
+  },
+  {
+    id: 'avaliacao',
+    q: 'Como funciona a avaliação profissional?',
+    a: 'Depois da sua triagem, um profissional habilitado do Desafio Diabetes analisa suas respostas e define os suplementos indicados para o seu caso antes de qualquer manipulação.',
+  },
+  {
+    id: 'trocar',
+    q: 'Posso trocar os suplementos do meu protocolo?',
+    a: 'Você pode remover itens complementares que não quiser levar, mas não é possível adicionar suplementos que não foram indicados na sua avaliação.',
+  },
+  {
+    id: 'cancelar',
+    q: 'Posso cancelar minha compra?',
+    a: 'Compras à vista ou parceladas em 3x/6x são cobradas integralmente no ato da compra, como qualquer compra parcelada — não há cobrança futura a cancelar.',
+  },
+  {
+    id: 'farmacia',
+    q: 'Quem manipula os suplementos?',
+    a: 'Farmácias de manipulação credenciadas pela Anvisa, de forma individualizada, conforme a prescrição do seu protocolo.',
+  },
+] as const
+
 function matchSupplementImage(productName: string): string | undefined {
   const needle = productName.toLowerCase()
   const firstWord = needle.split(' ')[0]
@@ -48,12 +78,41 @@ function formatProductList(names: string[]): string {
   return `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`
 }
 
+/** Marca os 2 mais baratos entre os liberados; demais ficam desmarcados. */
+function markTwoCheapest(items: LocalProtocolItem[]): LocalProtocolItem[] {
+  const available = items.filter((item) => !item.blocked)
+  if (available.length === 0) return items
+
+  const ranked = [...available].sort((a, b) => {
+    const priceA = a.price_monthly ?? Number.POSITIVE_INFINITY
+    const priceB = b.price_monthly ?? Number.POSITIVE_INFINITY
+    return priceA - priceB
+  })
+  const selectedIds = new Set(
+    ranked.slice(0, Math.min(2, ranked.length)).map((item) => item.product_id)
+  )
+
+  return items.map((item) => {
+    if (item.blocked) return item
+    const selected = selectedIds.has(item.product_id)
+    return {
+      ...item,
+      is_required: selected,
+      removed: !selected,
+      activation_reason: selected
+        ? 'Sugestão principal para o seu perfil'
+        : 'Disponível — adicione se quiser',
+    }
+  })
+}
+
 export default function RecomendacoesPage() {
   const router = useRouter()
   const [items, setItems] = useState<LocalProtocolItem[]>([])
-  const [plan, setPlan] = useState<PurchasePlanType>(DEFAULT_PURCHASE_PLAN)
-  const [planLocked, setPlanLocked] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [selectedPlan, setSelectedPlan] =
+    useState<PurchasePlanType>(DEFAULT_PURCHASE_PLAN)
+  const [openFaq, setOpenFaq] = useState<string | null>(null)
 
   useEffect(() => {
     loadFromSessionAndEnrichWithPrices()
@@ -68,25 +127,23 @@ export default function RecomendacoesPage() {
       }
 
       const parsedItems: LocalProtocolItem[] = JSON.parse(itemsRaw)
-
-      const lockedPlan = sessionStorage.getItem('cart_locked_plan')
-      if (lockedPlan && isPurchasePlanType(lockedPlan)) {
-        setPlan(lockedPlan)
-        setPlanLocked(true)
-      } else if (lockedPlan === '3meses' || lockedPlan === '1ano') {
-        setPlan(DEFAULT_PURCHASE_PLAN)
-        setPlanLocked(true)
-      }
+      // Bloqueados não entram na tela (compliance — só o prescrito elegível)
+      const visible = parsedItems.filter((item) => !item.blocked)
 
       const res = await fetch('/api/products')
       if (res.ok) {
         const { products } = await res.json()
-        const enriched = parsedItems.map(item => {
-          const product = products.find((p: { name: string }) =>
-            p.name.toLowerCase() === item.product_name.toLowerCase()
-          ) ?? products.find((p: { name: string }) =>
-            p.name.toLowerCase().includes(item.product_name.toLowerCase().split(' ')[0])
-          )
+        const enriched = visible.map((item) => {
+          const product =
+            products.find(
+              (p: { name: string }) =>
+                p.name.toLowerCase() === item.product_name.toLowerCase()
+            ) ??
+            products.find((p: { name: string }) =>
+              p.name
+                .toLowerCase()
+                .includes(item.product_name.toLowerCase().split(' ')[0])
+            )
           return {
             ...item,
             price_monthly: product?.price_monthly ?? 0,
@@ -95,13 +152,15 @@ export default function RecomendacoesPage() {
             image: matchSupplementImage(item.product_name) ?? item.image,
           }
         })
-        setItems(enriched)
+        setItems(markTwoCheapest(enriched))
       } else {
         setItems(
-          parsedItems.map((item) => ({
-            ...item,
-            image: matchSupplementImage(item.product_name) ?? item.image,
-          }))
+          markTwoCheapest(
+            visible.map((item) => ({
+              ...item,
+              image: matchSupplementImage(item.product_name) ?? item.image,
+            }))
+          )
         )
       }
     } catch {
@@ -112,39 +171,66 @@ export default function RecomendacoesPage() {
   }
 
   function toggleItem(productId: string) {
-    setItems(prev =>
-      prev.map(item =>
-        item.product_id === productId && !item.is_required && !item.blocked
+    setItems((prev) =>
+      prev.map((item) =>
+        item.product_id === productId
           ? { ...item, removed: !item.removed }
           : item
       )
     )
   }
 
-  function getPrice(item: LocalProtocolItem): number {
-    return getChargePrice(item.price_monthly ?? 0, plan)
-  }
-
-  function getActiveItems(): LocalProtocolItem[] {
-    return items.filter(item => !item.removed)
-  }
-
-  function getTotalPrice(): number {
-    return getActiveItems().reduce((sum, item) => sum + getPrice(item), 0)
-  }
-
-  function getSavingsInReais(targetPlan: PurchasePlanType): number {
-    if (targetPlan === '1mes') return 0
-    return getActiveItems().reduce(
-      (sum, item) => sum + getSubscriptionDiscountAmount(item.price_monthly ?? 0),
-      0
+  function getPrice(item: LocalProtocolItem, plan: PurchasePlanType = selectedPlan): number {
+    return (
+      getChargePrice(item.price_monthly ?? 0, plan) * (item.quantity ?? 1)
     )
   }
 
+  function getActiveItems(): LocalProtocolItem[] {
+    return items.filter((item) => !item.removed)
+  }
+
+  function getTotalForPlan(plan: PurchasePlanType): number {
+    return getActiveItems().reduce((sum, item) => sum + getPrice(item, plan), 0)
+  }
+
+  function getTotalPrice(): number {
+    return getTotalForPlan(selectedPlan)
+  }
+
+  function getTotalSavings(): number {
+    return getActiveItems().reduce((sum, item) => {
+      const qty = item.quantity ?? 1
+      return (
+        sum +
+        getSubscriptionDiscountAmount(item.price_monthly ?? 0, selectedPlan) *
+          qty
+      )
+    }, 0)
+  }
+
   function handleContinue() {
-    sessionStorage.setItem('protocol_items', JSON.stringify(items))
-    sessionStorage.setItem('selected_plan', plan)
-    sessionStorage.setItem('checkout_source', 'full_quiz')
+    const active = items.filter((item) => !item.removed)
+    const ranked = [...active].sort((a, b) => {
+      const priceA = a.price_monthly ?? Number.POSITIVE_INFINITY
+      const priceB = b.price_monthly ?? Number.POSITIVE_INFINITY
+      return priceA - priceB
+    })
+    const requiredIds = new Set(
+      ranked.slice(0, Math.min(2, ranked.length)).map((item) => item.product_id)
+    )
+
+    const synced = items.map((item) => ({
+      ...item,
+      is_required: requiredIds.has(item.product_id),
+    }))
+
+    sessionStorage.setItem('protocol_items', JSON.stringify(synced))
+    sessionStorage.setItem('selected_plan', selectedPlan)
+    sessionStorage.removeItem('cart_locked_plan')
+    if (!sessionStorage.getItem('checkout_source')) {
+      sessionStorage.setItem('checkout_source', 'full_quiz')
+    }
     router.push('/checkout')
   }
 
@@ -159,85 +245,134 @@ export default function RecomendacoesPage() {
   if (items.length === 0) return null
 
   const activeItems = getActiveItems()
-  const approvedNames = formatProductList(activeItems.map((i) => i.product_name))
+  const approvedNames = formatProductList(
+    activeItems.map((i) => i.product_name)
+  )
+  const totalSavings = getTotalSavings()
+  const installmentCount = getPlanInstallmentCount(selectedPlan)
+  const totalPrice = getTotalPrice()
+  const installmentTotal =
+    installmentCount > 1 ? totalPrice / installmentCount : totalPrice
 
   return (
     <div className="min-h-screen bg-[#f5f0eb]">
-
-      {/* Header */}
       <header className="bg-[#f5f0eb] px-6 pt-5 pb-4">
         <div className="max-w-2xl lg:max-w-5xl mx-auto">
-          <img src="/logo-azul.png" alt="Desafio Diabetes" className="h-7 w-auto mb-5" />
+          <img
+            src="/logo-azul.png"
+            alt="Desafio Diabetes"
+            className="h-7 w-auto mb-5"
+          />
 
-          {/* Progressão */}
           <div className="flex items-center gap-2 text-xs font-medium">
             <span className="flex items-center gap-1.5 text-[#13244f]">
-              <span className="w-4 h-4 rounded-full bg-[#13244f] text-white flex items-center justify-center text-[10px]">✓</span>
+              <span className="w-4 h-4 rounded-full bg-[#13244f] text-white flex items-center justify-center text-[10px]">
+                ✓
+              </span>
               Protocolo
             </span>
             <span className="flex-1 h-px bg-[#13244f]/20" />
             <span className="flex items-center gap-1.5 text-[#13244f] font-semibold">
-              <span className="w-4 h-4 rounded-full bg-[#13244f] text-white flex items-center justify-center text-[10px]">2</span>
+              <span className="w-4 h-4 rounded-full bg-[#13244f] text-white flex items-center justify-center text-[10px]">
+                2
+              </span>
               Checkout
             </span>
             <span className="flex-1 h-px bg-[#13244f]/20" />
             <span className="flex items-center gap-1.5 text-[#13244f]/40">
-              <span className="w-4 h-4 rounded-full border border-[#13244f]/30 flex items-center justify-center text-[10px]">3</span>
+              <span className="w-4 h-4 rounded-full border border-[#13244f]/30 flex items-center justify-center text-[10px]">
+                3
+              </span>
               Prescrição
             </span>
             <span className="flex-1 h-px bg-[#13244f]/20" />
             <span className="flex items-center gap-1.5 text-[#13244f]/40">
-              <span className="w-4 h-4 rounded-full border border-[#13244f]/30 flex items-center justify-center text-[10px]">4</span>
+              <span className="w-4 h-4 rounded-full border border-[#13244f]/30 flex items-center justify-center text-[10px]">
+                4
+              </span>
               Entrega
             </span>
           </div>
         </div>
       </header>
 
-      <main className="max-w-2xl lg:max-w-5xl mx-auto px-6 pb-12 pt-6">
+      <main className="max-w-2xl lg:max-w-5xl mx-auto px-6 pb-12 pt-6 space-y-6">
+        <Image
+          src="/linha-suplementos.png"
+          alt="Linha de suplementos Desafio Diabetes"
+          width={1024}
+          height={1024}
+          priority
+          className="w-full max-h-72 md:max-h-96 object-cover rounded-2xl"
+        />
+
         <div className="lg:grid lg:grid-cols-[1fr_280px] lg:gap-8 lg:items-start space-y-6 lg:space-y-0">
           <div className="space-y-6">
-            {/* Título */}
             <div>
-              {planLocked ? (
-                <>
-                  <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-1">SEU PEDIDO</p>
-                  <h1 className="font-display text-2xl md:text-3xl text-[#13244f]">Pronto para finalizar</h1>
-                  <p className="text-gray-500 text-sm md:text-base mt-1">
-                    Confira os itens e escolha o plano para <strong className="text-[#13244f] font-semibold">{approvedNames}</strong>.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-1">SEU PROTOCOLO</p>
-                  <h1 className="font-display text-2xl md:text-3xl text-[#13244f]">Protocolo personalizado</h1>
-                  <p className="text-gray-500 text-sm md:text-base mt-1">
-                    Baseado nas suas respostas, preparamos o tratamento ideal para você.
-                  </p>
-                </>
-              )}
+              <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-1">
+                SEU PROTOCOLO
+              </p>
+              <h1 className="font-display text-2xl md:text-3xl text-[#13244f]">
+                Este é o protocolo prescrito para você
+              </h1>
+              <p className="text-[#13244f]/80 text-sm md:text-base mt-1">
+                Avaliado por um profissional habilitado do Desafio Diabetes.
+                {approvedNames ? (
+                  <>
+                    {' '}
+                    Inclui{' '}
+                    <strong className="text-[#13244f] font-semibold">
+                      {approvedNames}
+                    </strong>
+                    .
+                  </>
+                ) : null}
+              </p>
+              <p className="text-[#13244f]/70 text-sm mt-3">
+                Já selecionamos os dois suplementos mais recomendados ao seu
+                perfil.
+              </p>
             </div>
 
-            {/* Itens do protocolo */}
-            <div className="space-y-3">
-              {items.map(item => {
-                const isRemoved = item.removed
-                const isBlocked = !!item.blocked
+            <fieldset className="space-y-3">
+              <legend className="sr-only">Suplementos disponíveis</legend>
+              {items.map((item) => {
+                const isChecked = !item.removed
                 const price = getPrice(item)
+                const qty = item.quantity ?? 1
+                const discount =
+                  getSubscriptionDiscountAmount(
+                    item.price_monthly ?? 0,
+                    selectedPlan
+                  ) * qty
+                const itemInstallments = getPlanInstallmentCount(selectedPlan)
+                const itemInstallment =
+                  itemInstallments > 1
+                    ? getInstallmentPrice(item.price_monthly ?? 0, selectedPlan) *
+                      qty
+                    : price
 
                 return (
-                  <div
+                  <label
                     key={item.product_id}
-                    className={`bg-white rounded-2xl border border-gray-100 p-4 transition-opacity shadow-sm ${
-                      isRemoved || isBlocked ? 'opacity-40' : ''
+                    className={`flex items-start gap-3 bg-white rounded-2xl border p-4 shadow-sm cursor-pointer transition ${
+                      isChecked
+                        ? 'border-[#13244f] ring-1 ring-[#13244f]/20'
+                        : 'border-gray-100 hover:border-[#13244f]/30'
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-4">
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => toggleItem(item.product_id)}
+                      className="mt-1 w-5 h-5 rounded border-gray-300 text-[#13244f] accent-[#13244f] flex-shrink-0 cursor-pointer"
+                    />
+                    <div className="flex items-start justify-between gap-4 flex-1 min-w-0">
                       <div className="flex items-start gap-3 flex-1 min-w-0">
                         {item.image ? (
                           <img
                             src={item.image}
-                            alt={item.product_name}
+                            alt=""
                             className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
                           />
                         ) : (
@@ -245,103 +380,136 @@ export default function RecomendacoesPage() {
                         )}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-1">
-                            <span className="font-semibold text-[#13244f] md:text-base">{item.product_name}</span>
-                            {isBlocked ? (
-                              <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-50 text-amber-700">
-                                Bloqueado por segurança
-                              </span>
-                            ) : (
-                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                                item.is_required
-                                  ? 'bg-[#13244f]/10 text-[#13244f]'
-                                  : 'bg-gray-100 text-gray-500'
-                              }`}>
-                                {item.is_required ? 'Tratamento principal' : 'Complementar'}
+                            <span className="font-semibold text-[#13244f] md:text-base">
+                              {qty > 1 ? `${qty}× ` : ''}
+                              {item.product_name}
+                            </span>
+                            {item.is_required && (
+                              <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-[#13244f]/10 text-[#13244f]">
+                                Recomendado
                               </span>
                             )}
                           </div>
-                          <p className="text-sm md:text-base text-gray-500 leading-relaxed">{item.activation_reason}</p>
+                          <p className="text-sm md:text-base text-[#13244f]/75 leading-relaxed">
+                            {item.activation_reason}
+                          </p>
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <p className="font-bold text-[#13244f]">R$ {price.toFixed(2).replace('.', ',')}</p>
-                        {!item.is_required && !isBlocked && (
-                          <button
-                            onClick={() => toggleItem(item.product_id)}
-                            className="text-xs text-gray-400 hover:text-gray-600 mt-1 underline"
-                          >
-                            {isRemoved ? 'Adicionar' : 'Remover'}
-                          </button>
+                        {itemInstallments > 1 ? (
+                          <>
+                            <p className="font-bold text-[#13244f]">
+                              {itemInstallments}× R${' '}
+                              {formatBRL(itemInstallment)}
+                            </p>
+                            <p className="text-xs text-[#13244f]/60">
+                              Total R$ {formatBRL(price)}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="font-bold text-[#13244f]">
+                            R$ {formatBRL(price)}
+                          </p>
+                        )}
+                        {discount > 0 && (
+                          <p className="text-xs text-green-700">
+                            −R$ {formatBRL(discount)}
+                          </p>
                         )}
                       </div>
                     </div>
-                  </div>
+                  </label>
                 )
               })}
-            </div>
+            </fieldset>
 
-            {/* Seleção de plano */}
-            <div>
-              <h2 className="font-bold text-[#13244f] mb-3">Escolha a forma de compra</h2>
-              {planLocked ? (
-                <div className="rounded-2xl border border-[#13244f]/20 bg-[#13244f]/5 px-4 py-3 text-sm md:text-base text-[#13244f] font-medium text-center">
-                  Plano escolhido: {PLAN_LABELS[plan]}
-                </div>
-              ) : (
-              <div className="grid grid-cols-2 gap-3">
-                {PURCHASE_PLAN_TYPES.map(p => {
-                  const savings = getSavingsInReais(p)
-                  const isSelected = plan === p
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
+              <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase">
+                Forma de compra
+              </p>
+              <div className="grid gap-2">
+                {PURCHASE_PLAN_TYPES.map((plan) => {
+                  const selected = selectedPlan === plan
+                  const planTotal = getTotalForPlan(plan)
+                  const count = getPlanInstallmentCount(plan)
+                  const installment =
+                    count > 1 && activeItems.length > 0
+                      ? planTotal / count
+                      : planTotal
 
                   return (
                     <button
-                      key={p}
-                      onClick={() => setPlan(p)}
-                      className={`relative rounded-2xl border p-3 text-center transition-all ${
-                        isSelected
-                          ? 'border-[#13244f] bg-[#13244f] text-white shadow-md'
-                          : 'border-gray-200 bg-white text-[#13244f] hover:border-[#13244f]/40'
+                      key={plan}
+                      type="button"
+                      onClick={() => setSelectedPlan(plan)}
+                      className={`w-full text-left rounded-xl border px-4 py-3 transition ${
+                        selected
+                          ? 'border-[#13244f] bg-[#13244f]/5'
+                          : 'border-gray-200 hover:border-[#13244f]/40'
                       }`}
                     >
-                      {PLAN_BADGE[p] && (
-                        <span className={`absolute -top-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          isSelected ? 'bg-[#f4001e] text-white' : 'bg-[#f4001e] text-white'
-                        }`}>
-                          {PLAN_BADGE[p]}
-                        </span>
-                      )}
-
-                      <div className={`text-xs font-medium mb-0.5 mt-1 ${isSelected ? 'text-white/70' : 'text-gray-400'}`}>
-                        {PLAN_TYPE_LABEL[p]}
-                      </div>
-                      <div className="text-sm font-bold">{PLAN_LABELS[p]}</div>
-                      {savings > 0 && (
-                        <div className={`text-xs mt-1 font-medium ${isSelected ? 'text-green-300' : 'text-green-600'}`}>
-                          Economize R$ {savings.toFixed(2).replace('.', ',')}/mês
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-[#13244f]">
+                            {PLAN_TYPE_LABEL[plan]}
+                          </p>
+                          <p className="text-xs text-[#13244f]/70 mt-0.5">
+                            {PLAN_HINT[plan]}
+                          </p>
+                          {activeItems.length > 0 && (
+                            <p className="text-sm font-semibold text-[#13244f] mt-2">
+                              {count > 1
+                                ? `${count}× de R$ ${formatBRL(installment)}`
+                                : `R$ ${formatBRL(planTotal)}`}
+                            </p>
+                          )}
+                          {count > 1 && activeItems.length > 0 && (
+                            <p className="text-xs text-[#13244f]/60">
+                              Total do ciclo R$ {formatBRL(planTotal)}
+                            </p>
+                          )}
                         </div>
-                      )}
+                        {PLAN_BADGE[plan] && (
+                          <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#13244f]/10 text-[#13244f] whitespace-nowrap">
+                            {PLAN_BADGE[plan]}
+                          </span>
+                        )}
+                      </div>
                     </button>
                   )
                 })}
               </div>
-              )}
-
-              <p className="text-xs text-gray-400 mt-2 text-center">
-                {PLAN_HINT[plan]}
-              </p>
             </div>
 
-            {/* Resumo + CTA */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm md:text-base text-gray-500">
-                  {activeItems.length} {activeItems.length === 1 ? 'produto' : 'produtos'}
+                <span className="text-sm md:text-base text-[#13244f]/70">
+                  {activeItems.length}{' '}
+                  {activeItems.length === 1 ? 'produto' : 'produtos'}
                 </span>
                 <div className="text-right">
-                  <p className="text-2xl font-bold text-[#13244f]">
-                    R$ {getTotalPrice().toFixed(2).replace('.', ',')}
-                  </p>
-                  <p className="text-xs text-gray-400">por {PLAN_LABELS[plan]}</p>
+                  {installmentCount > 1 ? (
+                    <>
+                      <p className="text-2xl font-bold text-[#13244f]">
+                        {installmentCount}× R$ {formatBRL(installmentTotal)}
+                      </p>
+                      <p className="text-xs text-[#13244f]/60">
+                        Total hoje R$ {formatBRL(totalPrice)}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-2xl font-bold text-[#13244f]">
+                        R$ {formatBRL(totalPrice)}
+                      </p>
+                      <p className="text-xs text-[#13244f]/60">Total hoje</p>
+                    </>
+                  )}
+                  {totalSavings > 0 && (
+                    <p className="text-[11px] text-green-700 mt-0.5">
+                      Você economiza R$ {formatBRL(totalSavings)}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -353,41 +521,119 @@ export default function RecomendacoesPage() {
                 Garantir meu protocolo
               </button>
 
-              <div className="flex items-center justify-center gap-4 text-xs text-gray-400">
+              <div className="flex items-center justify-center gap-4 text-xs text-[#13244f]/50">
                 <span className="flex items-center gap-1">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                    <rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="2"/>
-                    <path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                    <rect
+                      x="3"
+                      y="11"
+                      width="18"
+                      height="11"
+                      rx="2"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    />
+                    <path
+                      d="M7 11V7a5 5 0 0110 0v4"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
                   </svg>
                   Pagamento seguro
                 </span>
                 <span>·</span>
                 <span>Farmácia credenciada ANVISA</span>
-                <span>·</span>
-                <span>Cancele quando quiser</span>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-3">
+                Perguntas frequentes
+              </p>
+              <div className="divide-y divide-[#ececec]">
+                {FAQ_ITEMS.map((item) => {
+                  const open = openFaq === item.id
+                  return (
+                    <div key={item.id}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOpenFaq((current) =>
+                            current === item.id ? null : item.id
+                          )
+                        }
+                        className="w-full flex items-center justify-between gap-4 py-4 text-left"
+                        aria-expanded={open}
+                      >
+                        <span className="font-semibold text-[#13244f] text-sm">
+                          {item.q}
+                        </span>
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          className={`flex-shrink-0 text-[#13244f] transition-transform duration-300 ${
+                            open ? 'rotate-180' : ''
+                          }`}
+                          aria-hidden
+                        >
+                          <path
+                            d="M5 8.5L12 15.5L19 8.5"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      </button>
+                      <div
+                        className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                          open
+                            ? 'max-h-[32rem] opacity-100 pb-4'
+                            : 'max-h-0 opacity-0'
+                        }`}
+                      >
+                        <p className="text-sm text-[#13244f]/80 leading-relaxed">
+                          {item.a}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           </div>
 
-          {/* Coluna lateral desktop */}
           <aside className="hidden lg:block lg:sticky lg:top-8">
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
-              <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase">Confiança</p>
+              <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase">
+                Confiança
+              </p>
               <h2 className="font-display text-xl text-[#13244f] leading-snug">
-                {planLocked ? 'Compra liberada' : 'Protocolo sob medida'}
+                Protocolo sob medida
               </h2>
-              <ul className="space-y-2 text-sm md:text-base text-gray-600">
+              <ul className="space-y-2 text-sm md:text-base text-[#13244f]/80">
+                <li>Avaliado por profissional habilitado</li>
                 <li>Farmácia credenciada ANVISA</li>
                 <li>Pagamento seguro</li>
-                <li>Cancele quando quiser</li>
-                <li>Frete grátis</li>
+                <li>Frete calculado no checkout</li>
               </ul>
-              <div className="pt-2 border-t border-gray-100">
-                <p className="text-xs text-gray-400">Plano</p>
-                <p className="text-sm md:text-base font-semibold text-[#13244f]">{PLAN_LABELS[plan]}</p>
-              </div>
             </div>
           </aside>
+        </div>
+
+        <div className="rounded-2xl bg-white border border-gray-100 shadow-sm px-5 py-5 text-sm md:text-base text-[#13244f]/85 leading-relaxed space-y-2">
+          <p className="font-semibold text-[#13244f]">Vale lembrar:</p>
+          <p>
+            — Este protocolo é uma sugestão inicial. A partir dele, um
+            profissional habilitado do Desafio Diabetes avalia seu caso e
+            define, quando necessário, sua prescrição.
+          </p>
+          <p>
+            — Os suplementos são manipulados e dispensados por farmácias
+            credenciadas pela Anvisa.
+          </p>
         </div>
       </main>
     </div>

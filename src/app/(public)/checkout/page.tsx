@@ -4,7 +4,13 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { PLAN_LABELS, getChargePrice } from '@/lib/plans'
+import {
+  DEFAULT_PURCHASE_PLAN,
+  PLAN_TYPE_LABEL,
+  getChargePrice,
+  isPurchasePlanType,
+  type PurchasePlanType,
+} from '@/lib/plans'
 import {
   shippingQuoteKey,
   type ShippingOptionPublic,
@@ -67,9 +73,9 @@ export default function CheckoutPage() {
   const router = useRouter()
   const [step, setStep] = useState<Step>(2)
   const [items, setItems] = useState<LocalProtocolItem[]>([])
-  const [plan, setPlan] = useState<string>('assinatura_mensal')
   const [loading, setLoading] = useState(false)
   const [source, setSource] = useState<CheckoutSource>('full_quiz')
+  const [plan, setPlan] = useState<PurchasePlanType>(DEFAULT_PURCHASE_PLAN)
 
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
@@ -106,18 +112,20 @@ export default function CheckoutPage() {
   const [accountSummary, setAccountSummary] = useState<{ name: string; email: string } | null>(null)
   const [addressSummary, setAddressSummary] = useState<string | null>(null)
 
+  const pixAllowed = plan === '1mes'
+
   useEffect(() => {
     trackFunnelEvent('checkout_started')
   }, [])
 
   useEffect(() => {
-    if (plan !== '1mes' && paymentMethod === 'pix') {
+    if (!pixAllowed && paymentMethod === 'pix') {
       setPaymentMethod('credit_card')
       setPixInfo(null)
       setPixSubscriptionId(null)
       setPixExpired(false)
     }
-  }, [plan, paymentMethod])
+  }, [pixAllowed, paymentMethod])
 
   useEffect(() => {
     if (!pixInfo?.expires_at || pixExpired) return
@@ -162,8 +170,8 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     const itemsRaw = sessionStorage.getItem('protocol_items')
-    const savedPlan = sessionStorage.getItem('selected_plan')
     const savedSource = sessionStorage.getItem('checkout_source') as CheckoutSource | null
+    const savedPlan = sessionStorage.getItem('selected_plan')
     const triagemRaw = sessionStorage.getItem('triagem_data')
 
     if (!itemsRaw) {
@@ -177,8 +185,13 @@ export default function CheckoutPage() {
     }
 
     setSource(savedSource === 'mini_quiz' ? 'mini_quiz' : 'full_quiz')
-    setItems(JSON.parse(itemsRaw))
-    if (savedPlan) setPlan(savedPlan)
+    if (savedPlan && isPurchasePlanType(savedPlan)) {
+      setPlan(savedPlan)
+    } else {
+      setPlan(DEFAULT_PURCHASE_PLAN)
+    }
+    const parsed: LocalProtocolItem[] = JSON.parse(itemsRaw)
+    setItems(parsed)
 
     checkExistingSession()
   }, [])
@@ -215,7 +228,7 @@ export default function CheckoutPage() {
   }
 
   function getPrice(item: LocalProtocolItem): number {
-    return getChargePrice(item.price_monthly ?? 0, plan)
+    return getChargePrice(item.price_monthly ?? 0, plan) * (item.quantity ?? 1)
   }
 
   function getProductsSubtotal(): number {
@@ -365,12 +378,12 @@ export default function CheckoutPage() {
         return
       }
 
-      const method: PaymentMethod = plan === '1mes' ? paymentMethod : 'credit_card'
+      const method: PaymentMethod = pixAllowed ? paymentMethod : 'credit_card'
 
       const body: Record<string, unknown> = {
-        plan_type: plan,
         total_amount: getTotal(),
         source,
+        plan_type: plan,
         quiz,
         protocol_items: getActiveItems(),
         shipping,
@@ -406,6 +419,13 @@ export default function CheckoutPage() {
 
       const data = await res.json()
 
+      const results = data.results as
+        | {
+            oneTime?: { ok: boolean; paid?: boolean; error?: string }
+            subscription?: { ok: boolean; paid?: boolean; error?: string }
+          }
+        | undefined
+
       if (!res.ok) {
         toast.error(data.error ?? 'Erro no pagamento')
         return
@@ -426,6 +446,18 @@ export default function CheckoutPage() {
         return
       }
 
+      if (method === 'credit_card') {
+        const paid =
+          results?.oneTime?.paid === true ||
+          results?.subscription?.paid === true
+        if (!paid) {
+          toast.error(
+            'Pagamento recusado pela operadora do cartão. Verifique os dados ou tente outro cartão.'
+          )
+          return
+        }
+      }
+
       clearCheckoutSession()
       router.push('/obrigado')
     } catch {
@@ -444,8 +476,6 @@ export default function CheckoutPage() {
       toast.error('Não foi possível copiar. Selecione o código manualmente.')
     }
   }
-
-  const planLabel = PLAN_LABELS[plan] ?? plan
 
   return (
     <div className="min-h-screen bg-[#f5f0eb]">
@@ -830,7 +860,7 @@ export default function CheckoutPage() {
                   </div>
                 ) : (
                 <form onSubmit={handlePayment} className="space-y-3">
-                  {plan === '1mes' && (
+                  {pixAllowed && (
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
@@ -858,14 +888,14 @@ export default function CheckoutPage() {
                   )}
 
                   <input
-                    placeholder={paymentMethod === 'pix' ? 'CPF' : 'CPF do titular'}
+                    placeholder={paymentMethod === 'pix' && pixAllowed ? 'CPF' : 'CPF do titular'}
                     value={cpf}
                     onChange={e => setCpf(e.target.value)}
                     required
                     className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                   />
 
-                  {paymentMethod === 'credit_card' && (
+                  {(paymentMethod === 'credit_card' || !pixAllowed) && (
                     <>
                       <input
                         placeholder="Número do cartão"
@@ -903,7 +933,7 @@ export default function CheckoutPage() {
                     </>
                   )}
 
-                  {paymentMethod === 'pix' && (
+                  {paymentMethod === 'pix' && pixAllowed && (
                     <p className="text-xs text-gray-500 bg-[#13244f]/5 rounded-xl px-4 py-3">
                       Após gerar o QR Code, você terá 1 hora para pagar. A confirmação é automática.
                     </p>
@@ -936,7 +966,7 @@ export default function CheckoutPage() {
                   >
                     {processingPayment
                       ? 'Processando...'
-                      : paymentMethod === 'pix'
+                      : paymentMethod === 'pix' && pixAllowed
                         ? `Gerar Pix — R$ ${getTotal().toFixed(2).replace('.', ',')}`
                         : `Pagar R$ ${getTotal().toFixed(2).replace('.', ',')}`}
                   </button>
@@ -968,7 +998,9 @@ export default function CheckoutPage() {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
             <div>
               <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-1">Resumo da compra</p>
-              <p className="text-sm md:text-base text-gray-400">{planLabel} de tratamento</p>
+              <p className="text-sm md:text-base text-gray-400">
+                {PLAN_TYPE_LABEL[plan]}
+              </p>
             </div>
 
             <div className="space-y-3">
@@ -985,8 +1017,13 @@ export default function CheckoutPage() {
                       <div className="w-10 h-10 rounded-lg bg-[#ececec] flex-shrink-0" />
                     )}
                     <div className="min-w-0">
-                      <p className="text-sm md:text-base font-medium text-[#13244f] truncate">{item.product_name}</p>
-                      <p className="text-xs text-gray-400">{item.is_required ? 'Tratamento principal' : 'Complementar'}</p>
+                      <p className="text-sm md:text-base font-medium text-[#13244f] truncate">
+                        {(item.quantity ?? 1) > 1 ? `${item.quantity}× ` : ''}
+                        {item.product_name}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {item.is_required ? 'Principal' : 'Complementar'}
+                      </p>
                     </div>
                   </div>
                   <p className="text-sm md:text-base font-semibold text-[#13244f] flex-shrink-0">
@@ -1038,12 +1075,11 @@ export default function CheckoutPage() {
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm md:text-base font-bold text-[#13244f]">Total</span>
+                <span className="text-sm md:text-base font-bold text-[#13244f]">Total hoje</span>
                 <span className="text-xl font-bold text-[#13244f]">
                   R$ {getTotal().toFixed(2).replace('.', ',')}
                 </span>
               </div>
-              <p className="text-xs text-gray-400 text-right">por {planLabel}{plan === 'assinatura_mensal' ? '/mês' : ''}</p>
             </div>
 
             <div className="bg-[#13244f]/5 rounded-xl px-4 py-3 text-xs text-[#13244f] leading-relaxed">

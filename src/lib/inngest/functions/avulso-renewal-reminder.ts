@@ -1,6 +1,7 @@
 import { Resend } from 'resend'
 import { inngest } from '../client'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { isRecurringPlan } from '@/lib/plans'
 
 type ReminderKind = 'd-5' | 'd-1' | 'd+3'
 
@@ -67,10 +68,10 @@ function buildRenewalEmailHtml(params: {
     { subject: string; body: string; cta: string }
   > = {
     'd-5': {
-      subject: 'Seu plano acaba em 5 dias — quer continuar?',
+      subject: 'Seu protocolo está chegando ao fim — quer continuar?',
       body: `
         <p style="margin:0 0 16px;color:#4b5563;font-size:15px;line-height:1.7;">
-          Seu plano de tratamento do <strong style="color:#13244f;">Desafio Diabetes</strong> termina em <strong style="color:#13244f;">5 dias</strong>.
+          Seu protocolo do <strong style="color:#13244f;">Desafio Diabetes</strong> termina em <strong style="color:#13244f;">5 dias</strong>.
         </p>
         <p style="margin:0 0 16px;color:#4b5563;font-size:15px;line-height:1.7;">
           Se quiser manter seus suplementos e acompanhamento sem interrupção, é só renovar pelo link abaixo — você reaproveita o mesmo protocolo personalizado que já tem.
@@ -213,14 +214,21 @@ export const avulsoRenewalReminder = inngest.createFunction(
       const admin = createAdminClient()
       const { data } = await admin
         .from('subscriptions')
-        .select('plan_type, expires_at')
+        .select('plan_type, expires_at, pagarme_sub_id')
         .eq('id', subscription_id)
         .single()
       return data
     })
 
-    if (!sub || sub.plan_type !== '1mes' || !sub.expires_at) {
-      return { skipped: 'plano-nao-e-avulso' }
+    // Só compra única (1/3/6 meses sem sub Pagar.me). Legado recorrente com
+    // pagarme_sub_id não deve receber e-mail pedindo renovação manual.
+    if (
+      !sub ||
+      isRecurringPlan(sub.plan_type) ||
+      Boolean(sub.pagarme_sub_id) ||
+      !sub.expires_at
+    ) {
+      return { skipped: 'plano-e-recorrente' }
     }
 
     const expiresAt = new Date(sub.expires_at)

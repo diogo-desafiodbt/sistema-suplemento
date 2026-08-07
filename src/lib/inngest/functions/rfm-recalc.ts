@@ -31,6 +31,7 @@ function calcMonetaryScore(
   const { plan_type, status } = sub
   if (status === 'active') {
     if (plan_type === '1ano') return 100
+    if (plan_type === '6meses') return 95
     if (plan_type === 'assinatura_mensal') return 90
     if (plan_type === '3meses') return 85
     if (plan_type === '1mes') return 70

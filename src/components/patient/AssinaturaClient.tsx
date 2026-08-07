@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import Link from 'next/link'
-import { PLAN_LABELS, isRecurringPlan } from '@/lib/plans'
+import { PLAN_LABELS, canCancelRecurringBilling } from '@/lib/plans'
 
 type Subscription = {
   id: string
@@ -11,6 +11,7 @@ type Subscription = {
   status: string
   expires_at: string | null
   grace_period_ends_at: string | null
+  pagarme_sub_id: string | null
 } | null
 
 type Payment = {
@@ -47,7 +48,7 @@ export function AssinaturaClient({ subscription, payments }: Props) {
   const canCancel =
     !canceled &&
     subscription !== null &&
-    isRecurringPlan(subscription.plan_type) &&
+    canCancelRecurringBilling(subscription.plan_type, subscription.pagarme_sub_id) &&
     ['active', 'past_due', 'grace_period'].includes(subscription.status)
 
   const currentStatus = canceled ? 'canceled' : (subscription?.status ?? 'expired')
@@ -101,7 +102,10 @@ export function AssinaturaClient({ subscription, payments }: Props) {
               <p className="text-sm text-gray-400 mt-0.5">
                 {canceled
                   ? `Renovação cancelada — acesso até ${expiresAt}`
-                  : isRecurringPlan(subscription.plan_type)
+                  : canCancelRecurringBilling(
+                        subscription.plan_type,
+                        subscription.pagarme_sub_id
+                      )
                     ? `Próximo ciclo até ${expiresAt}`
                     : `Válido até ${expiresAt}`}
               </p>

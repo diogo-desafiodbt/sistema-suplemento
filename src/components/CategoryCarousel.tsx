@@ -1,13 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import AddedToCartDialog from '@/components/AddedToCartDialog'
 import { supplements } from '@/lib/supplements-content'
-import { useCart } from '@/lib/use-cart'
-import { DEFAULT_PURCHASE_PLAN, getChargePrice } from '@/lib/plans'
 
 type Product = {
   id: string
@@ -17,13 +13,6 @@ type Product = {
   price_yearly: number
   is_fixed: boolean
   is_active: boolean
-}
-
-function formatPrice(value: number) {
-  return value.toLocaleString('pt-BR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
 }
 
 function matchProduct(products: Product[], name: string): Product | undefined {
@@ -37,16 +26,9 @@ function matchProduct(products: Product[], name: string): Product | undefined {
 }
 
 export default function CategoryCarousel() {
-  const router = useRouter()
-  const { addItem } = useCart()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
-  const [showCartDialog, setShowCartDialog] = useState(false)
-  const [dialogItem, setDialogItem] = useState<{
-    name: string
-    image: string
-    price_monthly: number
-  } | null>(null)
+  const scrollerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -69,114 +51,123 @@ export default function CategoryCarousel() {
     }
   }, [])
 
-  function handleAddToCart(supplement: (typeof supplements)[number], product: Product) {
-    addItem({
-      product_id: product.id,
-      name: product.name,
-      price_monthly: product.price_monthly,
-      plan: DEFAULT_PURCHASE_PLAN,
-      image: supplement.gallery[0],
-    })
-    setDialogItem({
-      name: supplement.name,
-      image: supplement.gallery[0],
-      price_monthly: product.price_monthly,
-    })
-    setShowCartDialog(true)
+  function scrollByCard(direction: -1 | 1) {
+    const el = scrollerRef.current
+    if (!el) return
+    const amount = Math.min(el.clientWidth * 0.85, 400)
+    el.scrollBy({ left: direction * amount, behavior: 'smooth' })
   }
 
   return (
     <div className="w-full">
-      <h2 className="font-display text-2xl md:text-3xl text-[#13244f] mb-6 md:mb-8">
-        Escolha seu suplemento
-      </h2>
-
-      <div className="flex gap-4 md:gap-6 overflow-x-auto snap-x snap-mandatory scroll-pl-4 md:scroll-pl-2 pb-1 -mx-4 px-4 md:mx-0 md:px-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {supplements.map((supplement) => {
-          const product = matchProduct(products, supplement.name)
-          const image = supplement.gallery[0]
-
-          return (
-            <div
-              key={supplement.slug}
-              className="flex-shrink-0 snap-start w-[73vw] sm:w-[320px] md:w-[400px] flex flex-col"
-            >
-              <Link
-                href={`/suplementos/${supplement.slug}`}
-                className="relative rounded-2xl overflow-hidden aspect-square group"
-              >
-                <Image
-                  src={image}
-                  alt={supplement.name}
-                  fill
-                  sizes="(max-width: 640px) 73vw, (max-width: 768px) 320px, 400px"
-                  className="object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-                <span className="absolute bottom-6 left-0 right-0 text-center text-white font-display text-xl md:text-2xl">
-                  {supplement.name}
-                </span>
-                <span
-                  className="absolute bottom-4 right-4 w-9 h-9 rounded-full bg-white flex items-center justify-center"
-                  aria-hidden
-                >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path
-                      d="M3 8h10M9 4l4 4-4 4"
-                      stroke="#13244f"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </span>
-              </Link>
-
-              <div className="pt-3 flex flex-col gap-3">
-                {loading ? (
-                  <p className="text-sm text-gray-500">Carregando preço…</p>
-                ) : product ? (
-                  <p className="text-lg font-semibold text-[#13244f]">
-                    {`R$ ${formatPrice(getChargePrice(product.price_monthly, 'assinatura_mensal'))}/mês`}
-                    <span className="block text-sm font-normal text-gray-500 mt-0.5">
-                      de R$ {formatPrice(product.price_monthly)}/mês · 10% off
-                    </span>
-                  </p>
-                ) : (
-                  <p className="text-lg font-semibold text-[#13244f]">Em breve</p>
-                )}
-
-                <div className="flex gap-2">
-                  <Link
-                    href={`/suplementos/${supplement.slug}`}
-                    className="flex-1 inline-flex justify-center items-center rounded-md px-3 py-2.5 font-semibold text-sm transition border border-[#13244f] text-[#13244f] bg-transparent hover:bg-[#13244f]/5"
-                  >
-                    Detalhes
-                  </Link>
-                  <button
-                    type="button"
-                    disabled={!product}
-                    onClick={() => product && handleAddToCart(supplement, product)}
-                    className="flex-1 inline-flex justify-center items-center bg-[#f4001e] hover:bg-[#a30000] text-white rounded-md px-3 py-2.5 font-semibold text-sm transition disabled:bg-[#ececec] disabled:text-gray-500 disabled:hover:bg-[#ececec] disabled:cursor-not-allowed"
-                  >
-                    Adicionar ao carrinho
-                  </button>
-                </div>
-              </div>
-            </div>
-          )
-        })}
+      <div className="mb-6 md:mb-8 max-w-2xl">
+        <h2 className="font-display text-2xl md:text-3xl text-[#13244f]">
+          Conheça a linha
+        </h2>
+        <p className="text-base md:text-lg text-[#13244f]/80 mt-2 leading-relaxed">
+          Conteúdo informativo. A indicação do seu protocolo só acontece depois
+          do questionário.
+        </p>
+        <p className="text-base text-[#13244f]/70 mt-2 md:hidden">
+          Use as setas ou deslize para o lado →
+        </p>
       </div>
 
-      <AddedToCartDialog
-        open={showCartDialog}
-        onOpenChange={setShowCartDialog}
-        productName={dialogItem?.name ?? ''}
-        productImage={dialogItem?.image ?? ''}
-        productPrice={dialogItem?.price_monthly}
-        onFinish={() => router.push('/quiz')}
-        onContinue={() => setShowCartDialog(false)}
-      />
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => scrollByCard(-1)}
+          aria-label="Ver produtos anteriores"
+          className="absolute left-0 top-[28%] z-10 -translate-y-1/2 -translate-x-1 md:-translate-x-3 w-12 h-12 rounded-full bg-white border-2 border-[#13244f] text-[#13244f] shadow-md flex items-center justify-center hover:bg-[#f5f0eb] focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-[#13244f]"
+        >
+          <svg width="20" height="20" viewBox="0 0 16 16" fill="none" aria-hidden>
+            <path
+              d="M10 4L6 8l4 4"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => scrollByCard(1)}
+          aria-label="Ver próximos produtos"
+          className="absolute right-0 top-[28%] z-10 -translate-y-1/2 translate-x-1 md:translate-x-3 w-12 h-12 rounded-full bg-white border-2 border-[#13244f] text-[#13244f] shadow-md flex items-center justify-center hover:bg-[#f5f0eb] focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-[#13244f]"
+        >
+          <svg width="20" height="20" viewBox="0 0 16 16" fill="none" aria-hidden>
+            <path
+              d="M6 4l4 4-4 4"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+
+        <div
+          ref={scrollerRef}
+          className="flex gap-4 md:gap-6 overflow-x-auto snap-x snap-mandatory scroll-pl-4 md:scroll-pl-2 pb-2 px-1 scroll-smooth"
+        >
+          {supplements.map((supplement) => {
+            const product = matchProduct(products, supplement.name)
+            const image = supplement.gallery[0]
+
+            return (
+              <div
+                key={supplement.slug}
+                className="flex-shrink-0 snap-start w-[78vw] sm:w-[300px] md:w-[360px] flex flex-col"
+              >
+                <Link
+                  href={`/suplementos/${supplement.slug}`}
+                  className="relative rounded-2xl overflow-hidden aspect-square group focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-[#13244f]"
+                >
+                  <Image
+                    src={image}
+                    alt={supplement.name}
+                    fill
+                    sizes="(max-width: 640px) 78vw, (max-width: 768px) 300px, 360px"
+                    className="object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
+                  <span className="absolute bottom-5 left-3 right-3 text-center text-white font-display text-xl md:text-2xl">
+                    {supplement.name}
+                  </span>
+                </Link>
+
+                <div className="pt-4 flex flex-col gap-3">
+                  <p className="text-base text-[#13244f]/85 leading-relaxed line-clamp-2">
+                    {supplement.headline}
+                  </p>
+                  {loading ? (
+                    <p className="text-base text-[#13244f]/60">Carregando…</p>
+                  ) : !product ? (
+                    <p className="text-base font-semibold text-[#13244f]">Em breve</p>
+                  ) : null}
+
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Link
+                      href={`/suplementos/${supplement.slug}`}
+                      className="flex-1 inline-flex justify-center items-center min-h-12 rounded-full px-4 py-3 font-semibold text-base transition border-2 border-[#13244f] text-[#13244f] hover:bg-[#13244f]/5 focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-[#13244f]"
+                    >
+                      Saiba mais
+                    </Link>
+                    <Link
+                      href="/quiz"
+                      className="flex-1 inline-flex justify-center items-center min-h-12 bg-[#f4001e] hover:bg-[#a30000] text-white rounded-full px-4 py-3 font-semibold text-base transition focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-[#13244f]"
+                    >
+                      Fazer avaliação
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
