@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'crypto'
+import { timingSafeEqual } from 'node:crypto'
 import type { NextRequest } from 'next/server'
 
 /** Compara secrets de tamanho variável sem vazamento por timing. */

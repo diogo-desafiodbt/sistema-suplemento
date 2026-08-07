@@ -264,9 +264,11 @@ export default function RecomendacoesPage() {
     <div className="min-h-screen bg-[#f5f0eb]">
       <header className="bg-[#f5f0eb] px-6 pt-5 pb-4">
         <div className="max-w-2xl lg:max-w-5xl mx-auto">
-          <img
+          <Image
             src="/logo-azul.png"
             alt="Desafio Diabetes"
+            width={455}
+            height={355}
             className="h-7 w-auto mb-5"
           />
 
@@ -378,9 +380,11 @@ export default function RecomendacoesPage() {
                     <div className="flex items-start justify-between gap-4 flex-1 min-w-0">
                       <div className="flex items-start gap-3 flex-1 min-w-0">
                         {item.image ? (
-                          <img
+                          <Image
                             src={item.image}
                             alt=""
+                            width={56}
+                            height={56}
                             className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
                           />
                         ) : (
@@ -522,6 +526,7 @@ export default function RecomendacoesPage() {
               </div>
 
               <button
+                type="button"
                 onClick={handleContinue}
                 disabled={activeItems.length === 0}
                 className="w-full bg-[#f4001e] hover:bg-[#a30000] text-white py-4 rounded-full font-bold text-sm transition active:scale-95 disabled:opacity-40"
@@ -531,7 +536,13 @@ export default function RecomendacoesPage() {
 
               <div className="flex items-center justify-center gap-4 text-xs text-[#13244f]/50">
                 <span className="flex items-center gap-1">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    aria-hidden="true"
+                  >
                     <rect
                       x="3"
                       y="11"
@@ -585,7 +596,7 @@ export default function RecomendacoesPage() {
                           className={`flex-shrink-0 text-[#13244f] transition-transform duration-300 ${
                             open ? 'rotate-180' : ''
                           }`}
-                          aria-hidden
+                          aria-hidden="true"
                         >
                           <path
                             d="M5 8.5L12 15.5L19 8.5"

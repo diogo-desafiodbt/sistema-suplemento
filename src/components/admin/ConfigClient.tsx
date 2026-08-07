@@ -74,6 +74,7 @@ export function ConfigClient({ configs: initialConfigs }: Props) {
               className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#13244f] font-mono focus:outline-none focus:ring-2 focus:ring-[#13244f]/20 bg-white"
             />
             <button
+              type="button"
               onClick={() => handleSave(config.key, config.value)}
               disabled={saving === config.key}
               className="bg-[#f4001e] text-white font-bold px-5 py-2.5 rounded-full text-sm hover:bg-[#a30000] transition disabled:opacity-50 whitespace-nowrap"

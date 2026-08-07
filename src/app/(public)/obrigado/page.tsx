@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 
@@ -21,9 +22,11 @@ export default function ObrigadoPage() {
     <div className="min-h-screen bg-[#f5f0eb] flex flex-col">
       <header className="bg-[#f5f0eb] px-6 pt-5 pb-4">
         <div className="max-w-lg mx-auto">
-          <img
+          <Image
             src="/logo-azul.png"
             alt="Desafio Diabetes"
+            width={455}
+            height={355}
             className="h-7 w-auto"
           />
         </div>
@@ -33,7 +36,13 @@ export default function ObrigadoPage() {
         <div className="w-full max-w-lg space-y-6">
           <div className="text-center space-y-3">
             <div className="w-16 h-16 bg-[#13244f] rounded-full flex items-center justify-center mx-auto">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+              <svg
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
                 <path
                   d="M5 13l4 4L19 7"
                   stroke="white"
@@ -82,7 +91,7 @@ export default function ObrigadoPage() {
                 done: false,
               },
             ].map((item, i) => (
-              <div key={i} className="flex gap-4">
+              <div key={item.title} className="flex gap-4">
                 <div className="flex flex-col items-center">
                   <div
                     className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${item.done ? 'bg-[#13244f]' : 'bg-[#13244f]/10'}`}
@@ -93,6 +102,7 @@ export default function ObrigadoPage() {
                         height="16"
                         viewBox="0 0 24 24"
                         fill="none"
+                        aria-hidden="true"
                       >
                         <path
                           d="M5 13l4 4L19 7"
@@ -135,6 +145,7 @@ export default function ObrigadoPage() {
           </div>
 
           <button
+            type="button"
             onClick={() => router.push('/dashboard')}
             className="w-full bg-[#f4001e] hover:bg-[#a30000] text-white py-4 rounded-full font-bold text-sm transition active:scale-95"
           >

@@ -15,6 +15,7 @@ type Subscription = {
 } | null
 
 type Payment = {
+  id: string
   amount: number | null
   status: string
   paid_at: string | null
@@ -140,6 +141,7 @@ export function AssinaturaClient({ subscription, payments }: Props) {
 
           {canCancel && (
             <button
+              type="button"
               onClick={() => setShowModal(true)}
               className="text-sm text-gray-400 hover:text-[#f4001e] transition underline"
             >
@@ -175,14 +177,14 @@ export function AssinaturaClient({ subscription, payments }: Props) {
               Histórico de pagamentos
             </p>
             <div className="space-y-3">
-              {payments.map((payment, i) => {
+              {payments.map((payment) => {
                 const pStatus = paymentStatusLabels[payment.status] ?? {
                   label: payment.status,
                   className: 'text-gray-400',
                 }
                 return (
                   <div
-                    key={i}
+                    key={payment.id}
                     className="flex items-center justify-between text-sm"
                   >
                     <span className="text-gray-500">
@@ -225,6 +227,7 @@ export function AssinaturaClient({ subscription, payments }: Props) {
             </p>
             <div className="flex gap-3 pt-2">
               <button
+                type="button"
                 onClick={() => setShowModal(false)}
                 disabled={loading}
                 className="flex-1 border border-gray-200 text-[#13244f] font-semibold py-2.5 rounded-full text-sm hover:bg-gray-50 transition disabled:opacity-50"
@@ -232,6 +235,7 @@ export function AssinaturaClient({ subscription, payments }: Props) {
                 Manter assinatura
               </button>
               <button
+                type="button"
                 onClick={handleCancel}
                 disabled={loading}
                 className="flex-1 bg-[#f4001e] text-white font-bold py-2.5 rounded-full text-sm hover:bg-[#a30000] transition disabled:opacity-50"

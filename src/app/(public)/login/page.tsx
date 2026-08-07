@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -17,7 +18,7 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
 
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
@@ -47,9 +48,11 @@ export default function LoginPage() {
       <header className="bg-[#f5f0eb] px-6 pt-5 pb-4 border-b border-[#13244f]/10">
         <div className="max-w-md mx-auto">
           <Link href="/">
-            <img
+            <Image
               src="/logo-azul.png"
               alt="Desafio Diabetes"
+              width={455}
+              height={355}
               className="h-7 w-auto"
             />
           </Link>

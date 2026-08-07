@@ -85,7 +85,7 @@ export default function CategoryCarousel() {
             height="20"
             viewBox="0 0 16 16"
             fill="none"
-            aria-hidden
+            aria-hidden="true"
           >
             <path
               d="M10 4L6 8l4 4"
@@ -108,7 +108,7 @@ export default function CategoryCarousel() {
             height="20"
             viewBox="0 0 16 16"
             fill="none"
-            aria-hidden
+            aria-hidden="true"
           >
             <path
               d="M6 4l4 4-4 4"

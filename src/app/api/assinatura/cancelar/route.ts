@@ -29,7 +29,7 @@ async function cancelPagarmeSubscription(pagarmeSubId: string): Promise<void> {
   throw new Error(`Erro ao cancelar no Pagar.me: ${res.status} ${body}`)
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const supabase = await createClient()
     const {

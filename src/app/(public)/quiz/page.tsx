@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
@@ -240,7 +241,7 @@ export default function QuizPage() {
               height="8"
               viewBox="0 0 10 8"
               fill="none"
-              aria-hidden
+              aria-hidden="true"
             >
               <path
                 d="M1 4l2.5 2.5L9 1"
@@ -500,9 +501,11 @@ export default function QuizPage() {
       <div className="min-h-screen bg-[#f5f0eb] flex flex-col">
         <header className="px-6 pt-5 pb-4">
           <div className="max-w-lg mx-auto">
-            <img
+            <Image
               src="/logo-azul.png"
               alt="Desafio Diabetes"
+              width={455}
+              height={355}
               className="h-7 w-auto"
             />
           </div>
@@ -515,7 +518,7 @@ export default function QuizPage() {
                 height="28"
                 viewBox="0 0 24 24"
                 fill="none"
-                aria-hidden
+                aria-hidden="true"
               >
                 <path
                   d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
@@ -562,7 +565,6 @@ export default function QuizPage() {
               }
               placeholder="Seu nome completo"
               className="w-full border border-gray-200 rounded-xl px-4 py-3.5 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
-              autoFocus
             />
           </QuestionWrapper>
         )
@@ -590,7 +592,6 @@ export default function QuizPage() {
               }}
               placeholder="Ex.: 45"
               className="w-full border border-gray-200 rounded-xl px-4 py-3.5 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
-              autoFocus
             />
             <p className="text-xs text-gray-500 mt-2">
               Informe apenas o número (anos completos).
@@ -770,9 +771,11 @@ export default function QuizPage() {
     <div className="min-h-screen bg-[#f5f0eb] flex flex-col">
       <header className="px-6 pt-5 pb-2">
         <div className="max-w-lg mx-auto flex items-center justify-between">
-          <img
+          <Image
             src="/logo-azul.png"
             alt="Desafio Diabetes"
+            width={455}
+            height={355}
             className="h-7 w-auto"
           />
           <span className="text-xs text-[#13244f]/50 font-medium">

@@ -1,5 +1,5 @@
 import { type DocumentProps, renderToBuffer } from '@react-pdf/renderer'
-import { createHash } from 'crypto'
+import { createHash } from 'node:crypto'
 import { createElement, type ReactElement } from 'react'
 import { PrescriptionDocument } from './prescription-template'
 

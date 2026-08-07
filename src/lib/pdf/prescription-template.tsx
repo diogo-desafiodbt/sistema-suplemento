@@ -1,5 +1,4 @@
 import { Document, Page, StyleSheet, Text, View } from '@react-pdf/renderer'
-import React from 'react'
 import {
   calcAge,
   DIAGNOSIS_LABELS,
@@ -252,8 +251,8 @@ export function PrescriptionDocument({ data }: { data: PrescriptionData }) {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Protocolo Prescrito</Text>
-          {data.items.map((item, index) => (
-            <View key={index} style={styles.productItem}>
+          {data.items.map((item) => (
+            <View key={item.name} style={styles.productItem}>
               <Text style={styles.productName}>
                 {item.name}
                 {item.is_required

@@ -75,6 +75,7 @@ type ProtocolRow = {
   signed_by: string | null
   prescription_pdf_url: string | null
   protocol_items: Array<{
+    id: string
     is_required: boolean
     removed_by_patient: boolean
     activation_reason: string | null
@@ -277,7 +278,7 @@ export default async function AdminClienteDetalhePage({
       .select(`
         id, status, generated_at, signed_at, signed_by, prescription_pdf_url,
         protocol_items (
-          is_required, removed_by_patient, activation_reason,
+          id, is_required, removed_by_patient, activation_reason,
           products ( name )
         )
       `)
@@ -578,6 +579,7 @@ export default async function AdminClienteDetalhePage({
                     <ol className="space-y-1.5">
                       {eventos.map((ev, i) => (
                         <li
+                          // biome-ignore lint/suspicious/noArrayIndexKey: eventos vêm de um payload externo de rastreio sem id estável; a lista é somente leitura
                           key={i}
                           className="flex gap-3 text-xs text-gray-600"
                         >
@@ -703,9 +705,9 @@ export default async function AdminClienteDetalhePage({
                 Itens
               </p>
               <ul className="space-y-1.5">
-                {(protocol.protocol_items ?? []).map((item, i) => (
+                {(protocol.protocol_items ?? []).map((item) => (
                   <li
-                    key={i}
+                    key={item.id}
                     className="flex flex-wrap items-center gap-2 text-sm text-[#13244f]"
                   >
                     <span

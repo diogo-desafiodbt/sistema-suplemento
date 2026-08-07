@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import { redirect } from 'next/navigation'
 import { AssinaturaClient } from '@/components/patient/AssinaturaClient'
 import { DashboardNav } from '@/components/patient/DashboardNav'
@@ -25,7 +26,7 @@ export default async function AssinaturaPage() {
 
   const { data: payments } = await admin
     .from('payments')
-    .select('amount, status, paid_at')
+    .select('id, amount, status, paid_at')
     .eq('subscription_id', subscription?.id ?? '')
     .order('paid_at', { ascending: false })
     .limit(5)
@@ -33,9 +34,11 @@ export default async function AssinaturaPage() {
   return (
     <div className="min-h-screen bg-[#f5f0eb]">
       <header className="bg-white border-b border-gray-100 px-4 md:px-6 py-4 flex items-center justify-between">
-        <img
+        <Image
           src="/logo-azul.png"
           alt="Desafio Diabetes"
+          width={455}
+          height={355}
           className="h-7 w-auto"
         />
         <form action="/api/auth/signout" method="POST">

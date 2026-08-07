@@ -96,8 +96,11 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
         </p>
 
         <div>
-          <label className={labelClass}>Nome completo</label>
+          <label htmlFor="profile-full-name" className={labelClass}>
+            Nome completo
+          </label>
           <input
+            id="profile-full-name"
             type="text"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
@@ -107,8 +110,11 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
         </div>
 
         <div>
-          <label className={labelClass}>Email</label>
+          <label htmlFor="profile-email" className={labelClass}>
+            Email
+          </label>
           <input
+            id="profile-email"
             type="email"
             value={initialData.email}
             readOnly
@@ -120,8 +126,11 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
         </div>
 
         <div>
-          <label className={labelClass}>Telefone</label>
+          <label htmlFor="profile-phone" className={labelClass}>
+            Telefone
+          </label>
           <input
+            id="profile-phone"
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
@@ -131,8 +140,11 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
         </div>
 
         <div>
-          <label className={labelClass}>CPF</label>
+          <label htmlFor="profile-cpf" className={labelClass}>
+            CPF
+          </label>
           <input
+            id="profile-cpf"
             type="text"
             value={initialData.cpf}
             readOnly
@@ -144,8 +156,11 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
         </div>
 
         <div>
-          <label className={labelClass}>Data de nascimento</label>
+          <label htmlFor="profile-birth-date" className={labelClass}>
+            Data de nascimento
+          </label>
           <input
+            id="profile-birth-date"
             type="date"
             value={birthDate}
             onChange={(e) => setBirthDate(e.target.value)}
@@ -161,8 +176,11 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
 
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2 sm:col-span-1">
-            <label className={labelClass}>CEP</label>
+            <label htmlFor="profile-zip-code" className={labelClass}>
+              CEP
+            </label>
             <input
+              id="profile-zip-code"
               type="text"
               value={address.zip_code}
               onChange={(e) =>
@@ -177,8 +195,11 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
         </div>
 
         <div>
-          <label className={labelClass}>Logradouro</label>
+          <label htmlFor="profile-street" className={labelClass}>
+            Logradouro
+          </label>
           <input
+            id="profile-street"
             type="text"
             value={address.street}
             onChange={(e) =>
@@ -190,8 +211,11 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className={labelClass}>Número</label>
+            <label htmlFor="profile-number" className={labelClass}>
+              Número
+            </label>
             <input
+              id="profile-number"
               type="text"
               value={address.number}
               onChange={(e) =>
@@ -201,8 +225,11 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
             />
           </div>
           <div>
-            <label className={labelClass}>Complemento</label>
+            <label htmlFor="profile-complement" className={labelClass}>
+              Complemento
+            </label>
             <input
+              id="profile-complement"
               type="text"
               value={address.complement}
               onChange={(e) =>
@@ -215,8 +242,11 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
         </div>
 
         <div>
-          <label className={labelClass}>Bairro</label>
+          <label htmlFor="profile-neighborhood" className={labelClass}>
+            Bairro
+          </label>
           <input
+            id="profile-neighborhood"
             type="text"
             value={address.neighborhood}
             onChange={(e) =>
@@ -228,8 +258,11 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className={labelClass}>Cidade</label>
+            <label htmlFor="profile-city" className={labelClass}>
+              Cidade
+            </label>
             <input
+              id="profile-city"
               type="text"
               value={address.city}
               onChange={(e) =>
@@ -239,8 +272,11 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
             />
           </div>
           <div>
-            <label className={labelClass}>Estado (UF)</label>
+            <label htmlFor="profile-state" className={labelClass}>
+              Estado (UF)
+            </label>
             <input
+              id="profile-state"
               type="text"
               value={address.state}
               onChange={(e) =>

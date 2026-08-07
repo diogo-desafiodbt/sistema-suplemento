@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { ProfessionalNav } from '@/components/professional/ProfessionalNav'
@@ -91,9 +92,11 @@ export default async function FilaPage() {
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="space-y-2">
             <div className="flex items-center gap-4">
-              <img
+              <Image
                 src="/logo-branca.png"
                 alt="Desafio Diabetes"
+                width={455}
+                height={355}
                 className="h-7 w-auto"
               />
               <span className="text-white/40 text-sm">

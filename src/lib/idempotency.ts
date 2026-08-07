@@ -48,8 +48,7 @@ export async function claimOnce(
   const completedColumn = options?.completedColumn
   const protectColumns = options?.protectColumns ?? []
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const from = (admin.from as any).bind(admin)
+  const from = admin.from.bind(admin)
 
   const tryInsert = async (): Promise<'won' | 'conflict'> => {
     const { error } = await from(table).insert(claimRow)
@@ -123,8 +122,7 @@ export async function releaseClaim(
   keyColumnOrFilters: string | Record<string, unknown>,
   keyValue?: string,
 ): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const from = (admin.from as any).bind(admin)
+  const from = admin.from.bind(admin)
 
   if (typeof keyColumnOrFilters === 'string') {
     const { error } = await from(table)
@@ -160,8 +158,7 @@ export async function markClaimCompleted(
   keyValue?: string,
   completedColumn = 'completed_at',
 ): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const from = (admin.from as any).bind(admin)
+  const from = admin.from.bind(admin)
   const stamp = { [completedColumn]: new Date().toISOString() }
 
   if (typeof keyColumnOrFilters === 'string') {
@@ -201,8 +198,7 @@ export async function claimByFlag(
   flagColumn: string,
   staleAfterMs: number | false = DEFAULT_STALE_CLAIM_MS,
 ): Promise<boolean> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const from = (admin.from as any).bind(admin)
+  const from = admin.from.bind(admin)
 
   const tryClaim = async (): Promise<boolean> => {
     const { data } = await from(table)
@@ -221,7 +217,10 @@ export async function claimByFlag(
     .eq('id', id)
     .maybeSingle()
 
-  const flaggedAt = row?.[flagColumn] as string | null | undefined
+  const flaggedAt = (row as Record<string, unknown> | null)?.[flagColumn] as
+    | string
+    | null
+    | undefined
   if (!flaggedAt) return false
 
   // Flag permanente: se já tem valor, nunca reivindica de novo.
@@ -243,8 +242,8 @@ export async function releaseFlag(
   id: string,
   flagColumn: string,
 ): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (admin.from as any)(table)
+  const { error } = await admin
+    .from(table)
     .update({ [flagColumn]: null })
     .eq('id', id)
   if (error) {

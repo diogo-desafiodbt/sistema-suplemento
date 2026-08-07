@@ -40,7 +40,7 @@ export function CuponsClient({ coupons: initialCoupons }: Props) {
           type,
           value: parseFloat(value),
           expires_at: expiresAt || null,
-          max_uses: maxUses ? parseInt(maxUses) : null,
+          max_uses: maxUses ? parseInt(maxUses, 10) : null,
         }),
       })
       if (!res.ok) {
@@ -96,6 +96,7 @@ export function CuponsClient({ coupons: initialCoupons }: Props) {
     <div className="space-y-4">
       {!showForm && (
         <button
+          type="button"
           onClick={() => setShowForm(true)}
           className="bg-[#f4001e] text-white font-bold px-5 py-2.5 rounded-full text-sm hover:bg-[#a30000] transition"
         >
@@ -114,34 +115,41 @@ export function CuponsClient({ coupons: initialCoupons }: Props) {
 
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <div>
-              <label className={labelClass}>Código</label>
+              <label htmlFor="cupom-codigo" className={labelClass}>
+                Código
+              </label>
               <input
+                id="cupom-codigo"
                 type="text"
                 value={code}
                 onChange={(e) => setCode(e.target.value.toUpperCase())}
                 placeholder="EX: DESCONTO10"
-                className={inputClass + ' w-full uppercase'}
+                className={`${inputClass} w-full uppercase`}
                 required
               />
             </div>
             <div>
-              <label className={labelClass}>Tipo</label>
+              <label htmlFor="cupom-tipo" className={labelClass}>
+                Tipo
+              </label>
               <select
+                id="cupom-tipo"
                 value={type}
                 onChange={(e) =>
                   setType(e.target.value as 'percentage' | 'fixed')
                 }
-                className={inputClass + ' w-full'}
+                className={`${inputClass} w-full`}
               >
                 <option value="percentage">Percentual (%)</option>
                 <option value="fixed">Valor fixo (R$)</option>
               </select>
             </div>
             <div>
-              <label className={labelClass}>
+              <label htmlFor="cupom-valor" className={labelClass}>
                 {type === 'percentage' ? 'Valor (%)' : 'Valor (R$)'}
               </label>
               <input
+                id="cupom-valor"
                 type="number"
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
@@ -149,31 +157,37 @@ export function CuponsClient({ coupons: initialCoupons }: Props) {
                 max={type === 'percentage' ? 100 : undefined}
                 step="0.01"
                 placeholder={type === 'percentage' ? '10' : '20.00'}
-                className={inputClass + ' w-full'}
+                className={`${inputClass} w-full`}
                 required
               />
             </div>
             <div>
-              <label className={labelClass}>Máx. de usos</label>
+              <label htmlFor="cupom-max-usos" className={labelClass}>
+                Máx. de usos
+              </label>
               <input
+                id="cupom-max-usos"
                 type="number"
                 value={maxUses}
                 onChange={(e) => setMaxUses(e.target.value)}
                 min="1"
                 placeholder="Ilimitado"
-                className={inputClass + ' w-full'}
+                className={`${inputClass} w-full`}
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <div>
-              <label className={labelClass}>Validade</label>
+              <label htmlFor="cupom-validade" className={labelClass}>
+                Validade
+              </label>
               <input
+                id="cupom-validade"
                 type="date"
                 value={expiresAt}
                 onChange={(e) => setExpiresAt(e.target.value)}
-                className={inputClass + ' w-full'}
+                className={`${inputClass} w-full`}
               />
             </div>
           </div>
@@ -256,6 +270,7 @@ export function CuponsClient({ coupons: initialCoupons }: Props) {
                 </td>
                 <td className="px-5 py-4">
                   <button
+                    type="button"
                     onClick={() => handleToggle(coupon.id, coupon.is_active)}
                     disabled={toggling === coupon.id}
                     className={`text-xs font-bold px-3 py-1 rounded-full transition disabled:opacity-50 ${

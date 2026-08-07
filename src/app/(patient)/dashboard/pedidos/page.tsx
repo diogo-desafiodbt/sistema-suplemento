@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/server'
 import { findSupplementImageByProductName } from '@/lib/supplements-content'
 
 type OrderItem = {
+  id: string
   quantity: number
   unit_price: number
   products: { name: string } | null
@@ -40,7 +41,7 @@ export default async function PedidosPage() {
     .select(`
       id, status, created_at, tracking_code, pharmacy_sent_at, total_amount,
       order_items (
-        quantity, unit_price,
+        id, quantity, unit_price,
         products ( name )
       )
     `)
@@ -52,9 +53,11 @@ export default async function PedidosPage() {
   return (
     <div className="min-h-screen bg-[#f5f0eb]">
       <header className="bg-white border-b border-gray-100 px-4 md:px-6 py-4 flex items-center justify-between">
-        <img
+        <Image
           src="/logo-azul.png"
           alt="Desafio Diabetes"
+          width={455}
+          height={355}
           className="h-7 w-auto"
         />
         <form action="/api/auth/signout" method="POST">
@@ -109,14 +112,11 @@ export default async function PedidosPage() {
                 </div>
 
                 <div className="space-y-3">
-                  {order.order_items?.map((item, i) => {
+                  {order.order_items?.map((item) => {
                     const name = item.products?.name ?? 'Produto'
                     const image = findSupplementImageByProductName(name)
                     return (
-                      <div
-                        key={`${name}-${i}`}
-                        className="flex items-center gap-3"
-                      >
+                      <div key={item.id} className="flex items-center gap-3">
                         <div className="w-12 h-12 rounded-xl bg-[#f5f0eb] overflow-hidden shrink-0 flex items-center justify-center">
                           {image ? (
                             <Image
@@ -132,7 +132,7 @@ export default async function PedidosPage() {
                               height="20"
                               viewBox="0 0 24 24"
                               fill="none"
-                              aria-hidden
+                              aria-hidden="true"
                             >
                               <rect
                                 x="4"

@@ -69,19 +69,23 @@ export const supportInboxPoll = inngest.createFunction(
     triggers: [{ cron: '*/5 * * * *' }],
   },
   async () => {
-    if (!imapConfigured()) {
+    const imapHost = process.env.SUPPORT_IMAP_HOST
+    const imapUser = process.env.SUPPORT_IMAP_USER
+    const imapPassword = process.env.SUPPORT_IMAP_PASSWORD
+
+    if (!imapConfigured() || !imapHost || !imapUser || !imapPassword) {
       console.warn('SUPPORT_IMAP_* ausente — poll de suporte ignorado')
       return { ok: true, skipped: 'missing_imap_env' }
     }
 
     const admin = createAdminClient()
     const client = new ImapFlow({
-      host: process.env.SUPPORT_IMAP_HOST!,
+      host: imapHost,
       port: Number(process.env.SUPPORT_IMAP_PORT ?? 993),
       secure: true,
       auth: {
-        user: process.env.SUPPORT_IMAP_USER!,
-        pass: process.env.SUPPORT_IMAP_PASSWORD!,
+        user: imapUser,
+        pass: imapPassword,
       },
       logger: false,
     })

@@ -42,13 +42,19 @@ type FailedPayment = {
   patientName: string
 }
 
+// O client admin não usa os tipos gerados do Database (createAdminClient não
+// passa o generic), então o builder do Supabase acaba com generics profundos
+// demais pra compor via callback sem estourar "type instantiation is
+// excessively deep" do TS. `any` aqui é a via de escape deliberada — mantém
+// runtime seguro (filtros são só .eq/.gte/.not encadeados) sem tentar
+// recriar os tipos do postgrest-js.
 async function countRows(
   admin: ReturnType<typeof createAdminClient>,
   table: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: builder genérico do Supabase sem Database gerado; ver comentário acima
   filters: (q: any) => any,
 ): Promise<number> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: idem — encadeamento de filtros do query builder
   let query: any = admin
     .from(table)
     .select('id', { count: 'exact', head: true })

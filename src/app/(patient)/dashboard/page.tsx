@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { DashboardNav } from '@/components/patient/DashboardNav'
@@ -92,9 +93,11 @@ export default async function DashboardPage() {
   return (
     <div className="min-h-screen bg-[#f5f0eb]">
       <header className="bg-white border-b border-gray-100 px-4 md:px-6 py-4 flex items-center justify-between">
-        <img
+        <Image
           src="/logo-azul.png"
           alt="Desafio Diabetes"
+          width={455}
+          height={355}
           className="h-7 w-auto"
         />
         <div className="flex items-center gap-4">
@@ -131,7 +134,13 @@ export default async function DashboardPage() {
         {!hasTreatment ? (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center space-y-4">
             <div className="w-14 h-14 bg-[#13244f]/10 rounded-full flex items-center justify-center mx-auto">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
                 <path
                   d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                   stroke="#13244f"

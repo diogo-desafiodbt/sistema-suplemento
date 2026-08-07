@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import Footer from '@/components/Footer'
 import Header from '@/components/Header'
@@ -9,7 +10,13 @@ const benefits = [
     title: 'Farmácia autorizada pela Anvisa',
     detail: 'Elaborados e vendidos por farmácias de manipulação credenciadas.',
     icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <svg
+        width="22"
+        height="22"
+        viewBox="0 0 24 24"
+        fill="none"
+        aria-hidden="true"
+      >
         <path
           d="M12 3l7 3v5c0 4.5-3 8.2-7 9.5C8 19.2 5 15.5 5 11V6l7-3z"
           stroke="currentColor"
@@ -29,7 +36,13 @@ const benefits = [
     title: 'Compra única ou assinatura',
     detail: 'Você escolhe como prefere receber — sem compromisso escondido.',
     icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <svg
+        width="22"
+        height="22"
+        viewBox="0 0 24 24"
+        fill="none"
+        aria-hidden="true"
+      >
         <path
           d="M4 7h13l2 10H6L4 7z"
           stroke="currentColor"
@@ -54,7 +67,13 @@ const benefits = [
     detail:
       'Formulados para não disparar o açúcar no sangue como suplementos comuns.',
     icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <svg
+        width="22"
+        height="22"
+        viewBox="0 0 24 24"
+        fill="none"
+        aria-hidden="true"
+      >
         <path
           d="M4 8l5 5 3.5-3.5L20 17"
           stroke="currentColor"
@@ -76,7 +95,13 @@ const benefits = [
     title: 'Base científica',
     detail: 'Componentes estudados e indicados após avaliação do seu perfil.',
     icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <svg
+        width="22"
+        height="22"
+        viewBox="0 0 24 24"
+        fill="none"
+        aria-hidden="true"
+      >
         <path
           d="M10 3h4v7l4 7v2H6v-2l4-7V3z"
           stroke="currentColor"
@@ -144,13 +169,15 @@ export default function SuplementosPage() {
         <section className="relative bg-[#f4001e] overflow-hidden min-h-[calc(100dvh-5rem)] flex flex-col">
           <div
             className="pointer-events-none absolute right-0 md:right-10 top-1/2 -translate-y-1/2 w-[28rem] h-[28rem] md:w-[36rem] md:h-[36rem] rounded-full bg-[#ff6666]/40 blur-3xl"
-            aria-hidden
+            aria-hidden="true"
           />
 
-          <img
+          <Image
             src="/marca-dagua.png"
             alt=""
-            aria-hidden
+            aria-hidden="true"
+            width={319}
+            height={321}
             className="pointer-events-none absolute top-3 right-3 md:top-5 md:right-6 z-10 w-24 sm:w-32 md:w-36 h-auto opacity-70 select-none"
           />
 
@@ -170,9 +197,11 @@ export default function SuplementosPage() {
             </div>
 
             <div className="order-2 self-end flex justify-center md:justify-end mt-2 md:mt-0">
-              <img
+              <Image
                 src="/dr-turi.png"
                 alt="Dr. Turí Souza"
+                width={1945}
+                height={2328}
                 className="w-72 sm:w-96 md:w-[30rem] lg:w-[36rem] h-auto object-contain transition-transform duration-500 ease-out hover:-translate-y-3 hover:scale-105"
               />
             </div>
@@ -193,7 +222,7 @@ export default function SuplementosPage() {
                 >
                   <span
                     className="w-11 h-11 rounded-full bg-[#13244f] text-white flex items-center justify-center"
-                    aria-hidden
+                    aria-hidden="true"
                   >
                     {b.icon}
                   </span>
@@ -279,7 +308,7 @@ export default function SuplementosPage() {
                     >
                       <span
                         className="text-red-600 font-bold text-xl leading-none"
-                        aria-hidden
+                        aria-hidden="true"
                       >
                         ✕
                       </span>
@@ -306,7 +335,7 @@ export default function SuplementosPage() {
                     >
                       <span
                         className="text-[#13244f] font-bold text-xl leading-none"
-                        aria-hidden
+                        aria-hidden="true"
                       >
                         ✓
                       </span>

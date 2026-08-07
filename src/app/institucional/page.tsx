@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import Footer from '@/components/Footer'
@@ -47,7 +48,13 @@ const timeline = [
     label: 'Adaptação',
     desc: 'O organismo inicia o processo de adaptação metabólica. Os primeiros ajustes costumam ocorrer de forma gradual, sem mudanças imediatas nos exames. Consistência é o fator mais importante nesta fase.',
     icon: (
-      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+      <svg
+        width="32"
+        height="32"
+        viewBox="0 0 32 32"
+        fill="none"
+        aria-hidden="true"
+      >
         <path
           d="M16 6C10.477 6 6 10.477 6 16s4.477 10 10 10 10-4.477 10-10"
           stroke="#13244f"
@@ -69,7 +76,13 @@ const timeline = [
     label: 'Acompanhamento',
     desc: 'Com a manutenção do protocolo e da alimentação, os exames de rotina passam a refletir o processo metabólico em andamento. Os resultados variam de acordo com o histórico e a adesão de cada pessoa.',
     icon: (
-      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+      <svg
+        width="32"
+        height="32"
+        viewBox="0 0 32 32"
+        fill="none"
+        aria-hidden="true"
+      >
         <path
           d="M16 26V10M10 16l6-6 6 6"
           stroke="#13244f"
@@ -91,7 +104,13 @@ const timeline = [
     label: 'Continuidade',
     desc: 'Pessoas que seguem o protocolo de forma consistente relatam melhorias perceptíveis nos exames de glicemia e hemoglobina glicada. O acompanhamento contínuo permite ajustes individuais para apoiar a saúde metabólica a longo prazo.',
     icon: (
-      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+      <svg
+        width="32"
+        height="32"
+        viewBox="0 0 32 32"
+        fill="none"
+        aria-hidden="true"
+      >
         <circle cx="16" cy="16" r="10" stroke="#13244f" strokeWidth="2" />
         <path
           d="M11 16l3.5 3.5L21 11"
@@ -186,14 +205,26 @@ export default function LandingPage() {
       {/* ── POPUP ── */}
       {popupOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="absolute inset-0 bg-black/60" onClick={closePopup} />
+          <button
+            type="button"
+            aria-label="Fechar"
+            className="absolute inset-0 bg-black/60 cursor-default"
+            onClick={closePopup}
+          />
           <div className="relative bg-white rounded-t-2xl sm:rounded-2xl overflow-hidden w-full sm:max-w-sm shadow-2xl">
             <button
+              type="button"
               onClick={closePopup}
               className="absolute top-3 right-3 z-10 bg-black/30 rounded-full p-2.5 flex items-center justify-center"
               aria-label="Fechar oferta"
             >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 14 14"
+                fill="none"
+                aria-hidden="true"
+              >
                 <path
                   d="M11 3L3 11M3 3l8 8"
                   stroke="white"
@@ -242,9 +273,9 @@ export default function LandingPage() {
               </Link>
               <p className="text-xs text-gray-400 mt-3 text-center">
                 Ao continuar concordo com os{' '}
-                <a href="#" className="underline">
+                <Link href="/termos-de-uso" className="underline">
                   Termos e Condições
-                </a>
+                </Link>
               </p>
             </div>
           </div>
@@ -254,8 +285,10 @@ export default function LandingPage() {
       {/* ── POPUP FARMÁCIA ── */}
       {farmaciaPopupOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div
-            className="absolute inset-0 bg-black/60"
+          <button
+            type="button"
+            aria-label="Fechar"
+            className="absolute inset-0 bg-black/60 cursor-default"
             onClick={() => setFarmaciaPopupOpen(false)}
           />
           <div className="relative bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl overflow-hidden">
@@ -270,11 +303,18 @@ export default function LandingPage() {
                 </p>
               </div>
               <button
+                type="button"
                 onClick={() => setFarmaciaPopupOpen(false)}
                 className="p-1.5 bg-white/10 rounded-full hover:bg-white/20 transition flex-shrink-0 ml-4"
                 aria-label="Fechar"
               >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 14 14"
+                  fill="none"
+                  aria-hidden="true"
+                >
                   <path
                     d="M11 3L3 11M3 3l8 8"
                     stroke="white"
@@ -288,30 +328,42 @@ export default function LandingPage() {
             {/* Formulário */}
             <div className="p-6 flex flex-col gap-3">
               <div>
-                <label className="text-xs font-semibold text-[#13244f] block mb-1">
+                <label
+                  htmlFor="farmacia-nome"
+                  className="text-xs font-semibold text-[#13244f] block mb-1"
+                >
                   Nome da farmácia *
                 </label>
                 <input
+                  id="farmacia-nome"
                   type="text"
                   placeholder="Ex: Farmácia Central Ltda"
                   className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f]"
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-[#13244f] block mb-1">
+                <label
+                  htmlFor="farmacia-cnpj"
+                  className="text-xs font-semibold text-[#13244f] block mb-1"
+                >
                   CNPJ *
                 </label>
                 <input
+                  id="farmacia-cnpj"
                   type="text"
                   placeholder="00.000.000/0000-00"
                   className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f]"
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-[#13244f] block mb-1">
+                <label
+                  htmlFor="farmacia-responsavel"
+                  className="text-xs font-semibold text-[#13244f] block mb-1"
+                >
                   Responsável técnico *
                 </label>
                 <input
+                  id="farmacia-responsavel"
                   type="text"
                   placeholder="Nome do farmacêutico responsável"
                   className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f]"
@@ -319,20 +371,28 @@ export default function LandingPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-semibold text-[#13244f] block mb-1">
+                  <label
+                    htmlFor="farmacia-crf"
+                    className="text-xs font-semibold text-[#13244f] block mb-1"
+                  >
                     CRF *
                   </label>
                   <input
+                    id="farmacia-crf"
                     type="text"
                     placeholder="CRF-SP 00000"
                     className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f]"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-[#13244f] block mb-1">
+                  <label
+                    htmlFor="farmacia-estado"
+                    className="text-xs font-semibold text-[#13244f] block mb-1"
+                  >
                     Estado *
                   </label>
                   <input
+                    id="farmacia-estado"
                     type="text"
                     placeholder="SP"
                     className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f]"
@@ -340,20 +400,28 @@ export default function LandingPage() {
                 </div>
               </div>
               <div>
-                <label className="text-xs font-semibold text-[#13244f] block mb-1">
+                <label
+                  htmlFor="farmacia-email"
+                  className="text-xs font-semibold text-[#13244f] block mb-1"
+                >
                   E-mail *
                 </label>
                 <input
+                  id="farmacia-email"
                   type="email"
                   placeholder="contato@suafarmacia.com.br"
                   className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f]"
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-[#13244f] block mb-1">
+                <label
+                  htmlFor="farmacia-whatsapp"
+                  className="text-xs font-semibold text-[#13244f] block mb-1"
+                >
                   WhatsApp *
                 </label>
                 <input
+                  id="farmacia-whatsapp"
                   type="tel"
                   placeholder="(11) 99999-9999"
                   className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f]"
@@ -380,10 +448,12 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto flex flex-col md:grid md:grid-cols-2 gap-8 md:gap-12 items-center">
           {/* Imagem */}
           <div className="w-full md:order-1">
-            <img
+            <Image
               src="/hero-ciencia-reversao.png"
               alt="A ciência da reversão do diabetes"
-              className="w-full rounded-2xl"
+              width={1890}
+              height={1750}
+              className="w-full h-auto rounded-2xl"
             />
           </div>
 
@@ -515,9 +585,9 @@ export default function LandingPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
-            {testimonials.map((t, i) => (
+            {testimonials.map((t) => (
               <div
-                key={i}
+                key={t.name}
                 className="bg-white rounded-2xl p-6 md:p-7 flex flex-col gap-4 shadow-sm border border-gray-100"
               >
                 {/* Aspas decorativas */}
@@ -527,6 +597,7 @@ export default function LandingPage() {
                   viewBox="0 0 32 24"
                   fill="none"
                   className="flex-shrink-0 opacity-20"
+                  aria-hidden="true"
                 >
                   <path
                     d="M0 24V14.4C0 6.4 4.8 1.6 14.4 0L16 3.2C11.2 4.267 8.533 7.2 8 12H14.4V24H0ZM17.6 24V14.4C17.6 6.4 22.4 1.6 32 0L33.6 3.2C28.8 4.267 26.133 7.2 25.6 12H32V24H17.6Z"
@@ -551,7 +622,13 @@ export default function LandingPage() {
                     <p className="text-xs text-gray-400">{t.plan}</p>
                   </div>
                   <div className="flex items-center gap-1.5 bg-green-50 px-2.5 py-1 rounded-full">
-                    <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 14 14"
+                      fill="none"
+                      aria-hidden="true"
+                    >
                       <circle cx="7" cy="7" r="7" fill="#22c55e" />
                       <path
                         d="M4 7l2 2 4-4"
@@ -581,9 +658,9 @@ export default function LandingPage() {
             Evolução do Protocolo
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-10 md:mb-12">
-            {timeline.map((item, i) => (
+            {timeline.map((item) => (
               <div
-                key={i}
+                key={item.period}
                 className="bg-white rounded-2xl p-5 md:p-6 flex gap-4 items-start"
               >
                 <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-[#ececec] flex items-center justify-center flex-shrink-0">
@@ -640,7 +717,15 @@ export default function LandingPage() {
                     {card.desc}
                   </p>
                 </div>
-                <img src={card.img} alt={card.title} className="w-full" />
+                <div className="relative w-full aspect-[758/400]">
+                  <Image
+                    src={card.img}
+                    alt={card.title}
+                    fill
+                    unoptimized
+                    className="object-cover"
+                  />
+                </div>
               </div>
             ))}
           </div>
@@ -734,10 +819,11 @@ export default function LandingPage() {
           <div className="md:col-span-2">
             {faqs.map((faq, i) => (
               <div
-                key={i}
+                key={faq.q}
                 className={`border-b border-gray-200 ${i === 0 ? 'border-t' : ''}`}
               >
                 <button
+                  type="button"
                   className="w-full text-left py-4 md:py-5 flex items-center justify-between gap-4 text-[#13244f] font-medium text-sm"
                   onClick={() => setActiveFaq(activeFaq === i ? null : i)}
                   aria-expanded={activeFaq === i}
@@ -749,6 +835,7 @@ export default function LandingPage() {
                     height="20"
                     viewBox="0 0 24 24"
                     fill="none"
+                    aria-hidden="true"
                   >
                     <path
                       d="M5 8.5L12 15.5L19 8.5"
@@ -776,7 +863,13 @@ export default function LandingPage() {
       <section className="py-10 md:py-12 px-4 md:px-6 bg-[#f5f3f0] border-t border-gray-200">
         <div className="max-w-6xl mx-auto flex items-start justify-center gap-4 md:gap-6">
           <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#ececec] flex items-center justify-center flex-shrink-0 mt-0.5">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
               <path
                 d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
                 stroke="#13244f"
@@ -795,6 +888,7 @@ export default function LandingPage() {
               ANVISA.
             </p>
             <button
+              type="button"
               onClick={() => setFarmaciaPopupOpen(true)}
               className="mt-4 inline-block text-sm font-semibold text-[#f4001e] underline underline-offset-2 hover:text-[#a30000] transition"
             >

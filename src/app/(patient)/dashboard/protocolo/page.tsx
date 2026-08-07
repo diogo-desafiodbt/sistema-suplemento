@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import { redirect } from 'next/navigation'
 import { DashboardNav } from '@/components/patient/DashboardNav'
 import {
@@ -72,9 +73,11 @@ export default async function ProtocoloPage() {
   return (
     <div className="min-h-screen bg-[#f5f0eb]">
       <header className="bg-white border-b border-gray-100 px-4 md:px-6 py-4 flex items-center justify-between">
-        <img
+        <Image
           src="/logo-azul.png"
           alt="Desafio Diabetes"
+          width={455}
+          height={355}
           className="h-7 w-auto"
         />
         <form action="/api/auth/signout" method="POST">

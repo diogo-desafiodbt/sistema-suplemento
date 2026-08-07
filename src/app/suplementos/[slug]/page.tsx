@@ -138,7 +138,7 @@ export default function SupplementPage() {
                       viewBox="0 0 24 24"
                       fill="none"
                       className="shrink-0 mt-0.5"
-                      aria-hidden
+                      aria-hidden="true"
                     >
                       <path
                         d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
@@ -176,7 +176,7 @@ export default function SupplementPage() {
                       height="20"
                       viewBox="0 0 24 24"
                       fill="none"
-                      aria-hidden
+                      aria-hidden="true"
                     >
                       <path
                         d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
@@ -193,7 +193,7 @@ export default function SupplementPage() {
                       height="20"
                       viewBox="0 0 24 24"
                       fill="none"
-                      aria-hidden
+                      aria-hidden="true"
                     >
                       <rect
                         x="3"
@@ -219,7 +219,7 @@ export default function SupplementPage() {
                       height="20"
                       viewBox="0 0 24 24"
                       fill="none"
-                      aria-hidden
+                      aria-hidden="true"
                     >
                       <path
                         d="M5 13l4 4L19 7"
@@ -254,7 +254,7 @@ export default function SupplementPage() {
                           viewBox="0 0 24 24"
                           fill="none"
                           className={`flex-shrink-0 text-[#13244f] transition-transform duration-300 ${open ? 'rotate-180' : ''}`}
-                          aria-hidden
+                          aria-hidden="true"
                         >
                           <path
                             d="M5 8.5L12 15.5L19 8.5"
@@ -283,9 +283,9 @@ export default function SupplementPage() {
                   RESULTADOS DA COMUNIDADE
                 </p>
                 <div className="grid grid-cols-1 gap-4">
-                  {testimonials.map((t, i) => (
+                  {testimonials.map((t) => (
                     <div
-                      key={i}
+                      key={t.name}
                       className="bg-white rounded-2xl p-5 flex flex-col gap-3 shadow-sm border border-gray-100"
                     >
                       <svg
@@ -294,7 +294,7 @@ export default function SupplementPage() {
                         viewBox="0 0 32 24"
                         fill="none"
                         className="flex-shrink-0 opacity-20"
-                        aria-hidden
+                        aria-hidden="true"
                       >
                         <path
                           d="M0 24V14.4C0 6.4 4.8 1.6 14.4 0L16 3.2C11.2 4.267 8.533 7.2 8 12H14.4V24H0ZM17.6 24V14.4C17.6 6.4 22.4 1.6 32 0L33.6 3.2C28.8 4.267 26.133 7.2 25.6 12H32V24H17.6Z"
@@ -320,7 +320,7 @@ export default function SupplementPage() {
                             height="12"
                             viewBox="0 0 14 14"
                             fill="none"
-                            aria-hidden
+                            aria-hidden="true"
                           >
                             <circle cx="7" cy="7" r="7" fill="#22c55e" />
                             <path

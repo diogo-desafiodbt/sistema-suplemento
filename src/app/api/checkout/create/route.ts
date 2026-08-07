@@ -1,4 +1,4 @@
-import { createHash } from 'crypto'
+import { createHash } from 'node:crypto'
 import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { computeServerCheckoutTotal } from '@/lib/checkout/price'
@@ -289,20 +289,30 @@ async function chargeOneTimeOrder(opts: {
   card: PagarmeCard | null
   pagarmeHeaders: Record<string, string>
 }): Promise<ChargeAttemptResult> {
-  const payments =
-    opts.paymentMethod === 'pix'
-      ? [{ payment_method: 'pix' as const, pix: { expires_in: 3600 } }]
-      : [
-          {
-            payment_method: 'credit_card' as const,
-            credit_card: {
-              recurrence: false,
-              installments: opts.installments,
-              statement_descriptor: 'DESAF DIABETS',
-              card: opts.card!,
-            },
-          },
-        ]
+  let payments: Array<Record<string, unknown>>
+  if (opts.paymentMethod === 'pix') {
+    payments = [{ payment_method: 'pix' as const, pix: { expires_in: 3600 } }]
+  } else {
+    if (!opts.card) {
+      // O caller (route handler) já valida isso antes de chamar esta função
+      // (payment_method === 'credit_card' exige data.card), mas checamos de
+      // novo aqui pra nunca mandar um card nulo pro Pagarme silenciosamente.
+      throw new Error(
+        'chargeOneTimeOrder: card é obrigatório quando paymentMethod é credit_card',
+      )
+    }
+    payments = [
+      {
+        payment_method: 'credit_card' as const,
+        credit_card: {
+          recurrence: false,
+          installments: opts.installments,
+          statement_descriptor: 'DESAF DIABETS',
+          card: opts.card,
+        },
+      },
+    ]
+  }
 
   const pagarmePayload = {
     items: [
@@ -476,7 +486,7 @@ export async function POST(request: NextRequest) {
         : parseInt(data.card.exp_year, 10)
       : 0
 
-    const pagarmeAuth = `Basic ${Buffer.from(process.env.PAGARME_API_KEY + ':').toString('base64')}`
+    const pagarmeAuth = `Basic ${Buffer.from(`${process.env.PAGARME_API_KEY}:`).toString('base64')}`
     const pagarmeHeaders = {
       'Content-Type': 'application/json',
       Authorization: pagarmeAuth,

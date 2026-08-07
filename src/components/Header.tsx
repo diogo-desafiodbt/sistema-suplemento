@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useEffect, useRef, useState } from 'react'
 import PromoBar from '@/components/PromoBar'
 
@@ -49,9 +50,11 @@ export default function Header() {
             className="relative z-10 shrink-0"
             onClick={() => setMenuOpen(false)}
           >
-            <img
+            <Image
               src="/logo-principal.png"
               alt="Desafio Diabetes"
+              width={600}
+              height={196}
               className="h-12 sm:h-14 w-auto"
             />
           </a>
@@ -81,7 +84,7 @@ export default function Header() {
                   height="20"
                   viewBox="0 0 20 20"
                   fill="none"
-                  aria-hidden
+                  aria-hidden="true"
                 >
                   <path
                     d="M15 5L5 15M5 5l10 10"
@@ -96,7 +99,7 @@ export default function Header() {
                   height="22"
                   viewBox="0 0 22 22"
                   fill="none"
-                  aria-hidden
+                  aria-hidden="true"
                 >
                   <path
                     d="M3 6h16M3 11h16M3 16h16"

@@ -5,8 +5,7 @@
  * Usage: node --input-type=module scripts/validate-deferred-protocol.mjs
  */
 import { createClient } from '@supabase/supabase-js'
-import { randomUUID } from 'crypto'
-import { readFileSync } from 'fs'
+import { readFileSync } from 'node:fs'
 
 const env = Object.fromEntries(
   readFileSync(new URL('../.env.local', import.meta.url), 'utf8')

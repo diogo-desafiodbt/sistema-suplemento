@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import {
@@ -162,9 +163,11 @@ export default async function ProtocoloPage({
             >
               ← Voltar
             </Link>
-            <img
+            <Image
               src="/logo-branca.png"
               alt="Desafio Diabetes"
+              width={455}
+              height={355}
               className="h-6 w-auto"
             />
           </div>

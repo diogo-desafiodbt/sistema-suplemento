@@ -81,11 +81,13 @@ function renderInline(text: string): ReactNode[] {
   return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
       return (
+        // biome-ignore lint/suspicious/noArrayIndexKey: fragmentos derivados de um split() de texto estático, sem id natural; a lista nunca é reordenada
         <strong key={i} className="font-semibold text-[#13244f]">
           {part.slice(2, -2)}
         </strong>
       )
     }
+    // biome-ignore lint/suspicious/noArrayIndexKey: fragmentos derivados de um split() de texto estático, sem id natural; a lista nunca é reordenada
     return <span key={i}>{part}</span>
   })
 }
@@ -102,6 +104,7 @@ export default function TermosDeUsoPage() {
           {blocks.map((block, i) => {
             if (block.type === 'h1') {
               return (
+                // biome-ignore lint/suspicious/noArrayIndexKey: blocos vêm de um parser de markdown estático (TERMS_CONTENT), sem id natural; a lista nunca é reordenada
                 <div key={i} className="mb-10">
                   <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-2">
                     Documento legal · versão {TERMS_VERSION}
@@ -115,6 +118,7 @@ export default function TermosDeUsoPage() {
             if (block.type === 'h2') {
               return (
                 <h2
+                  // biome-ignore lint/suspicious/noArrayIndexKey: blocos vêm de um parser de markdown estático, sem id natural; a lista nunca é reordenada
                   key={i}
                   className="font-display text-xl md:text-2xl text-[#13244f] mt-12 mb-4 pt-6 border-t border-gray-100"
                 >
@@ -125,6 +129,7 @@ export default function TermosDeUsoPage() {
             if (block.type === 'h3') {
               return (
                 <h3
+                  // biome-ignore lint/suspicious/noArrayIndexKey: blocos vêm de um parser de markdown estático, sem id natural; a lista nunca é reordenada
                   key={i}
                   className="text-base md:text-lg font-bold text-[#13244f] mt-8 mb-3"
                 >
@@ -134,9 +139,11 @@ export default function TermosDeUsoPage() {
             }
             if (block.type === 'ul') {
               return (
+                // biome-ignore lint/suspicious/noArrayIndexKey: blocos vêm de um parser de markdown estático, sem id natural; a lista nunca é reordenada
                 <ul key={i} className="space-y-2 mb-5 pl-1">
                   {block.items.map((item, j) => (
                     <li
+                      // biome-ignore lint/suspicious/noArrayIndexKey: itens de lista vêm de um parser de markdown estático, sem id natural; a lista nunca é reordenada
                       key={j}
                       className="flex gap-3 text-sm md:text-[15px] text-gray-600 leading-relaxed"
                     >
@@ -149,6 +156,7 @@ export default function TermosDeUsoPage() {
             }
             return (
               <p
+                // biome-ignore lint/suspicious/noArrayIndexKey: blocos vêm de um parser de markdown estático, sem id natural; a lista nunca é reordenada
                 key={i}
                 className="text-sm md:text-[15px] text-gray-600 leading-relaxed mb-5"
               >

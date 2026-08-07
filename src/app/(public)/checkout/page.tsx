@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
@@ -291,9 +292,10 @@ export default function CheckoutPage() {
       setAccountSummary({ name: fullName, email })
       setStep(3)
       toast.success('Conta criada com sucesso!')
-    } catch (err: any) {
+    } catch (err) {
       console.error('SignUp catch:', err)
-      toast.error(err?.message ?? `Erro desconhecido: ${String(err)}`)
+      const message = err instanceof Error ? err.message : String(err)
+      toast.error(message || 'Erro desconhecido')
     } finally {
       setLoading(false)
     }
@@ -502,9 +504,11 @@ export default function CheckoutPage() {
     <div className="min-h-screen bg-[#f5f0eb]">
       <header className="bg-[#f5f0eb] px-6 py-5 border-b border-[#13244f]/10">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <img
+          <Image
             src="/logo-azul.png"
             alt="Desafio Diabetes"
+            width={455}
+            height={355}
             className="h-7 w-auto"
           />
           <nav className="hidden sm:flex items-center gap-2 text-xs text-[#13244f]/50 font-medium">
@@ -541,6 +545,7 @@ export default function CheckoutPage() {
               </div>
               {step > 2 && (
                 <button
+                  type="button"
                   onClick={() => setStep(2)}
                   className="text-xs text-[#f4001e] font-semibold hover:underline"
                 >
@@ -625,6 +630,7 @@ export default function CheckoutPage() {
               </div>
               {step > 3 && (
                 <button
+                  type="button"
                   onClick={() => setStep(3)}
                   className="text-xs text-[#f4001e] font-semibold hover:underline"
                 >
@@ -771,6 +777,7 @@ export default function CheckoutPage() {
                   )}
                 </div>
                 <button
+                  type="button"
                   onClick={() => {
                     setAddressSummary(
                       `${street}, ${number}${complement ? ` ${complement}` : ''} — ${city}/${state}`,
@@ -805,11 +812,14 @@ export default function CheckoutPage() {
             <aside className="rounded-2xl bg-[#13244f] text-white shadow-lg border-l-8 border-[#f4001e] overflow-hidden">
               <div className="px-5 py-5 md:px-6 md:py-6 space-y-4">
                 <div className="flex items-start gap-4">
-                  <img
-                    src="/dr-turi.png"
-                    alt="Dr. Turí Souza"
-                    className="h-16 w-16 md:h-20 md:w-20 rounded-full object-cover object-top bg-white/10 shrink-0 ring-2 ring-[#f4001e]/60"
-                  />
+                  <div className="relative h-16 w-16 md:h-20 md:w-20 rounded-full bg-white/10 shrink-0 ring-2 ring-[#f4001e]/60 overflow-hidden">
+                    <Image
+                      src="/dr-turi.png"
+                      alt="Dr. Turí Souza"
+                      fill
+                      className="object-cover object-top"
+                    />
+                  </div>
                   <div className="min-w-0 flex-1 space-y-2">
                     <p className="inline-flex items-center gap-1.5 rounded-full bg-[#f4001e] px-3 py-1 text-[10px] md:text-xs font-bold uppercase tracking-wide">
                       Antes de pagar
@@ -855,7 +865,7 @@ export default function CheckoutPage() {
                       height="14"
                       viewBox="0 0 24 24"
                       fill="none"
-                      aria-hidden
+                      aria-hidden="true"
                     >
                       <path
                         d="M9 12l2 2 4-4"
@@ -930,9 +940,12 @@ export default function CheckoutPage() {
                     ) : (
                       <>
                         <div className="flex justify-center">
-                          <img
+                          <Image
                             src={pixInfo.qr_code_url}
                             alt="QR Code Pix"
+                            width={224}
+                            height={224}
+                            unoptimized
                             className="w-56 h-56 rounded-xl border border-gray-100 bg-white p-2"
                           />
                         </div>
@@ -1099,6 +1112,7 @@ export default function CheckoutPage() {
                         height="12"
                         viewBox="0 0 24 24"
                         fill="none"
+                        aria-hidden="true"
                       >
                         <path
                           d="M5 13l4 4L19 7"
@@ -1136,9 +1150,11 @@ export default function CheckoutPage() {
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     {item.image ? (
-                      <img
+                      <Image
                         src={item.image}
                         alt={item.product_name}
+                        width={40}
+                        height={40}
                         className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
                       />
                     ) : (
@@ -1169,7 +1185,7 @@ export default function CheckoutPage() {
                   viewBox="0 0 24 24"
                   fill="none"
                   className="shrink-0 mt-0.5"
-                  aria-hidden
+                  aria-hidden="true"
                 >
                   <path
                     d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"

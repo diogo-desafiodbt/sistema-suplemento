@@ -16,6 +16,7 @@ import { createClient } from '@/lib/supabase/server'
 import { findSupplementImageByProductName } from '@/lib/supplements-content'
 
 type OrderItem = {
+  id: string
   quantity: number
   unit_price: number
   products: { name: string } | null
@@ -102,7 +103,7 @@ export default async function PedidoDetalhePage({
       id, status, created_at, total_amount, tracking_code, pharmacy_sent_at,
       subscription_id, shipping_quote_json, shipping_json, pharmacy_json,
       order_items (
-        quantity, unit_price,
+        id, quantity, unit_price,
         products ( name )
       )
     `)
@@ -138,7 +139,7 @@ export default async function PedidoDetalhePage({
       : null
 
   const pharmacy = orderData.pharmacy_json
-  const hasAddress = !!pharmacy?.EntregaLogradouro
+  const address = pharmacy?.EntregaLogradouro ? pharmacy : null
 
   // Forma de pagamento: inspeciona o payload do pagamento da mesma subscription
   let paymentMethod: 'credit_card' | 'pix' | null = null
@@ -158,9 +159,11 @@ export default async function PedidoDetalhePage({
   return (
     <div className="min-h-screen bg-[#f5f0eb]">
       <header className="bg-white border-b border-gray-100 px-4 md:px-6 py-4 flex items-center justify-between">
-        <img
+        <Image
           src="/logo-azul.png"
           alt="Desafio Diabetes"
+          width={455}
+          height={355}
           className="h-7 w-auto"
         />
         <form action="/api/auth/signout" method="POST">
@@ -223,11 +226,11 @@ export default async function PedidoDetalhePage({
             Produtos
           </p>
           <div className="space-y-4">
-            {orderData.order_items?.map((item, i) => {
+            {orderData.order_items?.map((item) => {
               const name = item.products?.name ?? 'Produto'
               const image = findSupplementImageByProductName(name)
               return (
-                <div key={`${name}-${i}`} className="flex items-center gap-4">
+                <div key={item.id} className="flex items-center gap-4">
                   <div className="w-14 h-14 rounded-xl bg-[#f5f0eb] overflow-hidden shrink-0 flex items-center justify-center">
                     {image ? (
                       <Image
@@ -243,7 +246,7 @@ export default async function PedidoDetalhePage({
                         height="22"
                         viewBox="0 0 24 24"
                         fill="none"
-                        aria-hidden
+                        aria-hidden="true"
                       >
                         <rect
                           x="4"
@@ -312,6 +315,7 @@ export default async function PedidoDetalhePage({
             ) : (
               <ol>
                 {eventos.map((ev, i) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: eventos vêm de um payload externo de rastreio sem id estável; a lista é somente leitura e reordenada por data a cada render
                   <li key={i} className="relative flex gap-4">
                     <div className="flex flex-col items-center">
                       <div
@@ -347,20 +351,19 @@ export default async function PedidoDetalhePage({
           <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-3">
             Endereço de entrega
           </p>
-          {hasAddress ? (
+          {address ? (
             <div className="text-sm text-[#13244f]">
               <p>
-                {pharmacy!.EntregaLogradouro},{' '}
-                {pharmacy!.EntregaLogradouroNumero}
-                {pharmacy!.EntregaLogradouroComplemento
-                  ? ` — ${pharmacy!.EntregaLogradouroComplemento}`
+                {address.EntregaLogradouro}, {address.EntregaLogradouroNumero}
+                {address.EntregaLogradouroComplemento
+                  ? ` — ${address.EntregaLogradouroComplemento}`
                   : ''}
               </p>
               <p className="text-gray-500 mt-0.5">
-                {pharmacy!.EntregaBairro} — {pharmacy!.EntregaMunicipioNome}/
-                {pharmacy!.EntregaUnidadeFederativa}
-                {pharmacy!.EntregaCEP
-                  ? ` — CEP ${fmtCep(pharmacy!.EntregaCEP)}`
+                {address.EntregaBairro} — {address.EntregaMunicipioNome}/
+                {address.EntregaUnidadeFederativa}
+                {address.EntregaCEP
+                  ? ` — CEP ${fmtCep(address.EntregaCEP)}`
                   : ''}
               </p>
             </div>

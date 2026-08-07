@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 
 export default function Footer() {
@@ -26,13 +27,12 @@ export default function Footer() {
           <div>
             <h3 className="font-bold mb-3 text-sm">Suplementos</h3>
             {['Diabetes Tipo 2', 'Pré-diabetes'].map((item) => (
-              <a
+              <span
                 key={item}
-                href="#"
                 className="block text-xs py-1.5 opacity-70 hover:opacity-100 transition"
               >
                 {item}
-              </a>
+              </span>
             ))}
           </div>
           <div>
@@ -43,32 +43,30 @@ export default function Footer() {
             >
               Home
             </Link>
-            <a
-              href="#"
-              className="block text-xs py-1.5 opacity-70 hover:opacity-100 transition"
-            >
+            <span className="block text-xs py-1.5 opacity-70 hover:opacity-100 transition">
               Perguntas Frequentes
-            </a>
-            <a
-              href="#"
-              className="block text-xs py-1.5 opacity-70 hover:opacity-100 transition"
-            >
+            </span>
+            <span className="block text-xs py-1.5 opacity-70 hover:opacity-100 transition">
               Blog
-            </a>
+            </span>
           </div>
           <div className="flex flex-col gap-3">
-            <img
+            <Image
               src="/logo-principal.png"
               alt="Desafio Diabetes"
+              width={600}
+              height={196}
               className="h-10 w-auto brightness-0 invert"
             />
             <div className="flex gap-4">
-              <a
-                href="#"
-                aria-label="Instagram"
-                className="opacity-70 hover:opacity-100 transition"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <span className="opacity-70 hover:opacity-100 transition">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden="true"
+                >
                   <rect
                     x="2"
                     y="2"
@@ -87,13 +85,15 @@ export default function Footer() {
                   />
                   <circle cx="17.5" cy="6.5" r="1" fill="white" />
                 </svg>
-              </a>
-              <a
-                href="#"
-                aria-label="Facebook"
-                className="opacity-70 hover:opacity-100 transition"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              </span>
+              <span className="opacity-70 hover:opacity-100 transition">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden="true"
+                >
                   <path
                     d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"
                     stroke="white"
@@ -101,15 +101,15 @@ export default function Footer() {
                     strokeLinejoin="round"
                   />
                 </svg>
-              </a>
+              </span>
             </div>
           </div>
         </div>
         <div className="border-t border-white/20 pt-5 flex flex-col md:flex-row justify-between gap-3">
           <div className="flex gap-3 md:gap-4">
-            <a href="#" className="text-xs opacity-60 hover:opacity-100">
+            <span className="text-xs opacity-60 hover:opacity-100">
               Política de privacidade
-            </a>
+            </span>
             <Link
               href="/termos-de-uso"
               className="text-xs opacity-60 hover:opacity-100"
