@@ -12,27 +12,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const admin = createAdminClient()
-  let payload: WebhookEtiquetaPayload
-
   try {
-    payload = await request.json()
-  } catch {
-    return NextResponse.json({ ok: true })
-  }
+    const admin = createAdminClient()
+    let payload: WebhookEtiquetaPayload
 
-  const { data: log } = await admin
-    .from('webhook_logs')
-    .insert({
-      source: 'shipping',
-      event_type: 'etiqueta_gerada',
-      payload: summarizeShippingWebhookPayload(payload),
-      processed: false,
-    })
-    .select('id')
-    .single()
+    try {
+      payload = await request.json()
+    } catch {
+      return NextResponse.json({ ok: true })
+    }
 
-  try {
+    const { data: log } = await admin
+      .from('webhook_logs')
+      .insert({
+        source: 'shipping',
+        event_type: 'etiqueta_gerada',
+        payload: summarizeShippingWebhookPayload(payload),
+        processed: false,
+      })
+      .select('id')
+      .single()
+
     const idReq = payload.id_requisicao
     if (!idReq) {
       console.error(

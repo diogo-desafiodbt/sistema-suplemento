@@ -111,6 +111,7 @@ type PrescriptionData = {
   }>
   quiz: {
     diagnosis_type: string
+    age?: number | null
     birth_date?: string | null
     sex?: string | null
     is_pregnant_or_breastfeeding?: boolean | null
@@ -124,11 +125,15 @@ type PrescriptionData = {
 }
 
 export function PrescriptionDocument({ data }: { data: PrescriptionData }) {
-  const isLegacyQuiz = !data.quiz.birth_date
-  const age =
+  const isLegacyQuiz = data.quiz.age == null && !data.quiz.birth_date
+  const ageFromBirth =
     data.quiz.birth_date &&
     !Number.isNaN(new Date(data.quiz.birth_date).getTime())
       ? calcAge(data.quiz.birth_date)
+      : null
+  const informedAge =
+    typeof data.quiz.age === 'number' && Number.isFinite(data.quiz.age)
+      ? data.quiz.age
       : null
   const renal = data.quiz.renal_conditions ?? []
   const hepatic = data.quiz.hepatic_conditions ?? []
@@ -204,9 +209,17 @@ export function PrescriptionDocument({ data }: { data: PrescriptionData }) {
           ) : (
             <>
               <View style={styles.row}>
-                <Text style={styles.label}>Idade:</Text>
+                <Text style={styles.label}>
+                  {informedAge != null
+                    ? 'Idade informada (anos):'
+                    : 'Idade:'}
+                </Text>
                 <Text style={styles.value}>
-                  {age != null ? `${age} anos` : '—'}
+                  {informedAge != null
+                    ? `${informedAge}`
+                    : ageFromBirth != null
+                      ? `${ageFromBirth} anos`
+                      : '—'}
                 </Text>
               </View>
               <View style={styles.row}>

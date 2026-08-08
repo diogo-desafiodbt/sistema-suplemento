@@ -20,6 +20,7 @@ type ProtocolItem = {
 }
 
 type QuizResponse = {
+  age: number | null
   birth_date: string | null
   sex: string | null
   is_pregnant_or_breastfeeding: boolean | null
@@ -89,6 +90,7 @@ export default async function ProtocoloPage({
         client_code
       ),
       quiz_responses (
+        age,
         birth_date,
         sex,
         is_pregnant_or_breastfeeding,
@@ -125,12 +127,14 @@ export default async function ProtocoloPage({
 
   const quiz = protocolData.quiz_responses
   const patient = protocolData.users
-  const isLegacyQuiz = !quiz?.birth_date
+  const isLegacyQuiz = quiz?.age == null && !quiz?.birth_date
 
-  const age =
+  const ageFromBirth =
     quiz?.birth_date && !Number.isNaN(new Date(quiz.birth_date).getTime())
       ? calcAge(quiz.birth_date)
       : null
+  const informedAge =
+    typeof quiz?.age === 'number' && Number.isFinite(quiz.age) ? quiz.age : null
 
   const renal = quiz?.renal_conditions ?? []
   const hepatic = quiz?.hepatic_conditions ?? []
@@ -360,10 +364,14 @@ export default async function ProtocoloPage({
               </div>
               <div>
                 <p className="text-gray-400 text-xs uppercase tracking-wide mb-0.5">
-                  Idade
+                  {informedAge != null ? 'Idade informada' : 'Idade'}
                 </p>
                 <p className="font-semibold text-[#13244f]">
-                  {age != null ? `${age} anos` : '—'}
+                  {informedAge != null
+                    ? `${informedAge} anos`
+                    : ageFromBirth != null
+                      ? `${ageFromBirth} anos`
+                      : '—'}
                 </p>
               </div>
               <div>

@@ -26,7 +26,8 @@ export type PendingCheckoutPayload = {
   }
   quiz: {
     full_name: string
-    birth_date: string
+    age: number
+    birth_date?: string
     sex: 'homem' | 'mulher'
     is_pregnant_or_breastfeeding: boolean
     renal_conditions: string[]
@@ -386,7 +387,7 @@ export async function ensureProtocolAfterPayment(
       pending.source === 'mini_quiz' ? 'mini_quiz' : 'full_quiz'
     const quiz = pending.quiz
 
-    // Sempre atualiza perfil com nome e data de nascimento da triagem
+    // Atualiza nome do perfil; NÃO fabricar/propagar birth_date a partir da idade.
     const updates: Record<string, string | null> = {}
     if (quiz.full_name?.trim()) updates.full_name = quiz.full_name.trim()
     if (quiz.birth_date) updates.birth_date = quiz.birth_date
@@ -399,7 +400,8 @@ export async function ensureProtocolAfterPayment(
       .insert({
         user_id: userId,
         diagnosis_type: quiz.diagnosis_type,
-        birth_date: quiz.birth_date,
+        age: quiz.age,
+        ...(quiz.birth_date ? { birth_date: quiz.birth_date } : {}),
         sex: quiz.sex,
         is_pregnant_or_breastfeeding: quiz.is_pregnant_or_breastfeeding,
         renal_conditions: quiz.renal_conditions ?? [],

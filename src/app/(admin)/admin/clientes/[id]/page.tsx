@@ -319,33 +319,34 @@ export default async function AdminClienteDetalhePage({
   const loginList = (loginHistory ?? []) as Record<string, unknown>[]
   const termsList = (termsAcceptances ?? []) as TermsRow[]
 
-  // Pagamentos das assinaturas do cliente
+  // Pagamentos das assinaturas + profissionais que assinaram (em paralelo)
   const subIds = subList.map((s) => s.id)
-  let paymentList: PaymentRow[] = []
-  if (subIds.length > 0) {
-    const { data: payments } = await admin
-      .from('payments')
-      .select('*')
-      .in('subscription_id', subIds)
-      .order('created_at', { ascending: false })
-    paymentList = (payments ?? []) as PaymentRow[]
-  }
-
-  // Profissionais que assinaram protocolos
   const signerIds = [
     ...new Set(
       protocolList.map((p) => p.signed_by).filter((v): v is string => !!v),
     ),
   ]
+
+  const [{ data: payments }, { data: pros }] = await Promise.all([
+    subIds.length > 0
+      ? admin
+          .from('payments')
+          .select('*')
+          .in('subscription_id', subIds)
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] as PaymentRow[] }),
+    signerIds.length > 0
+      ? admin
+          .from('professionals')
+          .select('id, crm, crm_state, users ( full_name )')
+          .in('id', signerIds)
+      : Promise.resolve({ data: [] as ProfessionalRow[] }),
+  ])
+
+  const paymentList = (payments ?? []) as PaymentRow[]
   const professionalsById = new Map<string, ProfessionalRow>()
-  if (signerIds.length > 0) {
-    const { data: pros } = await admin
-      .from('professionals')
-      .select('id, crm, crm_state, users ( full_name )')
-      .in('id', signerIds)
-    for (const pro of (pros ?? []) as unknown as ProfessionalRow[]) {
-      professionalsById.set(pro.id, pro)
-    }
+  for (const pro of (pros ?? []) as unknown as ProfessionalRow[]) {
+    professionalsById.set(pro.id, pro)
   }
 
   function professionalName(signedBy: string | null): string {

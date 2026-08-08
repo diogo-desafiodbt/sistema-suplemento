@@ -16,27 +16,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const admin = createAdminClient()
-  let payload: WebhookRastreamentoPayload
-
   try {
-    payload = await request.json()
-  } catch {
-    return NextResponse.json({ ok: true })
-  }
+    const admin = createAdminClient()
+    let payload: WebhookRastreamentoPayload
 
-  const { data: log } = await admin
-    .from('webhook_logs')
-    .insert({
-      source: 'shipping',
-      event_type: 'rastreamento_atualizado',
-      payload: summarizeShippingWebhookPayload(payload),
-      processed: false,
-    })
-    .select('id')
-    .single()
+    try {
+      payload = await request.json()
+    } catch {
+      return NextResponse.json({ ok: true })
+    }
 
-  try {
+    const { data: log } = await admin
+      .from('webhook_logs')
+      .insert({
+        source: 'shipping',
+        event_type: 'rastreamento_atualizado',
+        payload: summarizeShippingWebhookPayload(payload),
+        processed: false,
+      })
+      .select('id')
+      .single()
+
     const eventos = payload.eventos ?? []
     const idReq = eventos.find((e) => e.id_requisicao)?.id_requisicao
 

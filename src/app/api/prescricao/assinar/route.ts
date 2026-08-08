@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
         *,
         users ( full_name, email, client_code ),
         quiz_responses (
-          diagnosis_type, birth_date, sex, is_pregnant_or_breastfeeding,
+          diagnosis_type, age, birth_date, sex, is_pregnant_or_breastfeeding,
           renal_conditions, hepatic_conditions, medications,
           years_diagnosed, hba1c_range, allergies
         ),
@@ -97,6 +97,7 @@ export async function POST(request: NextRequest) {
     } | null
     const quiz = protocol.quiz_responses as unknown as {
       diagnosis_type: string
+      age: number | null
       birth_date: string | null
       sex: string | null
       is_pregnant_or_breastfeeding: boolean | null

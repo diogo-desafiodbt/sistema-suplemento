@@ -186,6 +186,42 @@ async function handlePaymentSucceeded(
     return
   }
 
+  const chargeIds = getChargeIdCandidates(payload)
+  const { data: existingPaid } = await admin
+    .from('payments')
+    .select('id, pagarme_charge_id, paid_at, created_at')
+    .eq('subscription_id', subscriptionId)
+    .eq('status', 'paid')
+    .limit(20)
+
+  const duplicateWindowMs = 2 * 60 * 60 * 1000
+  const now = Date.now()
+  const hasOtherPaidCharge = (existingPaid ?? []).some((p) => {
+    const id = p.pagarme_charge_id
+    if (typeof id !== 'string' || !id) return false
+    if (chargeId && id === chargeId) return false
+    if (chargeIds.includes(id)) return false
+    const when = p.paid_at ?? p.created_at
+    if (!when) return true
+    return now - new Date(when).getTime() < duplicateWindowMs
+  })
+
+  // Já houve fulfillment recente nesta subscription (outro charge pago) — evita
+  // recriar protocolo / reenviar farmácia (ex.: webhook duplicado). Renovações
+  // (>2h) seguem o fluxo normal.
+  const skipFulfillment = hasOtherPaidCharge
+  if (skipFulfillment) {
+    console.warn(
+      'Webhook: subscription já tem payment paid recente com charge_id diferente — pulando protocol/farmácia',
+      {
+        subscriptionId,
+        chargeId,
+        chargeIds,
+        existingPaid: existingPaid?.map((p) => p.pagarme_charge_id),
+      },
+    )
+  }
+
   // Model A: a cada cobrança paga, avança expires_at e next_billing_at pelo período do plano.
   const expiresAt = addPlanPeriod(new Date(), planType)
 
@@ -202,7 +238,6 @@ async function handlePaymentSucceeded(
 
   if (chargeId) {
     const paidAt = new Date().toISOString()
-    const chargeIds = getChargeIdCandidates(payload)
 
     // Tenta marcar como pago por qualquer ID conhecido da cobrança.
     for (const candidateId of chargeIds) {
@@ -362,7 +397,9 @@ async function handlePaymentSucceeded(
     })
   }
 
-  await ensureProtocolAfterPayment(admin, subscriptionId, userId)
+  if (!skipFulfillment) {
+    await ensureProtocolAfterPayment(admin, subscriptionId, userId)
+  }
 
   if (webhookLogId) {
     await admin
@@ -371,7 +408,7 @@ async function handlePaymentSucceeded(
       .eq('id', webhookLogId)
   }
 
-  if (dispatchPharmacy) {
+  if (!skipFulfillment && dispatchPharmacy) {
     const { data: sub } = await admin
       .from('subscriptions')
       .select('protocol_id')
@@ -456,9 +493,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const admin = createAdminClient()
-
   try {
+    const admin = createAdminClient()
     const payload = (await request.json()) as PagarmePayload
 
     const { data: webhookLog } = await admin

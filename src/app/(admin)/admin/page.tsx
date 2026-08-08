@@ -51,10 +51,10 @@ type FailedPayment = {
 async function countRows(
   admin: ReturnType<typeof createAdminClient>,
   table: string,
-  // biome-ignore lint/suspicious/noExplicitAny: builder genérico do Supabase sem Database gerado; ver comentário acima
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- query builder genérico sem Database tipado
   filters: (q: any) => any,
 ): Promise<number> {
-  // biome-ignore lint/suspicious/noExplicitAny: idem — encadeamento de filtros do query builder
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- idem
   let query: any = admin
     .from(table)
     .select('id', { count: 'exact', head: true })

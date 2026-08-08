@@ -81,7 +81,7 @@ export function calcAge(birthDateIso: string): number {
   return age
 }
 
-/** Aproxima uma data de nascimento a partir da idade (hoje − N anos), para persistência. */
+/** @deprecated Não usar para persistência — fabricava birth_date falso. Preferir `age`. */
 export function birthDateFromAge(age: number): string {
   const today = new Date()
   const d = new Date(

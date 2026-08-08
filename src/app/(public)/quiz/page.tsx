@@ -1,16 +1,15 @@
 'use client'
 
 import Image from 'next/image'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { trackFunnelEvent } from '@/lib/funnel/track'
 import {
   ALL_PRODUCT_KEYS,
-  birthDateFromAge,
   blockReasonForProduct,
   cheapestSuggestion,
-  computeTriage,
   type DiagnosisType,
   defaultSuggestion,
   type HepaticCondition,
@@ -151,6 +150,152 @@ type StepId =
   | 'diabetes'
   | 'medicamentos'
 
+function OptionButton({
+  label,
+  selected,
+  onClick,
+}: {
+  label: string
+  selected: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border text-sm md:text-base text-left transition-all ${
+        selected
+          ? 'border-[#13244f] bg-[#13244f]/5 text-[#13244f] font-medium'
+          : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+      }`}
+    >
+      <span
+        className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${
+          selected ? 'border-[#13244f]' : 'border-gray-300'
+        }`}
+      >
+        {selected && <span className="w-2 h-2 rounded-full bg-[#13244f]" />}
+      </span>
+      {label}
+    </button>
+  )
+}
+
+function CheckOption({
+  label,
+  selected,
+  onClick,
+}: {
+  label: string
+  selected: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full flex items-start gap-3 px-4 py-3.5 rounded-xl border text-sm md:text-base text-left transition-all ${
+        selected
+          ? 'border-[#13244f] bg-[#13244f]/5 text-[#13244f] font-medium'
+          : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+      }`}
+    >
+      <span
+        className={`mt-0.5 w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center transition-all ${
+          selected ? 'border-[#13244f] bg-[#13244f]' : 'border-gray-300'
+        }`}
+      >
+        {selected && (
+          <svg
+            width="10"
+            height="8"
+            viewBox="0 0 10 8"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M1 4l2.5 2.5L9 1"
+              stroke="white"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
+      </span>
+      <span className="leading-snug">{label}</span>
+    </button>
+  )
+}
+
+function QuestionWrapper({
+  title,
+  subtitle,
+  category,
+  children,
+  showContinue = false,
+  continueDisabled = false,
+  onContinue,
+  onBack,
+  stepIndex,
+  loading = false,
+}: {
+  title: string
+  subtitle?: string
+  category?: string
+  children: React.ReactNode
+  showContinue?: boolean
+  continueDisabled?: boolean
+  onContinue?: () => void
+  onBack: () => void
+  stepIndex: number
+  loading?: boolean
+}) {
+  return (
+    <div className="space-y-5">
+      <div>
+        {category && (
+          <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-2">
+            {category}
+          </p>
+        )}
+        <h2 className="font-display text-2xl md:text-3xl lg:text-4xl text-[#13244f] leading-snug">
+          {title}
+        </h2>
+        {subtitle && (
+          <p className="text-sm md:text-base text-gray-500 mt-1.5 leading-relaxed">
+            {subtitle}
+          </p>
+        )}
+      </div>
+      <div className="space-y-3">{children}</div>
+      {(stepIndex > 0 || showContinue) && (
+        <div className="flex gap-3 pt-2">
+          {stepIndex > 0 && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="flex-1 border border-[#13244f] text-[#13244f] py-3 rounded-full text-sm font-semibold hover:bg-[#13244f]/5 transition"
+            >
+              Voltar
+            </button>
+          )}
+          {showContinue && (
+            <button
+              type="button"
+              onClick={onContinue}
+              disabled={continueDisabled || loading}
+              className="flex-1 bg-[#f4001e] text-white py-3 rounded-full text-sm font-semibold hover:bg-[#a30000] transition disabled:opacity-40"
+            >
+              {loading ? 'Processando…' : 'Continuar'}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function QuizPage() {
   const router = useRouter()
   const [stepIndex, setStepIndex] = useState(0)
@@ -178,146 +323,6 @@ export default function QuizPage() {
 
   function goBack() {
     setStepIndex((s) => Math.max(s - 1, 0))
-  }
-
-  function OptionButton({
-    label,
-    selected,
-    onClick,
-  }: {
-    label: string
-    selected: boolean
-    onClick: () => void
-  }) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border text-sm md:text-base text-left transition-all ${
-          selected
-            ? 'border-[#13244f] bg-[#13244f]/5 text-[#13244f] font-medium'
-            : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
-        }`}
-      >
-        <span
-          className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${
-            selected ? 'border-[#13244f]' : 'border-gray-300'
-          }`}
-        >
-          {selected && <span className="w-2 h-2 rounded-full bg-[#13244f]" />}
-        </span>
-        {label}
-      </button>
-    )
-  }
-
-  function CheckOption({
-    label,
-    selected,
-    onClick,
-  }: {
-    label: string
-    selected: boolean
-    onClick: () => void
-  }) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        className={`w-full flex items-start gap-3 px-4 py-3.5 rounded-xl border text-sm md:text-base text-left transition-all ${
-          selected
-            ? 'border-[#13244f] bg-[#13244f]/5 text-[#13244f] font-medium'
-            : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
-        }`}
-      >
-        <span
-          className={`mt-0.5 w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center transition-all ${
-            selected ? 'border-[#13244f] bg-[#13244f]' : 'border-gray-300'
-          }`}
-        >
-          {selected && (
-            <svg
-              width="10"
-              height="8"
-              viewBox="0 0 10 8"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path
-                d="M1 4l2.5 2.5L9 1"
-                stroke="white"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          )}
-        </span>
-        <span className="leading-snug">{label}</span>
-      </button>
-    )
-  }
-
-  function QuestionWrapper({
-    title,
-    subtitle,
-    category,
-    children,
-    showContinue = false,
-    continueDisabled = false,
-    onContinue,
-  }: {
-    title: string
-    subtitle?: string
-    category?: string
-    children: React.ReactNode
-    showContinue?: boolean
-    continueDisabled?: boolean
-    onContinue?: () => void
-  }) {
-    return (
-      <div className="space-y-5">
-        <div>
-          {category && (
-            <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-2">
-              {category}
-            </p>
-          )}
-          <h2 className="font-display text-2xl md:text-3xl lg:text-4xl text-[#13244f] leading-snug">
-            {title}
-          </h2>
-          {subtitle && (
-            <p className="text-sm md:text-base text-gray-500 mt-1.5 leading-relaxed">
-              {subtitle}
-            </p>
-          )}
-        </div>
-        <div className="space-y-3">{children}</div>
-        {(stepIndex > 0 || showContinue) && (
-          <div className="flex gap-3 pt-2">
-            {stepIndex > 0 && (
-              <button
-                type="button"
-                onClick={goBack}
-                className="flex-1 border border-[#13244f] text-[#13244f] py-3 rounded-full text-sm font-semibold hover:bg-[#13244f]/5 transition"
-              >
-                Voltar
-              </button>
-            )}
-            {showContinue && (
-              <button
-                type="button"
-                onClick={onContinue ?? goNext}
-                disabled={continueDisabled || loading}
-                className="flex-1 bg-[#f4001e] text-white py-3 rounded-full text-sm font-semibold hover:bg-[#a30000] transition disabled:opacity-40"
-              >
-                {loading ? 'Processando…' : 'Continuar'}
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-    )
   }
 
   function toggleRenal(value: RenalCondition) {
@@ -386,16 +391,28 @@ export default function QuizPage() {
       medications: form.medications.filter((m) => m !== 'nenhum'),
     }
 
-    const result = computeTriage(answers)
     trackFunnelEvent('quiz_completed')
-    if (result.blocked) {
-      setBlockReason(result.blockReason)
-      return
-    }
-    trackFunnelEvent('quiz_eligible')
-
     setLoading(true)
     try {
+      const sessionRes = await fetch('/api/quiz/triage-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(answers),
+      })
+      const sessionData = await sessionRes.json()
+      if (sessionRes.status === 403 || sessionData.blocked) {
+        setBlockReason(
+          sessionData.error ?? 'Vendemos apenas para maiores de 18 anos.',
+        )
+        return
+      }
+      if (!sessionRes.ok || !sessionData.token || !sessionData.allowed) {
+        throw new Error('triage-session')
+      }
+
+      const allowed = sessionData.allowed as ProductKey[]
+      trackFunnelEvent('quiz_eligible')
+
       const res = await fetch('/api/products')
       if (!res.ok) throw new Error('products')
       const data = await res.json()
@@ -415,9 +432,9 @@ export default function QuizPage() {
       }
 
       const suggestion =
-        result.allowed.length > 0
-          ? cheapestSuggestion(result.allowed, monthlyPriceByKey)
-          : defaultSuggestion(result.allowed)
+        allowed.length > 0
+          ? cheapestSuggestion(allowed, monthlyPriceByKey)
+          : defaultSuggestion(allowed)
       const suggestionSet = new Set(suggestion)
 
       const protocolItems: ProtocolItemBuilt[] = []
@@ -443,13 +460,13 @@ export default function QuizPage() {
           image,
         }
 
-        if (!result.allowed.includes(key)) {
+        if (!allowed.includes(key)) {
           protocolItems.push({
             ...base,
             is_required: false,
             removed: true,
             blocked: true,
-            activation_reason: blockReasonForProduct(key, result.gates),
+            activation_reason: blockReasonForProduct(key, []),
           })
           continue
         }
@@ -474,12 +491,11 @@ export default function QuizPage() {
       const triagemData = {
         ...answers,
         full_name: form.full_name.trim(),
-        // Persistência / checkout ainda usam birth_date (aprox. a partir da idade).
-        birth_date: birthDateFromAge(age),
       }
 
       sessionStorage.setItem('protocol_items', JSON.stringify(protocolItems))
       sessionStorage.setItem('triagem_data', JSON.stringify(triagemData))
+      sessionStorage.setItem('triage_session_token', sessionData.token as string)
       sessionStorage.setItem('checkout_source', 'full_quiz')
       sessionStorage.removeItem('quiz_data')
       sessionStorage.removeItem('mini_quiz_data')
@@ -535,12 +551,12 @@ export default function QuizPage() {
             <p className="text-gray-600 text-sm leading-relaxed">
               {blockReason}
             </p>
-            <a
-              href="/"
+            <Link
+              href="/suplementos"
               className="inline-flex mt-2 bg-[#13244f] text-white px-6 py-3 rounded-full text-sm font-semibold hover:bg-[#0d1a3a] transition"
             >
               Voltar ao início
-            </a>
+            </Link>
           </div>
         </main>
       </div>
@@ -556,6 +572,11 @@ export default function QuizPage() {
             title="Qual é o seu nome completo?"
             showContinue
             continueDisabled={form.full_name.trim().length < 3}
+          
+            onBack={goBack}
+            stepIndex={stepIndex}
+            loading={loading}
+            onContinue={goNext}
           >
             <input
               type="text"
@@ -579,6 +600,11 @@ export default function QuizPage() {
             title="Qual é a sua idade?"
             showContinue
             continueDisabled={!ageValid}
+          
+            onBack={goBack}
+            stepIndex={stepIndex}
+            loading={loading}
+            onContinue={goNext}
           >
             <input
               type="number"
@@ -602,7 +628,11 @@ export default function QuizPage() {
 
       case 'sexo':
         return (
-          <QuestionWrapper category="DADOS BÁSICOS" title="Qual é o seu sexo?">
+          <QuestionWrapper category="DADOS BÁSICOS" title="Qual é o seu sexo?"
+            onBack={goBack}
+            stepIndex={stepIndex}
+            loading={loading}
+          >
             {(
               [
                 { value: 'homem' as Sex, label: 'Homem' },
@@ -634,6 +664,10 @@ export default function QuizPage() {
           <QuestionWrapper
             category="DADOS BÁSICOS"
             title="Está grávida ou amamentando?"
+          
+            onBack={goBack}
+            stepIndex={stepIndex}
+            loading={loading}
           >
             {[
               { value: true, label: 'Sim' },
@@ -665,6 +699,11 @@ export default function QuizPage() {
             continueDisabled={
               !form.renal_none && form.renal_conditions.length === 0
             }
+          
+            onBack={goBack}
+            stepIndex={stepIndex}
+            loading={loading}
+            onContinue={goNext}
           >
             {RENAL_OPTIONS.map((opt) => (
               <CheckOption
@@ -698,6 +737,11 @@ export default function QuizPage() {
             continueDisabled={
               !form.hepatic_none && form.hepatic_conditions.length === 0
             }
+          
+            onBack={goBack}
+            stepIndex={stepIndex}
+            loading={loading}
+            onContinue={goNext}
           >
             {HEPATIC_OPTIONS.map((opt) => (
               <CheckOption
@@ -726,6 +770,10 @@ export default function QuizPage() {
           <QuestionWrapper
             category="DIABETES"
             title="Qual é o seu tipo de diabetes?"
+          
+            onBack={goBack}
+            stepIndex={stepIndex}
+            loading={loading}
           >
             {DIAGNOSIS_OPTIONS.map((opt) => (
               <OptionButton
@@ -750,6 +798,10 @@ export default function QuizPage() {
             showContinue
             continueDisabled={form.medications.length === 0}
             onContinue={finishTriage}
+          
+            onBack={goBack}
+            stepIndex={stepIndex}
+            loading={loading}
           >
             {MEDICATION_OPTIONS.map((opt) => (
               <CheckOption

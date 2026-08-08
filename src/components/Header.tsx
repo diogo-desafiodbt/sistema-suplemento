@@ -1,6 +1,7 @@
 'use client'
 
 import Image from 'next/image'
+import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import PromoBar from '@/components/PromoBar'
 
@@ -45,8 +46,8 @@ export default function Header() {
 
       <header className="relative bg-white border-b border-[#ececec] sticky top-8 z-40">
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <a
-            href="/"
+          <Link
+            href="/suplementos"
             className="relative z-10 shrink-0"
             onClick={() => setMenuOpen(false)}
           >
@@ -57,7 +58,7 @@ export default function Header() {
               height={196}
               className="h-12 sm:h-14 w-auto"
             />
-          </a>
+          </Link>
 
           <div
             className="relative z-10 flex items-center gap-2 sm:gap-3"

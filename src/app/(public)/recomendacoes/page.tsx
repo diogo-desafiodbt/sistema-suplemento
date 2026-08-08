@@ -116,60 +116,64 @@ export default function RecomendacoesPage() {
   const [openFaq, setOpenFaq] = useState<string | null>(null)
 
   useEffect(() => {
-    loadFromSessionAndEnrichWithPrices()
-  }, [])
+    let cancelled = false
 
-  async function loadFromSessionAndEnrichWithPrices() {
-    try {
-      const itemsRaw = sessionStorage.getItem('protocol_items')
-      if (!itemsRaw) {
-        router.push('/quiz')
-        return
-      }
+    async function loadFromSessionAndEnrichWithPrices() {
+      try {
+        const itemsRaw = sessionStorage.getItem('protocol_items')
+        if (!itemsRaw) {
+          router.push('/quiz')
+          return
+        }
 
-      const parsedItems: LocalProtocolItem[] = JSON.parse(itemsRaw)
-      // Bloqueados não entram na tela (compliance — só o prescrito elegível)
-      const visible = parsedItems.filter((item) => !item.blocked)
+        const parsedItems: LocalProtocolItem[] = JSON.parse(itemsRaw)
+        const visible = parsedItems.filter((item) => !item.blocked)
 
-      const res = await fetch('/api/products')
-      if (res.ok) {
-        const { products } = await res.json()
-        const enriched = visible.map((item) => {
-          const product =
-            products.find(
-              (p: { name: string }) =>
-                p.name.toLowerCase() === item.product_name.toLowerCase(),
-            ) ??
-            products.find((p: { name: string }) =>
-              p.name
-                .toLowerCase()
-                .includes(item.product_name.toLowerCase().split(' ')[0]),
-            )
-          return {
-            ...item,
-            price_monthly: product?.price_monthly ?? 0,
-            price_quarterly: product?.price_quarterly ?? 0,
-            price_yearly: product?.price_yearly ?? 0,
-            image: matchSupplementImage(item.product_name) ?? item.image,
-          }
-        })
-        setItems(markTwoCheapest(enriched))
-      } else {
-        setItems(
-          markTwoCheapest(
-            visible.map((item) => ({
+        const res = await fetch('/api/products')
+        if (cancelled) return
+
+        if (res.ok) {
+          const { products } = await res.json()
+          const enriched = visible.map((item) => {
+            const product =
+              products.find(
+                (p: { id: string; name: string }) => p.id === item.product_id,
+              ) ??
+              products.find(
+                (p: { id: string; name: string }) =>
+                  p.name.toLowerCase() === item.product_name.toLowerCase(),
+              )
+            return {
               ...item,
+              price_monthly: product?.price_monthly ?? 0,
+              price_quarterly: product?.price_quarterly ?? 0,
+              price_yearly: product?.price_yearly ?? 0,
               image: matchSupplementImage(item.product_name) ?? item.image,
-            })),
-          ),
-        )
+            }
+          })
+          setItems(markTwoCheapest(enriched))
+        } else {
+          setItems(
+            markTwoCheapest(
+              visible.map((item) => ({
+                ...item,
+                image: matchSupplementImage(item.product_name) ?? item.image,
+              })),
+            ),
+          )
+        }
+      } catch {
+        if (!cancelled) router.push('/quiz')
+      } finally {
+        if (!cancelled) setLoading(false)
       }
-    } catch {
-      router.push('/quiz')
-    } finally {
-      setLoading(false)
     }
-  }
+
+    void loadFromSessionAndEnrichWithPrices()
+    return () => {
+      cancelled = true
+    }
+  }, [router])
 
   function toggleItem(productId: string) {
     setItems((prev) =>

@@ -1,7 +1,13 @@
 import { z } from 'zod'
 
 export const quizSchema = z.object({
-  diagnosis_type: z.enum(['type2', 'prediabetes', 'undiagnosed']),
+  diagnosis_type: z.enum([
+    'type1',
+    'type2',
+    'prediabetes',
+    'lada_avancado',
+    'undiagnosed',
+  ]),
   years_diagnosed: z.enum(['<1ano', '1-5anos', '5-10anos', '>10anos']),
   hba1c_range: z.enum(['<7', '7-9', '>9', 'nao_sei']).nullable(),
   fasting_glucose: z

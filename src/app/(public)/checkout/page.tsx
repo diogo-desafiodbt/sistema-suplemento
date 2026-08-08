@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { trackFunnelEvent } from '@/lib/funnel/track'
 import {
   DEFAULT_PURCHASE_PLAN,
+  formatBRL,
   getChargePrice,
   isPurchasePlanType,
   PLAN_TYPE_LABEL,
@@ -62,6 +63,26 @@ function clearCheckoutSession() {
   sessionStorage.removeItem('mini_quiz_data')
   sessionStorage.removeItem('checkout_source')
   sessionStorage.removeItem('cart_locked_plan')
+  sessionStorage.removeItem('triage_session_token')
+}
+
+async function waitForProfile(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  retries = 3,
+) {
+  for (let i = 0; i < retries; i++) {
+    const { data: profile } = await supabase
+      .from('users')
+      .select('full_name, email')
+      .eq('id', userId)
+      .maybeSingle()
+    if (profile) return profile
+    if (i < retries - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 500))
+    }
+  }
+  return null
 }
 
 function formatCountdown(seconds: number): string {
@@ -129,10 +150,12 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (!pixAllowed && paymentMethod === 'pix') {
-      setPaymentMethod('credit_card')
-      setPixInfo(null)
-      setPixSubscriptionId(null)
-      setPixExpired(false)
+      queueMicrotask(() => {
+        setPaymentMethod('credit_card')
+        setPixInfo(null)
+        setPixSubscriptionId(null)
+        setPixExpired(false)
+      })
     }
   }, [pixAllowed, paymentMethod])
 
@@ -180,56 +203,73 @@ export default function CheckoutPage() {
   }, [pixSubscriptionId, pixExpired, pixInfo, router])
 
   useEffect(() => {
-    const itemsRaw = sessionStorage.getItem('protocol_items')
-    const savedSource = sessionStorage.getItem(
-      'checkout_source',
-    ) as CheckoutSource | null
-    const savedPlan = sessionStorage.getItem('selected_plan')
-    const triagemRaw = sessionStorage.getItem('triagem_data')
+    let cancelled = false
 
-    if (!itemsRaw) {
-      router.push('/suplementos')
-      return
+    async function initCheckout() {
+      const itemsRaw = sessionStorage.getItem('protocol_items')
+      const savedSource = sessionStorage.getItem(
+        'checkout_source',
+      ) as CheckoutSource | null
+      const savedPlan = sessionStorage.getItem('selected_plan')
+      const triagemRaw = sessionStorage.getItem('triagem_data')
+
+      if (!itemsRaw) {
+        router.push('/suplementos')
+        return
+      }
+
+      if (!triagemRaw) {
+        router.push('/quiz')
+        return
+      }
+
+      const nextSource: CheckoutSource =
+        savedSource === 'mini_quiz' ? 'mini_quiz' : 'full_quiz'
+      const nextPlan =
+        savedPlan && isPurchasePlanType(savedPlan)
+          ? savedPlan
+          : DEFAULT_PURCHASE_PLAN
+      const parsed: LocalProtocolItem[] = JSON.parse(itemsRaw)
+
+      // Defer setState to satisfy react-hooks/set-state-in-effect.
+      await Promise.resolve()
+      if (cancelled) return
+
+      setSource(nextSource)
+      setPlan(nextPlan)
+      setItems(parsed)
+
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user || cancelled) return
+
+      const profile = await waitForProfile(supabase, user.id)
+      if (cancelled) return
+
+      if (profile) {
+        setAccountSummary({
+          name: profile.full_name ?? '',
+          email: profile.email ?? user.email ?? '',
+        })
+      } else {
+        toast.warning(
+          'Perfil ainda não disponível. Você pode continuar; se o pagamento falhar, aguarde e tente de novo.',
+        )
+        setAccountSummary({
+          name: '',
+          email: user.email ?? '',
+        })
+      }
+      setStep(3)
     }
 
-    if (!triagemRaw) {
-      router.push('/quiz')
-      return
+    void initCheckout()
+    return () => {
+      cancelled = true
     }
-
-    setSource(savedSource === 'mini_quiz' ? 'mini_quiz' : 'full_quiz')
-    if (savedPlan && isPurchasePlanType(savedPlan)) {
-      setPlan(savedPlan)
-    } else {
-      setPlan(DEFAULT_PURCHASE_PLAN)
-    }
-    const parsed: LocalProtocolItem[] = JSON.parse(itemsRaw)
-    setItems(parsed)
-
-    checkExistingSession()
-  }, [])
-
-  async function checkExistingSession() {
-    const supabase = createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return
-
-    const { data: profile } = await supabase
-      .from('users')
-      .select('full_name, email')
-      .eq('id', user.id)
-      .single()
-
-    if (profile) {
-      setAccountSummary({
-        name: profile.full_name ?? '',
-        email: profile.email ?? user.email ?? '',
-      })
-    }
-    setStep(3)
-  }
+  }, [router])
 
   function getActiveItems() {
     return items.filter((item) => !item.removed && !item.blocked)
@@ -287,7 +327,12 @@ export default function CheckoutPage() {
         return
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const profile = await waitForProfile(supabase, data.user.id)
+      if (!profile) {
+        toast.warning(
+          'Conta criada, mas o perfil ainda está sincronizando. Você pode continuar.',
+        )
+      }
 
       setAccountSummary({ name: fullName, email })
       setStep(3)
@@ -401,6 +446,12 @@ export default function CheckoutPage() {
         return
       }
 
+      const triageSessionToken = sessionStorage.getItem('triage_session_token')
+      if (!triageSessionToken) {
+        toast.error('Sessão de triagem ausente. Refaça o quiz.')
+        return
+      }
+
       const method: PaymentMethod = pixAllowed ? paymentMethod : 'credit_card'
 
       const body: Record<string, unknown> = {
@@ -412,6 +463,7 @@ export default function CheckoutPage() {
         shipping,
         payment_method: method,
         terms_accepted: true,
+        triage_session_token: triageSessionToken,
         address: {
           zip_code: cep.replace(/\D/g, ''),
           street,
@@ -422,6 +474,10 @@ export default function CheckoutPage() {
           state,
         },
         cpf,
+      }
+
+      if (pixSubscriptionId) {
+        body.replace_subscription_id = pixSubscriptionId
       }
 
       if (method === 'credit_card') {
@@ -761,7 +817,7 @@ export default function CheckoutPage() {
                                 </p>
                               </div>
                               <p className="text-sm font-bold text-[#13244f] flex-shrink-0">
-                                R$ {opt.valor.toFixed(2).replace('.', ',')}
+                                R$ {formatBRL(opt.valor)}
                               </p>
                             </div>
                           </button>
@@ -788,6 +844,7 @@ export default function CheckoutPage() {
                     !cep ||
                     !street ||
                     !number ||
+                    !neighborhood.trim() ||
                     !city ||
                     !state ||
                     loadingShipping
@@ -1090,8 +1147,8 @@ export default function CheckoutPage() {
                       {processingPayment
                         ? 'Processando...'
                         : paymentMethod === 'pix' && pixAllowed
-                          ? `Gerar Pix — R$ ${getTotal().toFixed(2).replace('.', ',')}`
-                          : `Pagar R$ ${getTotal().toFixed(2).replace('.', ',')}`}
+                          ? `Gerar Pix — R$ ${formatBRL(getTotal())}`
+                          : `Pagar R$ ${formatBRL(getTotal())}`}
                     </button>
                   </form>
                 )}
@@ -1171,7 +1228,7 @@ export default function CheckoutPage() {
                     </div>
                   </div>
                   <p className="text-sm md:text-base font-semibold text-[#13244f] flex-shrink-0">
-                    R$ {getPrice(item).toFixed(2).replace('.', ',')}
+                    R$ {formatBRL(getPrice(item))}
                   </p>
                 </div>
               ))}
@@ -1207,14 +1264,14 @@ export default function CheckoutPage() {
               <div className="flex items-center justify-between text-sm md:text-base">
                 <span className="text-gray-500">Subtotal</span>
                 <span className="text-[#13244f] font-semibold">
-                  R$ {getProductsSubtotal().toFixed(2).replace('.', ',')}
+                  R$ {formatBRL(getProductsSubtotal())}
                 </span>
               </div>
               <div className="flex items-center justify-between text-sm md:text-base">
                 <span className="text-gray-500">Frete</span>
                 <span className="text-[#13244f] font-semibold">
                   {shipping.valor > 0
-                    ? `R$ ${shipping.valor.toFixed(2).replace('.', ',')}`
+                    ? `R$ ${formatBRL(shipping.valor)}`
                     : shippingError
                       ? 'A calcular'
                       : 'R$ 0,00'}
@@ -1225,7 +1282,7 @@ export default function CheckoutPage() {
                   Total hoje
                 </span>
                 <span className="text-xl font-bold text-[#13244f]">
-                  R$ {getTotal().toFixed(2).replace('.', ',')}
+                  R$ {formatBRL(getTotal())}
                 </span>
               </div>
             </div>

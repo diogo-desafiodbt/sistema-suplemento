@@ -6,13 +6,18 @@ import { inngest } from '@/lib/inngest/client'
 import { addPlanPeriod, PLAN_LABELS, type PurchasePlanType } from '@/lib/plans'
 import type { PendingCheckoutPayload } from '@/lib/protocol/create-from-checkout'
 import { ensureProtocolAfterPayment } from '@/lib/protocol/create-from-checkout'
+import { productKeyFromName } from '@/lib/protocol/triage'
+import {
+  quizMatchesTriageSession,
+  verifyTriageSessionToken,
+} from '@/lib/quiz/triage-session'
 import { summarizePagarmePayload } from '@/lib/security/pagarme'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { TERMS_CONTENT, TERMS_VERSION } from '@/lib/terms/content'
 
 const protocolItemSchema = z.object({
-  product_id: z.string().uuid().optional(),
+  product_id: z.string().uuid(),
   product_name: z.string(),
   is_required: z.boolean().optional(),
   removed: z.boolean().optional(),
@@ -29,9 +34,12 @@ const checkoutSchema = z.object({
   total_amount: z.number().positive(),
   source: z.enum(['full_quiz', 'mini_quiz']),
   plan_type: z.enum(['1mes', '3meses', '6meses']),
+  triage_session_token: z.string().min(20),
+  replace_subscription_id: z.string().uuid().optional(),
   quiz: z.object({
     full_name: z.string(),
-    birth_date: z.string(),
+    age: z.number().int().min(18).max(120),
+    birth_date: z.string().optional(),
     sex: z.enum(['homem', 'mulher']),
     is_pregnant_or_breastfeeding: z.boolean(),
     renal_conditions: z.array(z.string()),
@@ -59,7 +67,7 @@ const checkoutSchema = z.object({
     street: z.string(),
     number: z.string(),
     complement: z.string().optional(),
-    neighborhood: z.string(),
+    neighborhood: z.string().min(1),
     city: z.string(),
     state: z.string().length(2),
   }),
@@ -390,6 +398,99 @@ async function deleteFailedSubscription(
   await admin.from('subscriptions').delete().eq('id', subscriptionId)
 }
 
+/** Cancela cobrança/pedido Pix pendente no Pagar.me (best effort). */
+async function cancelPagarmePendingOrder(
+  orderOrChargeId: string,
+  pagarmeHeaders: Record<string, string>,
+): Promise<void> {
+  try {
+    const patchRes = await fetch(
+      `https://api.pagar.me/core/v5/orders/${orderOrChargeId}/closed`,
+      {
+        method: 'PATCH',
+        headers: pagarmeHeaders,
+        body: JSON.stringify({ status: 'canceled' }),
+      },
+    )
+    if (patchRes.ok || patchRes.status === 404) return
+
+    const delRes = await fetch(
+      `https://api.pagar.me/core/v5/charges/${orderOrChargeId}`,
+      {
+        method: 'DELETE',
+        headers: pagarmeHeaders,
+      },
+    )
+    if (!delRes.ok && delRes.status !== 404) {
+      const body = await delRes.text()
+      console.error(
+        'cancelPagarmePendingOrder: falha ao cancelar charge/order',
+        orderOrChargeId,
+        delRes.status,
+        body,
+      )
+    }
+  } catch (error) {
+    console.error('cancelPagarmePendingOrder error:', error)
+  }
+}
+
+async function replacePendingPixSubscription(
+  admin: AdminClient,
+  opts: {
+    userId: string
+    replaceSubscriptionId: string
+    pagarmeHeaders: Record<string, string>
+  },
+): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
+  const { data: prev } = await admin
+    .from('subscriptions')
+    .select('id, user_id, status')
+    .eq('id', opts.replaceSubscriptionId)
+    .maybeSingle()
+
+  if (!prev || prev.user_id !== opts.userId) {
+    return {
+      ok: false,
+      error: 'Assinatura Pix anterior inválida',
+      status: 400,
+    }
+  }
+  if (prev.status !== 'pending') {
+    return {
+      ok: false,
+      error: 'Assinatura Pix anterior não está pendente',
+      status: 400,
+    }
+  }
+
+  const { data: payments } = await admin
+    .from('payments')
+    .select('id, pagarme_charge_id')
+    .eq('subscription_id', opts.replaceSubscriptionId)
+
+  for (const payment of payments ?? []) {
+    if (typeof payment.pagarme_charge_id === 'string' && payment.pagarme_charge_id) {
+      await cancelPagarmePendingOrder(
+        payment.pagarme_charge_id,
+        opts.pagarmeHeaders,
+      )
+    }
+  }
+
+  await admin
+    .from('terms_acceptances')
+    .update({ subscription_id: null })
+    .eq('subscription_id', opts.replaceSubscriptionId)
+  await admin
+    .from('payments')
+    .delete()
+    .eq('subscription_id', opts.replaceSubscriptionId)
+  await admin.from('subscriptions').delete().eq('id', opts.replaceSubscriptionId)
+
+  return { ok: true }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -422,6 +523,20 @@ export async function POST(request: NextRequest) {
     const data = parsed.data
     const planType = data.plan_type
 
+    const triageSession = verifyTriageSessionToken(data.triage_session_token)
+    if (!triageSession) {
+      return NextResponse.json(
+        { error: 'Sessão de triagem inválida ou expirada. Refaça o quiz.' },
+        { status: 400 },
+      )
+    }
+    if (!quizMatchesTriageSession(data.quiz, triageSession)) {
+      return NextResponse.json(
+        { error: 'Dados da triagem não conferem com a sessão. Refaça o quiz.' },
+        { status: 400 },
+      )
+    }
+
     if (data.payment_method === 'pix' && planType !== '1mes') {
       return NextResponse.json(
         { error: 'Pix disponível apenas no plano de 1 mês' },
@@ -445,6 +560,20 @@ export async function POST(request: NextRequest) {
         { error: 'Nenhum item ativo no protocolo' },
         { status: 400 },
       )
+    }
+
+    const allowedSet = new Set(triageSession.allowed)
+    for (const item of activeItems) {
+      const key = productKeyFromName(item.product_name)
+      if (!key || !allowedSet.has(key)) {
+        return NextResponse.json(
+          {
+            error:
+              'Produto não autorizado pela triagem. Refaça o quiz ou revise o protocolo.',
+          },
+          { status: 400 },
+        )
+      }
     }
 
     const admin = createAdminClient()
@@ -490,6 +619,20 @@ export async function POST(request: NextRequest) {
     const pagarmeHeaders = {
       'Content-Type': 'application/json',
       Authorization: pagarmeAuth,
+    }
+
+    if (data.replace_subscription_id) {
+      const replaced = await replacePendingPixSubscription(admin, {
+        userId: user.id,
+        replaceSubscriptionId: data.replace_subscription_id,
+        pagarmeHeaders,
+      })
+      if (!replaced.ok) {
+        return NextResponse.json(
+          { error: replaced.error },
+          { status: replaced.status },
+        )
+      }
     }
 
     const customer = {
