@@ -33,17 +33,17 @@ export type ProductKey =
   | 'resistencia_insulina'
 
 export const PRODUCT_NAME_BY_KEY: Record<ProductKey, string> = {
-  berberina: 'Berberina',
-  neuropatia: 'Neuropatia',
+  berberina: 'Berberine Complex',
+  neuropatia: 'Neuro Complex',
   omega3: 'Ômega 3',
-  polivitaminico: 'Polivitamínico',
-  resistencia_insulina: 'Resistência à Insulina',
+  polivitaminico: 'Metabolic Multivit',
+  resistencia_insulina: 'R-Alpha Lipoic Complex',
 }
 
+/** Produtos ativos no funil de triagem/protocolo (Ômega 3 fora da lógica). */
 export const ALL_PRODUCT_KEYS: ProductKey[] = [
   'berberina',
   'neuropatia',
-  'omega3',
   'polivitaminico',
   'resistencia_insulina',
 ]
@@ -115,10 +115,25 @@ function sameSet(a: ProductKey[], b: ProductKey[]): boolean {
 }
 
 export function computeTriage(answers: TriageAnswers): TriageResult {
-  if (!Number.isFinite(answers.age) || answers.age < 18) {
+  if (!Number.isFinite(answers.age) || answers.age < 14) {
     return {
       blocked: true,
-      blockReason: 'Vendemos apenas para maiores de 18 anos.',
+      blockReason: 'Vendemos apenas para pessoas a partir de 14 anos.',
+    }
+  }
+
+  // 14–17 anos: só Metabolic Multivit
+  if (answers.age < 18) {
+    return {
+      blocked: false,
+      allowed: ['polivitaminico'],
+      gates: [
+        {
+          allowed: ['polivitaminico'],
+          reason:
+            'Entre 14 e 17 anos, liberamos apenas o Metabolic Multivit.',
+        },
+      ],
     }
   }
 
@@ -126,17 +141,17 @@ export function computeTriage(answers: TriageAnswers): TriageResult {
 
   if (answers.sex === 'mulher' && answers.is_pregnant_or_breastfeeding) {
     gates.push({
-      allowed: ['omega3', 'polivitaminico'],
+      allowed: ['polivitaminico'],
       reason:
-        'Gravidez ou amamentação: por segurança, liberamos apenas Ômega 3 e Polivitamínico.',
+        'Gravidez ou amamentação: por segurança, liberamos apenas o Metabolic Multivit.',
     })
   }
 
   if (answers.renal_conditions.length > 0) {
     gates.push({
-      allowed: ['omega3'],
+      allowed: ['polivitaminico'],
       reason:
-        'Condição renal informada: por segurança, liberamos apenas Ômega 3.',
+        'Condição renal informada: por segurança, liberamos apenas o Metabolic Multivit.',
     })
   }
 
@@ -145,9 +160,9 @@ export function computeTriage(answers: TriageAnswers): TriageResult {
   )
   if (hepaticSerious.length > 0) {
     gates.push({
-      allowed: ['omega3'],
+      allowed: ['polivitaminico'],
       reason:
-        'Condição hepática informada: por segurança, liberamos apenas Ômega 3.',
+        'Condição hepática informada: por segurança, liberamos apenas o Metabolic Multivit.',
     })
   }
 
@@ -156,9 +171,9 @@ export function computeTriage(answers: TriageAnswers): TriageResult {
     answers.diagnosis_type === 'lada_avancado'
   ) {
     gates.push({
-      allowed: ['neuropatia', 'polivitaminico', 'omega3'],
+      allowed: ['neuropatia', 'polivitaminico'],
       reason:
-        'Para esse perfil, liberamos Neuropatia, Polivitamínico e Ômega 3.',
+        'Para esse perfil, liberamos Neuro Complex e Metabolic Multivit.',
     })
   }
 
@@ -209,11 +224,8 @@ export function cheapestSuggestion(
  */
 export function defaultSuggestion(allowed: ProductKey[]): ProductKey[] {
   if (sameSet(allowed, ALL_PRODUCT_KEYS)) return ['berberina']
-  if (sameSet(allowed, ['omega3'])) return ['omega3']
-  if (sameSet(allowed, ['omega3', 'polivitaminico'])) {
-    return ['omega3', 'polivitaminico']
-  }
-  if (sameSet(allowed, ['neuropatia', 'polivitaminico', 'omega3'])) {
+  if (sameSet(allowed, ['polivitaminico'])) return ['polivitaminico']
+  if (sameSet(allowed, ['neuropatia', 'polivitaminico'])) {
     return ['neuropatia']
   }
   return allowed.length > 0 ? [allowed[0]] : []
@@ -224,12 +236,14 @@ export function productKeyFromName(name: string): ProductKey | null {
   const needle = name.toLowerCase().trim()
   if (!needle) return null
 
-  for (const key of ALL_PRODUCT_KEYS) {
+  const knownKeys = Object.keys(PRODUCT_NAME_BY_KEY) as ProductKey[]
+
+  for (const key of knownKeys) {
     if (PRODUCT_NAME_BY_KEY[key].toLowerCase() === needle) return key
   }
 
   const matches: ProductKey[] = []
-  for (const key of ALL_PRODUCT_KEYS) {
+  for (const key of knownKeys) {
     const label = PRODUCT_NAME_BY_KEY[key].toLowerCase()
     const firstWord = needle.split(/\s+/)[0] ?? ''
     if (!firstWord) continue

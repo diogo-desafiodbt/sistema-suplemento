@@ -1,40 +1,35 @@
 /** Planos oferecidos em novas compras. */
-export const PURCHASE_PLAN_TYPES = ['1mes', '3meses', '6meses'] as const
+export const PURCHASE_PLAN_TYPES = ['1mes', 'assinatura_mensal'] as const
 export type PurchasePlanType = (typeof PURCHASE_PLAN_TYPES)[number]
 
 export const DEFAULT_PURCHASE_PLAN: PurchasePlanType = '1mes'
 
 const SUBSCRIPTION_DISCOUNT_3M = 0.1
 const SUBSCRIPTION_DISCOUNT_6M = 0.15
-/** Legado — clientes com assinatura_mensal ativa. */
-const SUBSCRIPTION_DISCOUNT = 0.1
+/** Desconto da assinatura mensal recorrente. */
+const SUBSCRIPTION_DISCOUNT = 0.15
 
 export const PLAN_LABELS: Record<string, string> = {
   '1mes': 'Compra única',
-  '3meses': 'Trimestral',
-  '6meses': 'Semestral',
-  assinatura_mensal: 'Assinatura mensal', // legado — esse sim é recorrente de verdade
+  assinatura_mensal: 'Assinatura',
+  '3meses': 'Trimestral', // legado
+  '6meses': 'Semestral', // legado
   '1ano': 'Anual', // legado
 }
 
 export const PLAN_TYPE_LABEL: Record<PurchasePlanType, string> = {
   '1mes': 'Compra única',
-  '3meses': 'Trimestral',
-  '6meses': 'Semestral',
+  assinatura_mensal: 'Assinatura',
 }
 
 export const PLAN_BADGE: Record<PurchasePlanType, string> = {
   '1mes': '',
-  '3meses': '10% off · Parcelado em 3x no cartão',
-  '6meses': '15% off · Parcelado em 6x no cartão · Maior desconto',
+  assinatura_mensal: '15% off · Cancele quando quiser',
 }
 
 export const PLAN_HINT: Record<PurchasePlanType, string> = {
-  '1mes': 'Compra única — à vista no Pix ou no cartão',
-  '3meses':
-    'Compra única — parcelado em 3x no cartão, sem renovação automática',
-  '6meses':
-    'Compra única — parcelado em 6x no cartão, sem renovação automática · Maior desconto',
+  '1mes': 'Compra única — parcele em até 6x no cartão',
+  assinatura_mensal: 'Cobrança mensal recorrente · Cancele quando quiser',
 }
 
 export function isPurchasePlanType(value: string): value is PurchasePlanType {
@@ -58,7 +53,8 @@ export function canCancelRecurringBilling(
 
 /**
  * Preço cobrado agora (reais) — total do ciclo, não mensal.
- * 3meses = monthly × 3 × 0,9; 6meses = monthly × 6 × 0,85.
+ * 3meses = monthly × 3 × 0,9; 6meses = monthly × 6 × 0,85 (legado).
+ * assinatura_mensal = monthly × 0,85.
  */
 export function getChargePrice(priceMonthly: number, planType: string): number {
   if (planType === '3meses') {
@@ -74,7 +70,7 @@ export function getChargePrice(priceMonthly: number, planType: string): number {
   return priceMonthly // 1mes
 }
 
-/** Parcelas de exibição na UI (3meses → 3×, 6meses → 6×). */
+/** Parcelas de exibição na UI (legado 3meses → 3×, 6meses → 6×). */
 export function getPlanInstallmentCount(planType: string): number {
   if (planType === '3meses') return 3
   if (planType === '6meses') return 6
@@ -95,7 +91,7 @@ export function formatBRL(value: number): string {
   return value.toFixed(2).replace('.', ',')
 }
 
-/** Economia vs. pagar o ciclo cheio sem desconto (só planos novos com desconto). */
+/** Economia vs. pagar o ciclo cheio sem desconto. */
 export function getSubscriptionDiscountAmount(
   priceMonthly: number,
   planType: string = '1mes',

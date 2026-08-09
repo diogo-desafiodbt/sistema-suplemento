@@ -148,6 +148,109 @@ const testimonials = [
   },
 ]
 
+const howItWorks = [
+  {
+    step: 1,
+    title: 'Questionário',
+    detail:
+      'Responde a triagem clínica, sem ver produto antes.',
+    icon: (
+      <svg
+        width="22"
+        height="22"
+        viewBox="0 0 24 24"
+        fill="none"
+        aria-hidden="true"
+      >
+        <path
+          d="M8 6h11M8 12h11M8 18h8"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+        <path
+          d="M4 6h.01M4 12h.01M4 18h.01"
+          stroke="currentColor"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+        />
+      </svg>
+    ),
+  },
+  {
+    step: 2,
+    title: 'Avaliação profissional',
+    detail:
+      'Um profissional habilitado do Desafio Diabetes analisa as respostas.',
+    icon: (
+      <svg
+        width="22"
+        height="22"
+        viewBox="0 0 24 24"
+        fill="none"
+        aria-hidden="true"
+      >
+        <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.8" />
+        <path
+          d="M5 19c1.5-3.5 4-5 7-5s5.5 1.5 7 5"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+      </svg>
+    ),
+  },
+  {
+    step: 3,
+    title: 'Produção especializada',
+    detail:
+      'Manipulação individualizada, produzida por uma das maiores farmácias de manipulação do Brasil.',
+    icon: (
+      <svg
+        width="22"
+        height="22"
+        viewBox="0 0 24 24"
+        fill="none"
+        aria-hidden="true"
+      >
+        <path
+          d="M4 20V9l8-5 8 5v11"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M9 20v-6h6v6"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+  },
+  {
+    step: 4,
+    title: 'Entrega em casa',
+    detail: 'Entrega na porta da sua casa',
+    icon: (
+      <svg
+        width="22"
+        height="22"
+        viewBox="0 0 24 24"
+        fill="none"
+        aria-hidden="true"
+      >
+        <path
+          d="M3 10.5L12 4l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5z"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+  },
+]
+
 function QuizCta({ className = '' }: { className?: string }) {
   return (
     <Link
@@ -362,6 +465,55 @@ export default function SuplementosPage() {
               Leva poucos minutos. Sem compromisso de compra no questionário.
             </p>
             <QuizCta className="bg-white text-[#13244f] hover:bg-[#f5f0eb] w-full sm:w-auto" />
+          </div>
+        </section>
+
+        {/* 6 — Como funciona */}
+        <section className="bg-white px-5 md:px-6 py-14 md:py-16">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-8 md:mb-10">
+              <p className="text-sm font-bold tracking-wide text-[#f4001e] uppercase mb-2">
+                O processo
+              </p>
+              <h2 className="font-display text-2xl md:text-3xl text-[#13244f]">
+                Como funciona
+              </h2>
+            </div>
+
+            <ol className="relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+              <span
+                className="pointer-events-none absolute hidden lg:block left-[12.5%] right-[12.5%] top-[2.35rem] h-px bg-[#13244f]/15"
+                aria-hidden="true"
+              />
+              {howItWorks.map((item) => (
+                <li
+                  key={item.step}
+                  className="relative bg-[#f5f0eb] rounded-2xl border border-gray-200 p-6 md:p-7 flex flex-col gap-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="relative z-10 w-9 h-9 rounded-full bg-white border-2 border-[#13244f] text-[#13244f] text-sm font-bold flex items-center justify-center">
+                      {item.step}
+                    </span>
+                    <span
+                      className="w-11 h-11 rounded-full bg-[#13244f] text-white flex items-center justify-center"
+                      aria-hidden="true"
+                    >
+                      {item.icon}
+                    </span>
+                  </div>
+                  <p className="text-lg font-bold text-[#13244f] leading-snug">
+                    {item.title}
+                  </p>
+                  <p className="text-base text-[#13244f]/80 leading-relaxed">
+                    {item.detail}
+                  </p>
+                </li>
+              ))}
+            </ol>
+
+            <div className="text-center mt-10">
+              <QuizCta className="bg-[#f4001e] text-white hover:bg-[#a30000] w-full sm:w-auto" />
+            </div>
           </div>
         </section>
       </main>

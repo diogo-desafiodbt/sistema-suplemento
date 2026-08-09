@@ -20,7 +20,10 @@ import {
   type Sex,
   type TriageAnswers,
 } from '@/lib/protocol/triage'
-import { findSupplementImageByProductName } from '@/lib/supplements-content'
+import {
+  findSupplementImageByProductName,
+  supplements,
+} from '@/lib/supplements-content'
 
 type TriageForm = {
   full_name: string
@@ -33,7 +36,17 @@ type TriageForm = {
   hepatic_none: boolean
   diagnosis_type: DiagnosisType | null
   medications: string[]
+  medications_none: boolean
+  allergies: string
 }
+
+/** Catálogo ativo no funil (sem Ômega 3) — para a pergunta de alergias. */
+const ALLERGY_CATALOG_NAMES = new Set(
+  ALL_PRODUCT_KEYS.map((k) => PRODUCT_NAME_BY_KEY[k]),
+)
+const ALLERGY_SUPPLEMENTS = supplements.filter((s) =>
+  ALLERGY_CATALOG_NAMES.has(s.name),
+)
 
 type ProtocolItemBuilt = {
   product_id: string
@@ -90,7 +103,6 @@ const DIAGNOSIS_OPTIONS: Array<{ value: DiagnosisType; label: string }> = [
 ]
 
 const MEDICATION_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: 'nenhum', label: 'Não utilizo nenhum medicamento.' },
   {
     value: 'insulina',
     label:
@@ -138,6 +150,8 @@ const initialForm: TriageForm = {
   hepatic_none: false,
   diagnosis_type: null,
   medications: [],
+  medications_none: false,
+  allergies: '',
 }
 
 type StepId =
@@ -149,6 +163,7 @@ type StepId =
   | 'hepatica'
   | 'diabetes'
   | 'medicamentos'
+  | 'alergias'
 
 function OptionButton({
   label,
@@ -310,7 +325,7 @@ export default function QuizPage() {
   const steps: StepId[] = useMemo(() => {
     const base: StepId[] = ['nome', 'idade', 'sexo']
     if (form.sex === 'mulher') base.push('gestacao')
-    base.push('renal', 'hepatica', 'diabetes', 'medicamentos')
+    base.push('renal', 'hepatica', 'diabetes', 'medicamentos', 'alergias')
     return base
   }, [form.sex])
 
@@ -353,16 +368,13 @@ export default function QuizPage() {
 
   function toggleMedication(value: string) {
     setForm((prev) => {
-      if (value === 'nenhum') {
-        return { ...prev, medications: ['nenhum'] }
-      }
-      const withoutNone = prev.medications.filter((v) => v !== 'nenhum')
-      const has = withoutNone.includes(value)
+      const has = prev.medications.includes(value)
       return {
         ...prev,
+        medications_none: false,
         medications: has
-          ? withoutNone.filter((v) => v !== value)
-          : [...withoutNone, value],
+          ? prev.medications.filter((v) => v !== value)
+          : [...prev.medications, value],
       }
     })
   }
@@ -388,7 +400,7 @@ export default function QuizPage() {
       renal_conditions: form.renal_none ? [] : form.renal_conditions,
       hepatic_conditions: form.hepatic_none ? [] : form.hepatic_conditions,
       diagnosis_type: form.diagnosis_type,
-      medications: form.medications.filter((m) => m !== 'nenhum'),
+      medications: form.medications_none ? [] : form.medications,
     }
 
     trackFunnelEvent('quiz_completed')
@@ -402,7 +414,8 @@ export default function QuizPage() {
       const sessionData = await sessionRes.json()
       if (sessionRes.status === 403 || sessionData.blocked) {
         setBlockReason(
-          sessionData.error ?? 'Vendemos apenas para maiores de 18 anos.',
+          sessionData.error ??
+            'Vendemos apenas para pessoas a partir de 14 anos.',
         )
         return
       }
@@ -488,9 +501,11 @@ export default function QuizPage() {
         }
       }
 
+      const allergiesText = form.allergies.trim()
       const triagemData = {
         ...answers,
         full_name: form.full_name.trim(),
+        allergies: allergiesText.length > 0 ? allergiesText : null,
       }
 
       sessionStorage.setItem('protocol_items', JSON.stringify(protocolItems))
@@ -503,7 +518,7 @@ export default function QuizPage() {
       sessionStorage.removeItem('cart_locked_plan')
       sessionStorage.removeItem('selected_plan')
 
-      router.push('/recomendacoes')
+      router.push('/recomendacoes/carregando')
     } catch {
       toast.error('Erro ao processar. Tente novamente.')
     } finally {
@@ -716,13 +731,14 @@ export default function QuizPage() {
             <CheckOption
               label="Nenhuma das anteriores"
               selected={form.renal_none}
-              onClick={() =>
+              onClick={() => {
                 setForm((prev) => ({
                   ...prev,
                   renal_none: true,
                   renal_conditions: [],
                 }))
-              }
+                setTimeout(goNext, 120)
+              }}
             />
           </QuestionWrapper>
         )
@@ -754,13 +770,14 @@ export default function QuizPage() {
             <CheckOption
               label="Nenhuma das anteriores"
               selected={form.hepatic_none}
-              onClick={() =>
+              onClick={() => {
                 setForm((prev) => ({
                   ...prev,
                   hepatic_none: true,
                   hepatic_conditions: [],
                 }))
-              }
+                setTimeout(goNext, 120)
+              }}
             />
           </QuestionWrapper>
         )
@@ -796,9 +813,10 @@ export default function QuizPage() {
             title="Você utiliza algum destes medicamentos?"
             subtitle="Selecione todos que se aplicam — a resposta é só informativa"
             showContinue
-            continueDisabled={form.medications.length === 0}
-            onContinue={finishTriage}
-          
+            continueDisabled={
+              !form.medications_none && form.medications.length === 0
+            }
+            onContinue={goNext}
             onBack={goBack}
             stepIndex={stepIndex}
             loading={loading}
@@ -811,6 +829,71 @@ export default function QuizPage() {
                 onClick={() => toggleMedication(opt.value)}
               />
             ))}
+            <CheckOption
+              label="Não utilizo nenhum medicamento"
+              selected={form.medications_none}
+              onClick={() => {
+                setForm((prev) => ({
+                  ...prev,
+                  medications_none: true,
+                  medications: [],
+                }))
+                setTimeout(goNext, 120)
+              }}
+            />
+          </QuestionWrapper>
+        )
+
+      case 'alergias':
+        return (
+          <QuestionWrapper
+            category="ALERGIAS"
+            title="Você tem alergia a algum ingrediente?"
+            subtitle="Confira a composição dos suplementos. A resposta é opcional e informativa."
+            showContinue
+            onContinue={finishTriage}
+            onBack={goBack}
+            stepIndex={stepIndex}
+            loading={loading}
+          >
+            <div className="space-y-2">
+              {ALLERGY_SUPPLEMENTS.map((supp, idx) => (
+                <div
+                  key={supp.slug}
+                  className="rounded-xl border border-gray-200 bg-white px-4 py-3"
+                >
+                  <p className="text-xs font-semibold text-[#13244f]/50 uppercase tracking-wide mb-2">
+                    Fórmula {idx + 1}
+                  </p>
+                  <ul className="space-y-1">
+                    {supp.composition.map((c) => (
+                      <li
+                        key={`${supp.slug}-${c.ativo}`}
+                        className="text-sm text-gray-700 leading-relaxed"
+                      >
+                        {c.ativo}
+                        {c.dose ? ` — ${c.dose}` : ''}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+            <label className="block space-y-1.5 pt-2">
+              <span className="text-xs font-semibold text-[#13244f]/70">
+                Tem alergia a algum desses ingredientes ou a outra substância?
+                Descreva aqui
+              </span>
+              <textarea
+                value={form.allergies}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, allergies: e.target.value }))
+                }
+                rows={3}
+                placeholder="Opcional — deixe em branco se não tiver alergias"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400 resize-none"
+              />
+            </label>
           </QuestionWrapper>
         )
 

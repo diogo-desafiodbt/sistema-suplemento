@@ -3,7 +3,12 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { computeServerCheckoutTotal } from '@/lib/checkout/price'
 import { inngest } from '@/lib/inngest/client'
-import { addPlanPeriod, PLAN_LABELS, type PurchasePlanType } from '@/lib/plans'
+import {
+  addPlanPeriod,
+  isRecurringPlan,
+  PLAN_LABELS,
+  type PurchasePlanType,
+} from '@/lib/plans'
 import type { PendingCheckoutPayload } from '@/lib/protocol/create-from-checkout'
 import { ensureProtocolAfterPayment } from '@/lib/protocol/create-from-checkout'
 import { productKeyFromName } from '@/lib/protocol/triage'
@@ -33,12 +38,13 @@ const protocolItemSchema = z.object({
 const checkoutSchema = z.object({
   total_amount: z.number().positive(),
   source: z.enum(['full_quiz', 'mini_quiz']),
-  plan_type: z.enum(['1mes', '3meses', '6meses']),
+  plan_type: z.enum(['1mes', 'assinatura_mensal']),
+  installments: z.number().int().min(1).max(6).default(1),
   triage_session_token: z.string().min(20),
   replace_subscription_id: z.string().uuid().optional(),
   quiz: z.object({
     full_name: z.string(),
-    age: z.number().int().min(18).max(120),
+    age: z.number().int().min(14).max(120),
     birth_date: z.string().optional(),
     sex: z.enum(['homem', 'mulher']),
     is_pregnant_or_breastfeeding: z.boolean(),
@@ -52,6 +58,7 @@ const checkoutSchema = z.object({
       'undiagnosed',
     ]),
     medications: z.array(z.string()),
+    allergies: z.string().nullable().optional(),
   }),
   protocol_items: z.array(protocolItemSchema).min(1),
   shipping: z.object({
@@ -386,6 +393,102 @@ async function chargeOneTimeOrder(opts: {
   }
 }
 
+async function chargeSubscription(opts: {
+  admin: AdminClient
+  subscriptionId: string
+  planType: PlanType
+  serverTotal: number
+  customer: Record<string, unknown>
+  metadata: Record<string, unknown>
+  card: PagarmeCard
+  pagarmeHeaders: Record<string, string>
+}): Promise<ChargeAttemptResult> {
+  const pagarmeSubscriptionPayload = {
+    payment_method: 'credit_card',
+    currency: 'BRL',
+    interval: 'month',
+    interval_count: 1,
+    billing_type: 'prepaid',
+    installments: 1,
+    items: [
+      {
+        name: planItemName(opts.planType),
+        quantity: 1,
+        pricing_scheme: {
+          scheme_type: 'unit',
+          price: Math.round(opts.serverTotal * 100),
+        },
+      },
+    ],
+    customer: opts.customer,
+    card: opts.card,
+    metadata: opts.metadata,
+  }
+
+  const pagarmeRes = await fetch(
+    'https://api.pagar.me/core/v5/subscriptions',
+    {
+      method: 'POST',
+      headers: opts.pagarmeHeaders,
+      body: JSON.stringify(pagarmeSubscriptionPayload),
+    },
+  )
+  const pagarmeData = await pagarmeRes.json()
+
+  if (!pagarmeRes.ok) {
+    console.error(
+      'Pagar.me subscription error:',
+      summarizePagarmePayload(pagarmeData),
+    )
+    return {
+      ok: false,
+      paid: false,
+      error: pagarmeData.message ?? 'Erro no pagamento da assinatura',
+    }
+  }
+
+  await opts.admin
+    .from('subscriptions')
+    .update({ pagarme_sub_id: pagarmeData.id })
+    .eq('id', opts.subscriptionId)
+
+  const charge = pagarmeData.charges?.[0]
+  const cycleStatus = pagarmeData.current_cycle?.status as string | undefined
+  const paid =
+    charge?.status === 'paid' ||
+    cycleStatus === 'paid' ||
+    pagarmeData.status === 'active'
+
+  const cycleChargeId =
+    (charge?.id as string | undefined) ??
+    (pagarmeData.current_cycle?.id as string | undefined) ??
+    pagarmeData.id
+
+  const payment = await insertPaymentWithRetry(opts.admin, {
+    subscription_id: opts.subscriptionId,
+    amount: opts.serverTotal,
+    status: paid ? 'paid' : 'pending',
+    pagarme_charge_id: cycleChargeId,
+    paid_at: paid ? new Date().toISOString() : null,
+    webhook_payload: summarizePagarmePayload(pagarmeData),
+  })
+
+  await opts.admin.from('webhook_logs').insert({
+    source: 'pagarme',
+    event_type: 'subscription.created',
+    payload: summarizePagarmePayload(pagarmeData),
+    processed: true,
+  })
+
+  return {
+    ok: true,
+    paid,
+    pagarmeId: pagarmeData.id,
+    paymentId: payment.id,
+    chargeStatus: charge?.status ?? cycleStatus ?? pagarmeData.status ?? 'pending',
+  }
+}
+
 async function deleteFailedSubscription(
   admin: AdminClient,
   subscriptionId: string,
@@ -539,7 +642,17 @@ export async function POST(request: NextRequest) {
 
     if (data.payment_method === 'pix' && planType !== '1mes') {
       return NextResponse.json(
-        { error: 'Pix disponível apenas no plano de 1 mês' },
+        { error: 'Pix disponível apenas na compra única' },
+        { status: 400 },
+      )
+    }
+
+    const installments =
+      planType === 'assinatura_mensal' ? 1 : data.installments
+
+    if (data.payment_method === 'pix' && installments > 1) {
+      return NextResponse.json(
+        { error: 'Parcelamento disponível apenas no cartão de crédito' },
         { status: 400 },
       )
     }
@@ -547,6 +660,13 @@ export async function POST(request: NextRequest) {
     if (data.payment_method === 'credit_card' && !data.card) {
       return NextResponse.json(
         { error: 'Dados do cartão são obrigatórios' },
+        { status: 400 },
+      )
+    }
+
+    if (isRecurringPlan(planType) && data.payment_method !== 'credit_card') {
+      return NextResponse.json(
+        { error: 'Assinatura disponível apenas no cartão de crédito' },
         { status: 400 },
       )
     }
@@ -727,21 +847,29 @@ export async function POST(request: NextRequest) {
       client_code: profile.client_code,
     }
 
-    const installments =
-      planType === '6meses' ? 6 : planType === '3meses' ? 3 : 1
-
-    const result = await chargeOneTimeOrder({
-      admin,
-      subscriptionId: subscription.id,
-      planType,
-      serverTotal,
-      paymentMethod: data.payment_method,
-      installments,
-      customer,
-      metadata,
-      card,
-      pagarmeHeaders,
-    })
+    const result = isRecurringPlan(planType)
+      ? await chargeSubscription({
+          admin,
+          subscriptionId: subscription.id,
+          planType,
+          serverTotal,
+          customer,
+          metadata,
+          card: card!,
+          pagarmeHeaders,
+        })
+      : await chargeOneTimeOrder({
+          admin,
+          subscriptionId: subscription.id,
+          planType,
+          serverTotal,
+          paymentMethod: data.payment_method,
+          installments,
+          customer,
+          metadata,
+          card,
+          pagarmeHeaders,
+        })
 
     if (!result.ok) {
       await deleteFailedSubscription(admin, subscription.id)
@@ -782,6 +910,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const resultKey = isRecurringPlan(planType) ? 'subscription' : 'oneTime'
+
     return NextResponse.json({
       ok: true,
       order_id: result.pagarmeId,
@@ -789,7 +919,7 @@ export async function POST(request: NextRequest) {
       subscription_id: subscription.id,
       protocol_id: protocolId,
       results: {
-        oneTime: {
+        [resultKey]: {
           ok: true,
           paid: result.paid,
           order_id: result.pagarmeId,

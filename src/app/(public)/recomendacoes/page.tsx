@@ -37,7 +37,7 @@ const FAQ_ITEMS = [
   {
     id: 'assinatura',
     q: 'Isso é uma assinatura?',
-    a: 'Não. Toda compra é única — à vista (1 mês) ou parcelada no cartão (3 ou 6 meses). Não existe cobrança automática depois que o pedido é pago.',
+    a: 'Você escolhe: compra única (pode parcelar em até 6x no cartão, sem renovação) ou assinatura mensal recorrente com 15% de desconto — cobrada todo mês até você cancelar.',
   },
   {
     id: 'avaliacao',
@@ -51,8 +51,8 @@ const FAQ_ITEMS = [
   },
   {
     id: 'cancelar',
-    q: 'Posso cancelar minha compra?',
-    a: 'Compras à vista ou parceladas em 3x/6x são cobradas integralmente no ato da compra, como qualquer compra parcelada — não há cobrança futura a cancelar.',
+    q: 'Posso cancelar?',
+    a: 'Na assinatura, sim — a qualquer momento pela sua conta; ciclos futuros não são cobrados. Na compra única (mesmo parcelada no cartão), o valor já foi autorizado integralmente no ato, como qualquer compra parcelada.',
   },
   {
     id: 'farmacia',
@@ -76,34 +76,6 @@ function formatProductList(names: string[]): string {
   if (names.length === 1) return names[0]
   if (names.length === 2) return `${names[0]} e ${names[1]}`
   return `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`
-}
-
-/** Marca os 2 mais baratos entre os liberados; demais ficam desmarcados. */
-function markTwoCheapest(items: LocalProtocolItem[]): LocalProtocolItem[] {
-  const available = items.filter((item) => !item.blocked)
-  if (available.length === 0) return items
-
-  const ranked = [...available].sort((a, b) => {
-    const priceA = a.price_monthly ?? Number.POSITIVE_INFINITY
-    const priceB = b.price_monthly ?? Number.POSITIVE_INFINITY
-    return priceA - priceB
-  })
-  const selectedIds = new Set(
-    ranked.slice(0, Math.min(2, ranked.length)).map((item) => item.product_id),
-  )
-
-  return items.map((item) => {
-    if (item.blocked) return item
-    const selected = selectedIds.has(item.product_id)
-    return {
-      ...item,
-      is_required: selected,
-      removed: !selected,
-      activation_reason: selected
-        ? 'Sugestão principal para o seu perfil'
-        : 'Disponível — adicione se quiser',
-    }
-  })
 }
 
 export default function RecomendacoesPage() {
@@ -151,15 +123,13 @@ export default function RecomendacoesPage() {
               image: matchSupplementImage(item.product_name) ?? item.image,
             }
           })
-          setItems(markTwoCheapest(enriched))
+          setItems(enriched)
         } else {
           setItems(
-            markTwoCheapest(
-              visible.map((item) => ({
-                ...item,
-                image: matchSupplementImage(item.product_name) ?? item.image,
-              })),
-            ),
+            visible.map((item) => ({
+              ...item,
+              image: matchSupplementImage(item.product_name) ?? item.image,
+            })),
           )
         }
       } catch {
@@ -216,24 +186,7 @@ export default function RecomendacoesPage() {
   }
 
   function handleContinue() {
-    const active = items.filter((item) => !item.removed)
-    const ranked = [...active].sort((a, b) => {
-      const priceA = a.price_monthly ?? Number.POSITIVE_INFINITY
-      const priceB = b.price_monthly ?? Number.POSITIVE_INFINITY
-      return priceA - priceB
-    })
-    const requiredIds = new Set(
-      ranked
-        .slice(0, Math.min(2, ranked.length))
-        .map((item) => item.product_id),
-    )
-
-    const synced = items.map((item) => ({
-      ...item,
-      is_required: requiredIds.has(item.product_id),
-    }))
-
-    sessionStorage.setItem('protocol_items', JSON.stringify(synced))
+    sessionStorage.setItem('protocol_items', JSON.stringify(items))
     sessionStorage.setItem('selected_plan', selectedPlan)
     sessionStorage.removeItem('cart_locked_plan')
     if (!sessionStorage.getItem('checkout_source')) {
@@ -246,7 +199,7 @@ export default function RecomendacoesPage() {
     return (
       <div className="min-h-screen bg-[#f5f0eb] flex items-center justify-center">
         <p className="text-[#13244f]/60 font-medium">
-          Carregando seu protocolo...
+          Carregando seus suplementos...
         </p>
       </div>
     )
@@ -281,7 +234,7 @@ export default function RecomendacoesPage() {
               <span className="w-4 h-4 rounded-full bg-[#13244f] text-white flex items-center justify-center text-[10px]">
                 ✓
               </span>
-              Protocolo
+              Suplementos
             </span>
             <span className="flex-1 h-px bg-[#13244f]/20" />
             <span className="flex items-center gap-1.5 text-[#13244f] font-semibold">
@@ -322,13 +275,14 @@ export default function RecomendacoesPage() {
           <div className="space-y-6">
             <div>
               <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-1">
-                SEU PROTOCOLO
+                SEUS SUPLEMENTOS
               </p>
               <h1 className="font-display text-2xl md:text-3xl text-[#13244f]">
-                Este é o protocolo prescrito para você
+                Estes são os suplementos indicados para você
               </h1>
               <p className="text-[#13244f]/80 text-sm md:text-base mt-1">
-                Avaliado por um profissional habilitado do Desafio Diabetes.
+                De acordo com suas respostas, selecionamos os seguintes
+                suplementos*.
                 {approvedNames ? (
                   <>
                     {' '}
@@ -341,8 +295,13 @@ export default function RecomendacoesPage() {
                 ) : null}
               </p>
               <p className="text-[#13244f]/70 text-sm mt-3">
-                Já selecionamos os dois suplementos mais recomendados ao seu
-                perfil.
+                {activeItems.length === 1
+                  ? 'Já selecionamos o suplemento para seu perfil.'
+                  : `Já selecionamos os ${activeItems.length} suplementos para seu perfil.`}
+              </p>
+              <p className="text-[#13244f]/50 text-xs mt-2">
+                * A composição final passa por avaliação de um profissional
+                habilitado antes da liberação.
               </p>
             </div>
 
@@ -535,7 +494,7 @@ export default function RecomendacoesPage() {
                 disabled={activeItems.length === 0}
                 className="w-full bg-[#f4001e] hover:bg-[#a30000] text-white py-4 rounded-full font-bold text-sm transition active:scale-95 disabled:opacity-40"
               >
-                Garantir meu protocolo
+                Garantir meus suplementos
               </button>
 
               <div className="flex items-center justify-center gap-4 text-xs text-[#13244f]/50">
@@ -565,8 +524,6 @@ export default function RecomendacoesPage() {
                   </svg>
                   Pagamento seguro
                 </span>
-                <span>·</span>
-                <span>Farmácia credenciada ANVISA</span>
               </div>
             </div>
 
@@ -634,11 +591,10 @@ export default function RecomendacoesPage() {
                 Confiança
               </p>
               <h2 className="font-display text-xl text-[#13244f] leading-snug">
-                Protocolo sob medida
+                Suplementos sob medida
               </h2>
               <ul className="space-y-2 text-sm md:text-base text-[#13244f]/80">
-                <li>Avaliado por profissional habilitado</li>
-                <li>Farmácia credenciada ANVISA</li>
+                <li>Selecionados conforme suas respostas</li>
                 <li>Pagamento seguro</li>
                 <li>Frete calculado no checkout</li>
               </ul>
@@ -649,7 +605,7 @@ export default function RecomendacoesPage() {
         <div className="rounded-2xl bg-white border border-gray-100 shadow-sm px-5 py-5 text-sm md:text-base text-[#13244f]/85 leading-relaxed space-y-2">
           <p className="font-semibold text-[#13244f]">Vale lembrar:</p>
           <p>
-            — Este protocolo é uma sugestão inicial. A partir dele, um
+            — Estes suplementos são uma sugestão inicial. A partir deles, um
             profissional habilitado do Desafio Diabetes avalia seu caso e
             define, quando necessário, sua prescrição.
           </p>

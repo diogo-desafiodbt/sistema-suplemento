@@ -15,60 +15,71 @@ export type SupplementContent = {
 export const supplements: SupplementContent[] = [
   {
     slug: 'neuropatia',
-    name: 'Neuropatia',
-    headline: 'Alívio e suporte nutricional personalizado para os nervos',
-    description:
-      'Combata os sintomas com suporte especializado — com R-ALA, Benfotiamina e B12 Ativa.',
+    name: 'Neuro Complex',
+    headline: 'Suporte nutricional à saúde dos nervos.',
+    description: 'Suporte nutricional à saúde dos nervos.',
     composition: [
       { ativo: 'Benfotiamina', dose: '50 mg' },
-      { ativo: 'Ácido Alfa Lipóico (ALA)', dose: '100 mg' },
+      { ativo: 'Ácido Alfa Lipóico', dose: '100 mg' },
       { ativo: 'Acetil-L-Carnitina HCl', dose: '100 mg' },
       { ativo: 'Piridoxina (Vitamina B6)', dose: '10 mg' },
     ],
     heroHorizontal: '/banners/banner-neuropatia-horizontal.png',
     heroVertical: '/banners/banner-neuropatia-vertical.png',
-    usage: 'Tomar 1 dose, 2 vezes ao dia. 60 doses.',
+    usage: '1 dose 2x ao dia. 60 doses.',
     scienceNote:
-      'Benfotiamina, ácido alfa-lipoico e acetil-L-carnitina têm estudos clínicos associados à redução de dor, dormência e formigamento em quadros de neuropatia diabética.',
+      'Benfotiamina, ácido alfa-lipoico e acetil-L-carnitina têm estudos clínicos associados ao suporte nutricional em quadros de neuropatia diabética.',
     gallery: ['/categorias/categoria-neuropatia.png'],
   },
   {
     slug: 'resistencia-insulina',
-    name: 'Resistência à Insulina',
-    headline: 'Fórmula personalizada para equilibrar sua glicemia',
+    name: 'R-Alpha Lipoic Complex',
+    headline: 'Suporte à sensibilidade à insulina e ao metabolismo energético.',
     description:
-      'Com R-ALA, Canela e Melão de São Caetano para ajudar no equilíbrio da resistência à insulina.',
+      'Suporte à sensibilidade à insulina e ao metabolismo energético.',
     composition: [
-      { ativo: 'R-Ácido Alfa Lipóico estabilizado (R-ALA)', dose: '50 mg' },
       {
-        ativo: 'Melão de São Caetano (Momordica charantia, ext. seco pad.)',
+        ativo:
+          'R-Ácido Alfa Lipóico estabilizado (R-ALA / Bio-enhanced R-Lipoic Acid)',
+        dose: '50 mg',
+      },
+      {
+        ativo:
+          'Melão de São Caetano (Momordica charantia) extrato seco padronizado',
         dose: '300 mg',
       },
-      { ativo: 'Canela (Cinnamomum, ext. seco pad.)', dose: '300 mg' },
+      {
+        ativo:
+          'Canela (Cinnamomum verum ou cassia) extrato seco padronizado',
+        dose: '300 mg',
+      },
     ],
     heroHorizontal: '/banners/banner-resistencia-insulina-horizontal.png',
     heroVertical: '/banners/banner-resistencia-insulina-vertical.png',
-    usage: 'Tomar 1 dose, 2 vezes ao dia. 60 doses.',
+    usage: '1 dose 2x ao dia. 60 doses.',
     scienceNote:
       'Canela e ácido alfa-lipoico têm sido estudados por seu papel no equilíbrio da glicemia e da sensibilidade à insulina.',
     gallery: ['/categorias/categoria-resistencia-insulina.png'],
   },
   {
     slug: 'berberina',
-    name: 'Berberina',
-    headline: 'O ativo central do protocolo Desafio Diabetes',
+    name: 'Berberine Complex',
+    headline: 'Suporte ao equilíbrio da glicemia e do metabolismo da glicose.',
     description:
-      'A Berberina é um dos ativos naturais mais estudados no apoio ao controle glicêmico, auxiliando no equilíbrio da glicemia e da resistência à insulina.',
+      'Suporte ao equilíbrio da glicemia e do metabolismo da glicose.',
     composition: [
       { ativo: 'Berberina HCl (mín. 97%)', dose: '250 mg' },
-      { ativo: 'Gymnema sylvestre (extrato seco padronizado)', dose: '150 mg' },
+      {
+        ativo: 'Gymnema sylvestre extrato seco padronizado',
+        dose: '150 mg',
+      },
       { ativo: 'Picolinato de Cromo', dose: '200 mcg' },
     ],
     heroHorizontal: '/banners/banner-berberina-horizontal.png',
     heroVertical: '/banners/banner-berberina-vertical.png',
-    usage: 'Tomar 1 dose, 2 vezes ao dia. Aviar 60 doses.',
+    usage: '1 dose 2x ao dia. 60 doses.',
     scienceNote:
-      'A Berberina é um dos ativos naturais mais estudados no apoio ao controle glicêmico — pesquisas com dezenas de ensaios clínicos mostram redução de glicemia e hemoglobina glicada.',
+      'A Berberina é um dos ativos naturais mais estudados no apoio ao equilíbrio glicêmico.',
     gallery: ['/categorias/categoria-berberina.png'],
   },
   {
@@ -87,26 +98,37 @@ export const supplements: SupplementContent[] = [
     scienceNote:
       'O Ômega-3 (EPA/DHA) tem evidência consistente na redução de triglicerídeos, um marcador cardiovascular frequentemente alterado em quem convive com diabetes.',
     gallery: ['/categorias/categoria-omega3.png'],
-    warningNote:
-      'Caso utilize medicamentos anticoagulantes ou antiagregantes plaquetários, consulte o seu médico antes de iniciar a suplementação.',
   },
   {
     slug: 'polivitaminico',
-    name: 'Polivitamínico',
-    headline: 'Suporte nutricional completo para o dia a dia',
+    name: 'Metabolic Multivit',
+    headline: 'Vitaminas e minerais essenciais para o metabolismo saudável.',
     description:
-      'Fórmula com Metilcobalamina (B12) 1000mcg, Metilfolato de cálcio (B9) 1mg, Zinco Bisglicinato Quelado 20mg, Magnésio Bisglicinato tamponado 200mg, Vitamina D3 microencapsulada 4000 UI e Vitamina K2 (MK-7) 150mcg.',
+      'Vitaminas e minerais essenciais para o metabolismo saudável.',
     composition: [
-      { ativo: 'Metilcobalamina (B12)', dose: '1000 mcg' },
-      { ativo: 'Metilfolato de cálcio (B9)', dose: '1 mg' },
-      { ativo: 'Zinco Bisglicinato Quelado', dose: '20 mg' },
-      { ativo: 'Magnésio Bisglicinato tamponado', dose: '200 mg' },
-      { ativo: 'Vitamina D3 microencapsulada', dose: '4000 UI' },
-      { ativo: 'Vitamina K2 (MK-7)', dose: '150 mcg' },
+      {
+        ativo: 'Vitamina B12 — Metilcobalamina (forma ativa)',
+        dose: '1000 mcg',
+      },
+      { ativo: 'Vitamina B9 — Metilfolato de cálcio', dose: '500 mcg' },
+      {
+        ativo: 'Zinco Bisglicinato Quelado',
+        dose: '10 mg de zinco elementar',
+      },
+      {
+        ativo: 'Magnésio Bisglicinato tamponado',
+        dose: '100 mg de magnésio elementar',
+      },
+      {
+        ativo: 'Vitamina D3 — Colecalciferol microencapsulado',
+        dose: '4000 UI',
+      },
+      { ativo: 'Vitamina K2 — MK-7', dose: '120 mcg' },
     ],
     heroHorizontal: '/banners/banner-polivitaminico-horizontal.png',
     heroVertical: '/banners/banner-polivitaminico-vertical.png',
-    usage: 'Tomar 1 dose ao dia, junto à principal refeição contendo gordura.',
+    usage:
+      '1 dose ao dia, junto à principal refeição contendo gordura. 30 doses.',
     scienceNote:
       'Suporte nutricional complementar ao protocolo Desafio Diabetes.',
     gallery: ['/categorias/categoria-polivitaminico.png'],

@@ -121,6 +121,7 @@ export default function CheckoutPage() {
 
   const [paymentMethod, setPaymentMethod] =
     useState<PaymentMethod>('credit_card')
+  const [installments, setInstallments] = useState(1)
   const [cardNumber, setCardNumber] = useState('')
   const [cardName, setCardName] = useState('')
   const [cardExpiry, setCardExpiry] = useState('')
@@ -158,6 +159,12 @@ export default function CheckoutPage() {
       })
     }
   }, [pixAllowed, paymentMethod])
+
+  useEffect(() => {
+    if (paymentMethod === 'pix' && installments > 1) {
+      queueMicrotask(() => setInstallments(1))
+    }
+  }, [paymentMethod, installments])
 
   useEffect(() => {
     if (!pixInfo?.expires_at || pixExpired) return
@@ -458,6 +465,8 @@ export default function CheckoutPage() {
         total_amount: getTotal(),
         source,
         plan_type: plan,
+        installments:
+          plan === '1mes' && method === 'credit_card' ? installments : 1,
         quiz,
         protocol_items: getActiveItems(),
         shipping,
@@ -865,90 +874,6 @@ export default function CheckoutPage() {
             )}
           </div>
 
-          {step >= 4 && (
-            <aside className="rounded-2xl bg-[#13244f] text-white shadow-lg border-l-8 border-[#f4001e] overflow-hidden">
-              <div className="px-5 py-5 md:px-6 md:py-6 space-y-4">
-                <div className="flex items-start gap-4">
-                  <div className="relative h-16 w-16 md:h-20 md:w-20 rounded-full bg-white/10 shrink-0 ring-2 ring-[#f4001e]/60 overflow-hidden">
-                    <Image
-                      src="/dr-turi.png"
-                      alt="Dr. Turí Souza"
-                      fill
-                      className="object-cover object-top"
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <p className="inline-flex items-center gap-1.5 rounded-full bg-[#f4001e] px-3 py-1 text-[10px] md:text-xs font-bold uppercase tracking-wide">
-                      Antes de pagar
-                    </p>
-                    <p className="text-lg md:text-xl font-bold leading-snug">
-                      Atenção,{' '}
-                      {(accountSummary?.name ?? '').split(' ')[0] || 'paciente'}
-                      .
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-3.5 text-sm md:text-base leading-relaxed text-white/90">
-                  <p>
-                    Nós levamos a saúde de quem tem diabetes a sério — e estamos
-                    muito orgulhosos do passo que você está dando no caminho da
-                    reversão.
-                  </p>
-                  <p>
-                    O Dr. Turí Souza dedicou anos à validação dessa formulação
-                    até chegar numa linha de suplementos de alto padrão, pensada
-                    exclusivamente para diabéticos.
-                  </p>
-                  <p>
-                    Seu suplemento não sai de uma linha industrial. Ele é
-                    preparado num atelier farmacêutico, lote a lote, sob a
-                    responsabilidade direta de um farmacêutico especializado —
-                    um processo raro no mercado de suplementação, reservado a
-                    quem exige o mais alto padrão de qualidade. É esse cuidado
-                    que garante alta tecnologia e rastreabilidade em cada
-                    entrega.
-                  </p>
-                  <p className="font-semibold text-white">
-                    Sua formulação chega em breve, com a exclusividade e a
-                    segurança que o seu tratamento merece.
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-white/90">
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      aria-hidden="true"
-                    >
-                      <path
-                        d="M9 12l2 2 4-4"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <circle
-                        cx="12"
-                        cy="12"
-                        r="9"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                      />
-                    </svg>
-                    Farmácia credenciada ANVISA
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-white/90">
-                    Preparado lote a lote
-                  </span>
-                </div>
-              </div>
-            </aside>
-          )}
-
           <div
             className={`bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden ${step < 4 ? 'opacity-50' : ''}`}
           >
@@ -1109,6 +1034,37 @@ export default function CheckoutPage() {
                             className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                           />
                         </div>
+                        {plan === '1mes' && (
+                          <div>
+                            <label
+                              htmlFor="installments"
+                              className="block text-xs font-semibold text-[#13244f]/70 mb-1.5"
+                            >
+                              Parcelas
+                            </label>
+                            <select
+                              id="installments"
+                              value={installments}
+                              onChange={(e) =>
+                                setInstallments(Number(e.target.value))
+                              }
+                              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f]"
+                            >
+                              {Array.from({ length: 6 }, (_, i) => i + 1).map(
+                                (n) => {
+                                  const portion = getTotal() / n
+                                  return (
+                                    <option key={n} value={n}>
+                                      {n === 1
+                                        ? `À vista — R$ ${formatBRL(getTotal())}`
+                                        : `${n}× de R$ ${formatBRL(portion)}`}
+                                    </option>
+                                  )
+                                },
+                              )}
+                            </select>
+                          </div>
+                        )}
                       </>
                     )}
 
@@ -1148,7 +1104,9 @@ export default function CheckoutPage() {
                         ? 'Processando...'
                         : paymentMethod === 'pix' && pixAllowed
                           ? `Gerar Pix — R$ ${formatBRL(getTotal())}`
-                          : `Pagar R$ ${formatBRL(getTotal())}`}
+                          : plan === '1mes' && installments > 1
+                            ? `Pagar ${installments}× de R$ ${formatBRL(getTotal() / installments)}`
+                            : `Pagar R$ ${formatBRL(getTotal())}`}
                     </button>
                   </form>
                 )}
@@ -1158,7 +1116,6 @@ export default function CheckoutPage() {
                     'Pagamento 100% seguro e criptografado',
                     'Farmácias credenciadas pela ANVISA',
                     'Cancele quando quiser, sem burocracia',
-                    'Entrega discreta direto na sua porta',
                   ].map((item) => (
                     <div
                       key={item}

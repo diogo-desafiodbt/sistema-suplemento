@@ -39,6 +39,7 @@ export type PendingCheckoutPayload = {
       | 'lada_avancado'
       | 'undiagnosed'
     medications: string[]
+    allergies?: string | null
   }
   protocol_items: PendingProtocolItem[]
 }
@@ -407,6 +408,10 @@ export async function ensureProtocolAfterPayment(
         renal_conditions: quiz.renal_conditions ?? [],
         hepatic_conditions: quiz.hepatic_conditions ?? [],
         medications: quiz.medications ?? [],
+        allergies:
+          typeof quiz.allergies === 'string' && quiz.allergies.trim()
+            ? quiz.allergies.trim()
+            : null,
         completed_at: new Date().toISOString(),
       })
       .select('id')
