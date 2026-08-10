@@ -37,7 +37,7 @@ type TriageForm = {
   diagnosis_type: DiagnosisType | null
   medications: string[]
   medications_none: boolean
-  allergies: string
+  allergic_supplement_slugs: string[]
 }
 
 /** Catálogo ativo no funil (sem Ômega 3) — para a pergunta de alergias. */
@@ -151,7 +151,7 @@ const initialForm: TriageForm = {
   diagnosis_type: null,
   medications: [],
   medications_none: false,
-  allergies: '',
+  allergic_supplement_slugs: [],
 }
 
 type StepId =
@@ -379,6 +379,18 @@ export default function QuizPage() {
     })
   }
 
+  function toggleAllergicSupplement(slug: string) {
+    setForm((prev) => {
+      const has = prev.allergic_supplement_slugs.includes(slug)
+      return {
+        ...prev,
+        allergic_supplement_slugs: has
+          ? prev.allergic_supplement_slugs.filter((s) => s !== slug)
+          : [...prev.allergic_supplement_slugs, slug],
+      }
+    })
+  }
+
   async function finishTriage() {
     const age = Number.parseInt(form.age, 10)
     if (
@@ -501,11 +513,17 @@ export default function QuizPage() {
         }
       }
 
-      const allergiesText = form.allergies.trim()
+      const allergicNames = ALLERGY_SUPPLEMENTS.filter((s) =>
+        form.allergic_supplement_slugs.includes(s.slug),
+      ).map((s) => s.name)
+      const allergiesText =
+        allergicNames.length > 0
+          ? `Paciente indicou alergia a algum ingrediente das fórmulas: ${allergicNames.join(', ')}.`
+          : null
       const triagemData = {
         ...answers,
         full_name: form.full_name.trim(),
-        allergies: allergiesText.length > 0 ? allergiesText : null,
+        allergies: allergiesText,
       }
 
       sessionStorage.setItem('protocol_items', JSON.stringify(protocolItems))
@@ -849,7 +867,7 @@ export default function QuizPage() {
           <QuestionWrapper
             category="ALERGIAS"
             title="Você tem alergia a algum ingrediente?"
-            subtitle="Confira a composição dos suplementos. A resposta é opcional e informativa."
+            subtitle="Confira a composição de cada fórmula e marque as que têm algum ingrediente ao qual você é alérgico. Opcional — deixe tudo desmarcado se não tiver alergias."
             showContinue
             onContinue={finishTriage}
             onBack={goBack}
@@ -857,43 +875,71 @@ export default function QuizPage() {
             loading={loading}
           >
             <div className="space-y-2">
-              {ALLERGY_SUPPLEMENTS.map((supp, idx) => (
-                <div
-                  key={supp.slug}
-                  className="rounded-xl border border-gray-200 bg-white px-4 py-3"
-                >
-                  <p className="text-xs font-semibold text-[#13244f]/50 uppercase tracking-wide mb-2">
-                    Fórmula {idx + 1}
-                  </p>
-                  <ul className="space-y-1">
-                    {supp.composition.map((c) => (
-                      <li
-                        key={`${supp.slug}-${c.ativo}`}
-                        className="text-sm text-gray-700 leading-relaxed"
+              {ALLERGY_SUPPLEMENTS.map((supp, idx) => {
+                const selected = form.allergic_supplement_slugs.includes(
+                  supp.slug,
+                )
+                return (
+                  <button
+                    key={supp.slug}
+                    type="button"
+                    onClick={() => toggleAllergicSupplement(supp.slug)}
+                    aria-pressed={selected}
+                    className={`w-full text-left rounded-xl border px-4 py-3 transition-all ${
+                      selected
+                        ? 'border-[#13244f] bg-[#13244f]/5'
+                        : 'border-gray-200 bg-white hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 mb-2">
+                      <span
+                        className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center transition-all ${
+                          selected
+                            ? 'border-[#13244f] bg-[#13244f]'
+                            : 'border-gray-300'
+                        }`}
                       >
-                        {c.ativo}
-                        {c.dose ? ` — ${c.dose}` : ''}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+                        {selected && (
+                          <svg
+                            width="10"
+                            height="8"
+                            viewBox="0 0 10 8"
+                            fill="none"
+                            aria-hidden="true"
+                          >
+                            <path
+                              d="M1 4l2.5 2.5L9 1"
+                              stroke="white"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        )}
+                      </span>
+                      <p
+                        className={`text-xs font-semibold uppercase tracking-wide ${
+                          selected ? 'text-[#13244f]' : 'text-[#13244f]/50'
+                        }`}
+                      >
+                        Fórmula {idx + 1} — tenho alergia a algum ingrediente
+                      </p>
+                    </div>
+                    <ul className="space-y-1 pl-7">
+                      {supp.composition.map((c) => (
+                        <li
+                          key={`${supp.slug}-${c.ativo}`}
+                          className="text-sm text-gray-700 leading-relaxed"
+                        >
+                          {c.ativo}
+                          {c.dose ? ` — ${c.dose}` : ''}
+                        </li>
+                      ))}
+                    </ul>
+                  </button>
+                )
+              })}
             </div>
-            <label className="block space-y-1.5 pt-2">
-              <span className="text-xs font-semibold text-[#13244f]/70">
-                Tem alergia a algum desses ingredientes ou a outra substância?
-                Descreva aqui
-              </span>
-              <textarea
-                value={form.allergies}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, allergies: e.target.value }))
-                }
-                rows={3}
-                placeholder="Opcional — deixe em branco se não tiver alergias"
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400 resize-none"
-              />
-            </label>
           </QuestionWrapper>
         )
 
