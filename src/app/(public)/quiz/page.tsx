@@ -267,7 +267,13 @@ function QuestionWrapper({
   loading?: boolean
 }) {
   return (
-    <div className="space-y-5">
+    <form
+      className="space-y-5"
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (!continueDisabled && !loading) onContinue?.()
+      }}
+    >
       <div>
         {category && (
           <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-2">
@@ -297,8 +303,7 @@ function QuestionWrapper({
           )}
           {showContinue && (
             <button
-              type="button"
-              onClick={onContinue}
+              type="submit"
               disabled={continueDisabled || loading}
               className="flex-1 bg-[#f4001e] text-white py-3 rounded-full text-sm font-semibold hover:bg-[#a30000] transition disabled:opacity-40"
             >
@@ -307,7 +312,7 @@ function QuestionWrapper({
           )}
         </div>
       )}
-    </div>
+    </form>
   )
 }
 
