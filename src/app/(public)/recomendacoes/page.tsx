@@ -57,7 +57,7 @@ const FAQ_ITEMS = [
   {
     id: 'farmacia',
     q: 'Quem manipula os suplementos?',
-    a: 'Farmácias de manipulação credenciadas pela Anvisa, de forma individualizada, conforme a prescrição do seu protocolo.',
+    a: 'Formulações produzidas pelas maiores farmácias de manipulação do Brasil, com estrutura de insumo internacional e presença no Brasil inteiro, de forma individualizada, conforme a prescrição do seu protocolo.',
   },
 ] as const
 
@@ -610,8 +610,9 @@ export default function RecomendacoesPage() {
             define, quando necessário, sua prescrição.
           </p>
           <p>
-            — Os suplementos são manipulados e dispensados por farmácias
-            credenciadas pela Anvisa.
+            — Os suplementos são manipulados e dispensados pelas maiores
+            farmácias de manipulação do Brasil, com estrutura de insumo
+            internacional e presença no Brasil inteiro.
           </p>
         </div>
       </main>

@@ -185,7 +185,7 @@ export default function SupplementPage() {
                         strokeLinejoin="round"
                       />
                     </svg>
-                    <span>Farmácia credenciada ANVISA</span>
+                    <span>Maiores farmácias de manipulação do Brasil</span>
                   </div>
                   <div className="flex flex-col items-center gap-1.5 px-1">
                     <svg

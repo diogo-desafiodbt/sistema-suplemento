@@ -127,7 +127,7 @@ const timeline = [
 const whyCards = [
   {
     title: 'Suplementos Comprovados',
-    desc: 'Fórmulas com base em evidências científicas, manipuladas por farmácias parceiras autorizadas pela ANVISA.',
+    desc: 'Fórmulas com base em evidências científicas, manipuladas pelas maiores farmácias de manipulação do Brasil, com estrutura de insumo internacional.',
     img: 'https://placehold.co/758x400/f5f3f0/13244f?text=Suplementos',
   },
   {
@@ -556,7 +556,7 @@ export default function LandingPage() {
                   'Adoçado com stevia/eritritol, sem carga glicêmica',
                   'Formulado com endocrinologista',
                   'Resposta glicêmica testada e estável',
-                  'Farmácia credenciada ANVISA',
+                  'Produzido pelas maiores farmácias de manipulação do Brasil',
                 ].map((item) => (
                   <li
                     key={item}
@@ -859,7 +859,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── ANVISA ── */}
+      {/* ── Farmácias parceiras ── */}
       <section className="py-10 md:py-12 px-4 md:px-6 bg-[#f5f3f0] border-t border-gray-200">
         <div className="max-w-6xl mx-auto flex items-start justify-center gap-4 md:gap-6">
           <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#ececec] flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -880,12 +880,12 @@ export default function LandingPage() {
           </div>
           <div className="text-center">
             <h3 className="font-bold text-[#13244f] mb-1 text-sm md:text-base">
-              Farmácias credenciadas ANVISA
+              Formulações produzidas em todo o Brasil
             </h3>
             <p className="text-xs md:text-sm text-gray-500 leading-relaxed max-w-2xl">
-              O Desafio Diabetes não é uma farmácia. Todos os suplementos são
-              manipulados por farmácias credenciadas de acordo com as normas da
-              ANVISA.
+              O Desafio Diabetes não é uma farmácia. Todas as formulações são
+              produzidas pelas maiores farmácias de manipulação do Brasil, com
+              estrutura de insumo internacional e presença em todo o país.
             </p>
             <button
               type="button"

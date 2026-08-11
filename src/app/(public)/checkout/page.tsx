@@ -1114,7 +1114,7 @@ export default function CheckoutPage() {
                 <div className="pt-2 space-y-2">
                   {[
                     'Pagamento 100% seguro e criptografado',
-                    'Farmácias credenciadas pela ANVISA',
+                    'Formulações das maiores farmácias de manipulação do Brasil',
                     'Cancele quando quiser, sem burocracia',
                   ].map((item) => (
                     <div

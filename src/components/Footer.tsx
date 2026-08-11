@@ -118,8 +118,9 @@ export default function Footer() {
             </Link>
           </div>
           <p className="text-xs opacity-40 md:max-w-sm leading-relaxed">
-            O Desafio Diabetes não é uma farmácia. Suplementos manipulados por
-            farmácias credenciadas pela ANVISA.
+            O Desafio Diabetes não é uma farmácia. Formulações produzidas pelas
+            maiores farmácias de manipulação do Brasil, com estrutura de insumo
+            internacional e presença no Brasil inteiro.
             <br />
             Copyright 2026 Desafio Diabetes™. Todos os direitos reservados.
           </p>

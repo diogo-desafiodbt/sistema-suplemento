@@ -7,8 +7,9 @@ import Header from '@/components/Header'
 
 const benefits = [
   {
-    title: 'Farmácia autorizada pela Anvisa',
-    detail: 'Elaborados e vendidos por farmácias de manipulação credenciadas.',
+    title: 'Maiores farmácias de manipulação do Brasil',
+    detail:
+      'Elaborados pelas maiores farmácias de manipulação do Brasil, com estrutura de insumo internacional e presença no Brasil inteiro.',
     icon: (
       <svg
         width="22"
@@ -430,7 +431,7 @@ export default function SuplementosPage() {
                     'Sem carga de açúcar que dispara a glicose',
                     'Pensado para quem tem diabetes',
                     'Indicação após avaliação do perfil',
-                    'Farmácia credenciada pela Anvisa',
+                    'Produzido pelas maiores farmácias de manipulação do Brasil',
                   ].map((item) => (
                     <li
                       key={item}
