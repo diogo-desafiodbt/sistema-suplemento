@@ -454,10 +454,9 @@ async function chargeSubscription(opts: {
 
   const charge = pagarmeData.charges?.[0]
   const cycleStatus = pagarmeData.current_cycle?.status as string | undefined
-  const paid =
-    charge?.status === 'paid' ||
-    cycleStatus === 'paid' ||
-    pagarmeData.status === 'active'
+  // Só considerar pago com evidência de cobrança/ciclo — `active` sozinho
+  // pode existir antes da 1ª charge confirmar e liberaria protocolo cedo.
+  const paid = charge?.status === 'paid' || cycleStatus === 'paid'
 
   const cycleChargeId =
     (charge?.id as string | undefined) ??
@@ -489,10 +488,72 @@ async function chargeSubscription(opts: {
   }
 }
 
+function isCardDeclinedStatus(status: string | undefined): boolean {
+  if (!status) return false
+  const s = status.toLowerCase()
+  return (
+    s === 'failed' ||
+    s === 'canceled' ||
+    s === 'cancelled' ||
+    s === 'not_authorized' ||
+    s === 'refused'
+  )
+}
+
+async function cancelPagarmeSubscriptionBestEffort(
+  pagarmeSubId: string,
+  pagarmeHeaders: Record<string, string>,
+): Promise<void> {
+  try {
+    const res = await fetch(
+      `https://api.pagar.me/core/v5/subscriptions/${pagarmeSubId}`,
+      {
+        method: 'DELETE',
+        headers: pagarmeHeaders,
+      },
+    )
+    if (res.ok || res.status === 404) return
+
+    const body = await res.text()
+    const lower = body.toLowerCase()
+    // Só tratar como "já cancelada" com evidência no corpo — 422 genérico pode ser outro erro.
+    const alreadyCanceled =
+      lower.includes('cancel') ||
+      lower.includes('not found') ||
+      lower.includes('already')
+    if (alreadyCanceled) return
+
+    console.error(
+      'cancelPagarmeSubscriptionBestEffort: falha ao cancelar',
+      pagarmeSubId,
+      res.status,
+      body,
+    )
+  } catch (error) {
+    console.error('cancelPagarmeSubscriptionBestEffort error:', error)
+  }
+}
+
 async function deleteFailedSubscription(
   admin: AdminClient,
   subscriptionId: string,
+  pagarmeHeaders?: Record<string, string>,
 ) {
+  // Cancela assinatura remota antes de apagar o registro local (evita órfão na Pagar.me).
+  if (pagarmeHeaders) {
+    const { data: row } = await admin
+      .from('subscriptions')
+      .select('pagarme_sub_id')
+      .eq('id', subscriptionId)
+      .maybeSingle()
+    if (row?.pagarme_sub_id) {
+      await cancelPagarmeSubscriptionBestEffort(
+        row.pagarme_sub_id as string,
+        pagarmeHeaders,
+      )
+    }
+  }
+
   await admin
     .from('terms_acceptances')
     .update({ subscription_id: null })
@@ -872,21 +933,28 @@ export async function POST(request: NextRequest) {
         })
 
     if (!result.ok) {
-      await deleteFailedSubscription(admin, subscription.id)
+      await deleteFailedSubscription(admin, subscription.id, pagarmeHeaders)
       return NextResponse.json(
         { error: result.error ?? 'Erro no pagamento' },
         { status: 400 },
       )
     }
 
-    // Cartão recusado / não pago: não deixar subscription pending acumulando.
-    // Pix fica pending de propósito até o pagamento confirmar.
+    // Cartão: avulso não pago = recusa imediata.
+    // Assinatura: só apaga se a charge veio explicitamente recusada; se ainda
+    // estiver pending/active sem `paid`, mantém local+remota e espera webhook.
     if (!result.paid && data.payment_method === 'credit_card') {
-      await deleteFailedSubscription(admin, subscription.id)
-      return NextResponse.json(
-        { error: 'Pagamento não autorizado. Tente outro cartão.' },
-        { status: 400 },
-      )
+      const waitForWebhook =
+        isRecurringPlan(planType) &&
+        !isCardDeclinedStatus(result.chargeStatus)
+
+      if (!waitForWebhook) {
+        await deleteFailedSubscription(admin, subscription.id, pagarmeHeaders)
+        return NextResponse.json(
+          { error: 'Pagamento não autorizado. Tente outro cartão.' },
+          { status: 400 },
+        )
+      }
     }
 
     let protocolId: string | null = null

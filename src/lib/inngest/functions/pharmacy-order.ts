@@ -263,23 +263,31 @@ export const pharmacyOrder = inngest.createFunction(
 
     // TODO(Miligrama): 3meses/6meses = N× SKU mensal num único pedido — validar operacionalmente.
     const cycleMult = getPharmacyCycleMultiplier(planType)
+    const cycleDivisor = Math.max(1, cycleMult)
 
     const packageItems: PackageItem[] = activeItems
       .map((item) => {
         const box = item.products?.box_type
         if (box !== 'R80' && box !== 'R110') return null
-        const qty =
-          item.quantity && item.quantity > 0 ? item.quantity : cycleMult
-        return { box_type: box, quantity: qty }
+        const physicalQty =
+          item.quantity && item.quantity > 0 ? item.quantity : cycleDivisor
+        return { box_type: box, quantity: physicalQty }
       })
       .filter((x): x is PackageItem => x !== null)
 
     const dimensions = await computePackageDimensions(packageItems)
 
-    const productsSubtotal = activeItems.reduce(
-      (sum, item) => sum + getUnitPriceFromProduct(item.products, planType),
-      0,
-    )
+    // protocol_items.quantity é física (checkout_qty × cycleMult).
+    // getUnitPriceFromProduct já devolve o valor cobrado do ciclo por 1 unidade de checkout.
+    // Subtotal cobrado = cycleCharge × checkout_qty (= physicalQty / cycleMult).
+    const productsSubtotal = activeItems.reduce((sum, item) => {
+      const physicalQty =
+        item.quantity && item.quantity > 0 ? item.quantity : cycleDivisor
+      const checkoutQty = Math.max(1, Math.round(physicalQty / cycleDivisor))
+      return (
+        sum + getUnitPriceFromProduct(item.products, planType) * checkoutQty
+      )
+    }, 0)
 
     const freteValor = shipping?.valor ?? 0
     const prazoDias = shipping?.prazoDias ?? 0
@@ -293,16 +301,17 @@ export const pharmacyOrder = inngest.createFunction(
       .maybeSingle()
 
     const pharmacyItems = activeItems.map((item) => {
-      const qty = item.quantity && item.quantity > 0 ? item.quantity : cycleMult
-      const unitPrice = getUnitPriceFromProduct(item.products, planType)
-      // Preço unitário no JSON da farmácia = preço do ciclo / qty física, se qty > 1
-      const unitForPharmacy = qty > 1 ? unitPrice / qty : unitPrice
+      const physicalQty =
+        item.quantity && item.quantity > 0 ? item.quantity : cycleDivisor
+      const cycleCharge = getUnitPriceFromProduct(item.products, planType)
+      // Preço unitário físico = cobrança do ciclo ÷ unidades do ciclo (não ÷ physicalQty total).
+      const unitForPharmacy = cycleCharge / cycleDivisor
       return buildPharmacyItem({
         sku: item.products?.[skuKey] ?? '',
         pharmacyCode: item.products?.pharmacy_code ?? 0,
         name: item.products?.name ?? '',
         unitPrice: unitForPharmacy,
-        quantity: qty,
+        quantity: physicalQty,
       })
     })
 
@@ -460,18 +469,16 @@ export const pharmacyOrder = inngest.createFunction(
 
       const { error: itemsError } = await admin.from('order_items').insert(
         activeItems.map((item) => {
-          const qty =
-            item.quantity && item.quantity > 0
-              ? item.quantity
-              : getPharmacyCycleMultiplier(planType)
-          const cyclePrice = getUnitPriceFromProduct(item.products, planType)
-          // unit_price × quantity deve bater com o total do ciclo cobrado
-          const unitPrice = qty > 1 ? cyclePrice / qty : cyclePrice
+          const physicalQty =
+            item.quantity && item.quantity > 0 ? item.quantity : cycleDivisor
+          const cycleCharge = getUnitPriceFromProduct(item.products, planType)
+          // Mesma regra do pharmacyItems / productsSubtotal.
+          const unitPrice = cycleCharge / cycleDivisor
           return {
             order_id: order.id,
             product_id: item.product_id,
             pharmacy_sku: item.products?.[skuKey] ?? '',
-            quantity: qty,
+            quantity: physicalQty,
             unit_price: unitPrice,
           }
         }),
