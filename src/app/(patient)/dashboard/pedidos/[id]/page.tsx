@@ -198,11 +198,30 @@ export default async function PedidoDetalhePage({
               Detalhes do pedido
             </h1>
           </div>
-          <span
-            className={`text-xs font-bold px-3 py-1 rounded-full ${getPatientOrderStatusColor(statusMessage)}`}
-          >
-            {statusMessage}
-          </span>
+          <div className="flex flex-col items-end gap-1">
+            <span
+              className={`text-xs font-bold px-3 py-1 rounded-full ${getPatientOrderStatusColor(statusMessage)}`}
+            >
+              {statusMessage}
+            </span>
+            {eventos.length > 0 && eventos[eventos.length - 1]?.datahora && (
+              <p className="text-xs text-gray-400">
+                Atualizado em{' '}
+                {(() => {
+                  const d = new Date(eventos[eventos.length - 1].datahora!)
+                  const day = d.toLocaleDateString('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                  })
+                  const time = d.toLocaleTimeString('pt-BR', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                  return `${day} às ${time}`
+                })()}
+              </p>
+            )}
+          </div>
         </div>
 
         {/* 2.3 — Prazo estimado / data real de entrega */}
