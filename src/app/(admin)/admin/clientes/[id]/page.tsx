@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { CopyButton } from '@/components/CopyButton'
 import { RFM_TIER_BADGE, RFM_TIER_LABEL } from '@/lib/admin/rfm-tier'
 import { PLAN_LABELS } from '@/lib/plans'
+import { getProductDisplayName } from '@/lib/product-display-names'
 import { isNorteNordeste } from '@/lib/shipping/sender-region'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
@@ -718,7 +719,15 @@ export default async function AdminClienteDetalhePage({
                           : ''
                       }
                     >
-                      {item.products?.name ?? '—'}
+                      {item.products?.name
+                        ? getProductDisplayName(item.products.name)
+                        : '—'}
+                      {item.products?.name && (
+                        <span className="text-gray-400 font-normal">
+                          {' '}
+                          ({item.products.name})
+                        </span>
+                      )}
                     </span>
                     {item.is_required && (
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#13244f]/10 text-[#13244f]">

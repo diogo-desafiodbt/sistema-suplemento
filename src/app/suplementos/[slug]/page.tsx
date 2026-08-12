@@ -6,6 +6,7 @@ import { notFound, useParams } from 'next/navigation'
 import { useState } from 'react'
 import Footer from '@/components/Footer'
 import Header from '@/components/Header'
+import { getProductDisplayName } from '@/lib/product-display-names'
 import { getSupplementBySlug, supplements } from '@/lib/supplements-content'
 
 const testimonials = [
@@ -106,7 +107,7 @@ export default function SupplementPage() {
                 >
                   <Image
                     src={src}
-                    alt={`${content.name} — imagem ${index + 1}`}
+                    alt={`${getProductDisplayName(content.name)} — imagem ${index + 1}`}
                     fill
                     priority={index === 0}
                     sizes="(max-width: 768px) 100vw, 50vw"
@@ -119,10 +120,10 @@ export default function SupplementPage() {
             <div className="md:sticky md:top-24 md:self-start flex flex-col gap-5">
               <div>
                 <p className="text-xs font-bold tracking-widest text-[#f4001e] uppercase mb-2">
-                  {content.name}
+                  {getProductDisplayName(content.name)}
                 </p>
                 <h1 className="font-display text-3xl md:text-4xl text-[#13244f] leading-tight">
-                  {content.name}
+                  {getProductDisplayName(content.name)}
                 </h1>
                 <p className="mt-2 text-lg text-gray-600">{content.headline}</p>
                 {primary && (
@@ -358,14 +359,14 @@ export default function SupplementPage() {
                   <div className="relative w-full aspect-square rounded-2xl overflow-hidden bg-[#f5f5f0]">
                     <Image
                       src={item.gallery[0]}
-                      alt={item.name}
+                      alt={getProductDisplayName(item.name)}
                       fill
                       sizes="(max-width: 768px) 33vw, 20vw"
                       className="object-cover transition group-hover:scale-105"
                     />
                   </div>
                   <span className="text-sm font-semibold text-[#13244f] text-center group-hover:text-[#f4001e] transition">
-                    {item.name}
+                    {getProductDisplayName(item.name)}
                   </span>
                 </Link>
               ))}

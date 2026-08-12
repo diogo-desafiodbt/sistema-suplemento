@@ -16,32 +16,8 @@ import {
   PURCHASE_PLAN_TYPES,
   type PurchasePlanType,
 } from '@/lib/plans'
+import { PRODUCT_DISPLAY } from '@/lib/product-display-names'
 import { supplements } from '@/lib/supplements-content'
-
-/** Só exibição nesta tela — não altera products.name / PRODUCT_NAME_BY_KEY. */
-const RECOMENDACOES_DISPLAY: Record<
-  string,
-  { name: string; ingredients: string }
-> = {
-  'Neuro Complex': {
-    name: 'Neuropatia Complex',
-    ingredients:
-      'Benfotiamina (B1) + Ácido Alfa Lipóico + Acetil-L-Carnitina + Piridoxina (B6)',
-  },
-  'R-Alpha Lipoic Complex': {
-    name: 'Resistência à Insulina Complex',
-    ingredients: 'Ácido R-Alfa Lipóico + Canela + Melão de São Caetano',
-  },
-  'Berberine Complex': {
-    name: 'Glicose Complex',
-    ingredients: 'Berberina + Gymnema + Picolinato de Cromo',
-  },
-  'Metabolic Multivit': {
-    name: 'Multivitamínico Complex',
-    ingredients:
-      'Magnésio + D3 + K2 + Metilcobalamina (B12) + Metilfolato (B9) + Zinco',
-  },
-}
 
 type LocalProtocolItem = {
   product_id: string
@@ -394,7 +370,7 @@ export default function RecomendacoesPage() {
                           <div className="flex items-center gap-2 flex-wrap mb-1">
                             <span className="font-semibold text-[#13244f] md:text-base">
                               {qty > 1 ? `${qty}× ` : ''}
-                              {RECOMENDACOES_DISPLAY[item.product_name]?.name ??
+                              {PRODUCT_DISPLAY[item.product_name]?.name ??
                                 item.product_name}
                             </span>
                             {item.is_required && (
@@ -406,13 +382,9 @@ export default function RecomendacoesPage() {
                           <p className="text-sm md:text-base text-[#13244f]/75 leading-relaxed">
                             {item.activation_reason}
                           </p>
-                          {RECOMENDACOES_DISPLAY[item.product_name]
-                            ?.ingredients && (
+                          {PRODUCT_DISPLAY[item.product_name]?.ingredients && (
                             <p className="text-xs text-[#13244f]/60 mt-1.5 leading-relaxed">
-                              {
-                                RECOMENDACOES_DISPLAY[item.product_name]
-                                  .ingredients
-                              }
+                              {PRODUCT_DISPLAY[item.product_name]?.ingredients}
                             </p>
                           )}
                           {isChecked && (

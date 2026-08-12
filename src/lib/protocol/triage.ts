@@ -131,7 +131,7 @@ export function computeTriage(answers: TriageAnswers): TriageResult {
         {
           allowed: ['polivitaminico'],
           reason:
-            'Entre 14 e 17 anos, liberamos apenas o Metabolic Multivit.',
+            'Entre 14 e 17 anos, liberamos apenas o Polivitamínico Glicemic.',
         },
       ],
     }
@@ -143,7 +143,7 @@ export function computeTriage(answers: TriageAnswers): TriageResult {
     gates.push({
       allowed: ['polivitaminico'],
       reason:
-        'Gravidez ou amamentação: por segurança, liberamos apenas o Metabolic Multivit.',
+        'Gravidez ou amamentação: por segurança, liberamos apenas o Polivitamínico Glicemic.',
     })
   }
 
@@ -151,7 +151,7 @@ export function computeTriage(answers: TriageAnswers): TriageResult {
     gates.push({
       allowed: ['polivitaminico'],
       reason:
-        'Condição renal informada: por segurança, liberamos apenas o Metabolic Multivit.',
+        'Condição renal informada: por segurança, liberamos apenas o Polivitamínico Glicemic.',
     })
   }
 
@@ -162,7 +162,7 @@ export function computeTriage(answers: TriageAnswers): TriageResult {
     gates.push({
       allowed: ['polivitaminico'],
       reason:
-        'Condição hepática informada: por segurança, liberamos apenas o Metabolic Multivit.',
+        'Condição hepática informada: por segurança, liberamos apenas o Polivitamínico Glicemic.',
     })
   }
 
@@ -173,7 +173,7 @@ export function computeTriage(answers: TriageAnswers): TriageResult {
     gates.push({
       allowed: ['neuropatia', 'polivitaminico'],
       reason:
-        'Para esse perfil, liberamos Neuro Complex e Metabolic Multivit.',
+        'Para esse perfil, liberamos Neuropatia Support e Polivitamínico Glicemic.',
     })
   }
 

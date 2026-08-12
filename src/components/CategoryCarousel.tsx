@@ -4,6 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { supplements } from '@/lib/supplements-content'
+import { getProductDisplayName } from '@/lib/product-display-names'
 
 type Product = {
   id: string
@@ -139,14 +140,14 @@ export default function CategoryCarousel() {
                 >
                   <Image
                     src={image}
-                    alt={supplement.name}
+                    alt={getProductDisplayName(supplement.name)}
                     fill
                     sizes="(max-width: 640px) 78vw, (max-width: 768px) 300px, 360px"
                     className="object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
                   <span className="absolute bottom-5 left-3 right-3 text-center text-white font-display text-xl md:text-2xl">
-                    {supplement.name}
+                    {getProductDisplayName(supplement.name)}
                   </span>
                 </Link>
 

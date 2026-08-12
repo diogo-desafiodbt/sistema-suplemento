@@ -13,6 +13,7 @@ import {
   PLAN_TYPE_LABEL,
   type PurchasePlanType,
 } from '@/lib/plans'
+import { getProductDisplayName } from '@/lib/product-display-names'
 import { estimateCustomerDeliveryDays } from '@/lib/shipping/estimate'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -1177,7 +1178,7 @@ export default function CheckoutPage() {
                     <div className="min-w-0">
                       <p className="text-sm md:text-base font-medium text-[#13244f] truncate">
                         {(item.quantity ?? 1) > 1 ? `${item.quantity}× ` : ''}
-                        {item.product_name}
+                        {getProductDisplayName(item.product_name)}
                       </p>
                       <p className="text-xs text-gray-400">
                         {item.is_required ? 'Principal' : 'Complementar'}

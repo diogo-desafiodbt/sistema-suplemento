@@ -13,6 +13,7 @@ import {
 } from '@/lib/shipping/estimate'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { getProductDisplayName } from '@/lib/product-display-names'
 import { findSupplementImageByProductName } from '@/lib/supplements-content'
 
 type OrderItem = {
@@ -248,13 +249,14 @@ export default async function PedidoDetalhePage({
             {orderData.order_items?.map((item) => {
               const name = item.products?.name ?? 'Produto'
               const image = findSupplementImageByProductName(name)
+              const displayName = getProductDisplayName(name)
               return (
                 <div key={item.id} className="flex items-center gap-4">
                   <div className="w-14 h-14 rounded-xl bg-[#f5f0eb] overflow-hidden shrink-0 flex items-center justify-center">
                     {image ? (
                       <Image
                         src={image}
-                        alt={name}
+                        alt={displayName}
                         width={56}
                         height={56}
                         className="w-full h-full object-cover"
@@ -288,7 +290,7 @@ export default async function PedidoDetalhePage({
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-[#13244f]">
-                      {name}
+                      {displayName}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">
                       Quantidade: {item.quantity ?? 1}

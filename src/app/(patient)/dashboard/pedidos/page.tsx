@@ -8,6 +8,7 @@ import {
 } from '@/lib/order-status'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { getProductDisplayName } from '@/lib/product-display-names'
 import { findSupplementImageByProductName } from '@/lib/supplements-content'
 
 type OrderItem = {
@@ -115,13 +116,14 @@ export default async function PedidosPage() {
                   {order.order_items?.map((item) => {
                     const name = item.products?.name ?? 'Produto'
                     const image = findSupplementImageByProductName(name)
+                    const displayName = getProductDisplayName(name)
                     return (
                       <div key={item.id} className="flex items-center gap-3">
                         <div className="w-12 h-12 rounded-xl bg-[#f5f0eb] overflow-hidden shrink-0 flex items-center justify-center">
                           {image ? (
                             <Image
                               src={image}
-                              alt={name}
+                              alt={displayName}
                               width={48}
                               height={48}
                               className="w-full h-full object-cover"
@@ -155,7 +157,7 @@ export default async function PedidosPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-[#13244f] truncate">
-                            {name}
+                            {displayName}
                           </p>
                           <p className="text-xs text-gray-400">
                             {item.quantity > 1 ? `${item.quantity}× ` : ''}
