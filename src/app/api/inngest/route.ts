@@ -2,6 +2,7 @@ import { serve } from 'inngest/next'
 import { inngest } from '@/lib/inngest/client'
 import { avulsoRenewalReminder } from '@/lib/inngest/functions/avulso-renewal-reminder'
 import { createShippingLabel } from '@/lib/inngest/functions/create-shipping-label'
+import { hotmartSalesSync } from '@/lib/inngest/functions/hotmart-sales-sync'
 import { paymentRetry } from '@/lib/inngest/functions/payment-retry'
 import { pharmacyOrder } from '@/lib/inngest/functions/pharmacy-order'
 import { pharmacyReconciliation } from '@/lib/inngest/functions/pharmacy-reconciliation'
@@ -20,6 +21,7 @@ export const { GET, POST, PUT } = serve({
     avulsoRenewalReminder,
     createShippingLabel,
     pharmacyReconciliation,
+    hotmartSalesSync,
     purchaseConfirmed,
     supportInboxPoll,
     supportAnalyze,
