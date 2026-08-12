@@ -180,6 +180,19 @@ export default function RecomendacoesPage() {
     )
   }
 
+  function setQuantity(productId: string, delta: number) {
+    setItems((prev) =>
+      prev.map((item) =>
+        item.product_id === productId
+          ? {
+              ...item,
+              quantity: Math.min(20, Math.max(1, (item.quantity ?? 1) + delta)),
+            }
+          : item,
+      ),
+    )
+  }
+
   function getPrice(
     item: LocalProtocolItem,
     plan: PurchasePlanType = selectedPlan,
@@ -401,6 +414,44 @@ export default function RecomendacoesPage() {
                                   .ingredients
                               }
                             </p>
+                          )}
+                          {isChecked && (
+                            <div className="mt-3 flex items-center gap-2">
+                              <span className="text-xs text-[#13244f]/50 font-medium">
+                                Qtd.
+                              </span>
+                              <div className="inline-flex items-center rounded-full border border-gray-200 bg-[#f5f0eb]/80">
+                                <button
+                                  type="button"
+                                  disabled={qty <= 1}
+                                  aria-label="Diminuir quantidade"
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    setQuantity(item.product_id, -1)
+                                  }}
+                                  className="w-8 h-8 flex items-center justify-center text-[#13244f] font-bold disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/60 rounded-l-full transition"
+                                >
+                                  −
+                                </button>
+                                <span className="w-8 text-center text-sm font-semibold text-[#13244f] tabular-nums">
+                                  {qty}
+                                </span>
+                                <button
+                                  type="button"
+                                  disabled={qty >= 20}
+                                  aria-label="Aumentar quantidade"
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    setQuantity(item.product_id, 1)
+                                  }}
+                                  className="w-8 h-8 flex items-center justify-center text-[#13244f] font-bold disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/60 rounded-r-full transition"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
                           )}
                         </div>
                       </div>
