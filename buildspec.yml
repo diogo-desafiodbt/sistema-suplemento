@@ -1,0 +1,41 @@
+# Construção da imagem no AWS CodeBuild.
+#
+# O build roda aqui, não na máquina do Diogo: o MacBook tem 8 GB e vive em
+# swap, e o Docker Desktop derruba o daemon no meio do `next build`.
+#
+# Todos os comandos vão entre aspas simples de propósito: comando não citado
+# com dois-pontos faz o YAML interpretar a linha como mapa aninhado, e o
+# build falha em DOWNLOAD_SOURCE sem executar nada.
+version: 0.2
+
+env:
+  variables:
+    IMAGE_REPO: 768102455037.dkr.ecr.us-east-1.amazonaws.com/sistema-suplemento
+    NEXT_TELEMETRY_DISABLED: "1"
+  secrets-manager:
+    NEXT_PUBLIC_SUPABASE_URL: sistema/NEXT_PUBLIC_SUPABASE_URL
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: sistema/NEXT_PUBLIC_SUPABASE_ANON_KEY
+    NEXT_PUBLIC_PAGARME_PUBLIC_KEY: sistema/NEXT_PUBLIC_PAGARME_PUBLIC_KEY
+    NEXT_PUBLIC_APP_URL: sistema/NEXT_PUBLIC_APP_URL
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 22
+
+  pre_build:
+    commands:
+      - 'aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 768102455037.dkr.ecr.us-east-1.amazonaws.com'
+      - 'export TAG=$(date +%Y%m%d-%H%M%S)'
+      - 'echo "tag da imagem = $TAG"'
+
+  build:
+    commands:
+      - 'npm ci'
+      - 'npm run build'
+      - 'docker build -t "$IMAGE_REPO:$TAG" -t "$IMAGE_REPO:latest" .'
+
+  post_build:
+    commands:
+      - 'docker push "$IMAGE_REPO:$TAG"'
+      - 'docker push "$IMAGE_REPO:latest"'

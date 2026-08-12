@@ -1,0 +1,7 @@
+# A imagem leva só o resultado do build: .next/standalone, .next/static e
+# public. O código-fonte já está compilado dentro do standalone.
+*
+
+!.next/standalone
+!.next/static
+!public
