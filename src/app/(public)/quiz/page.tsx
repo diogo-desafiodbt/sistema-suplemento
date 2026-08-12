@@ -48,6 +48,41 @@ const ALLERGY_SUPPLEMENTS = supplements.filter((s) =>
   ALLERGY_CATALOG_NAMES.has(s.name),
 )
 
+/** Nomes simplificados só na tela de alergia do quiz — sem dose/forma. */
+const ALLERGY_COMPOSTOS: Record<
+  string,
+  { letter: string; ingredients: string[] }
+> = {
+  neuropatia: {
+    letter: 'A',
+    ingredients: [
+      'Vitamina B1',
+      'Ácido Alfa Lipóico',
+      'Acetil-L-Carnitina',
+      'Vitamina B6',
+    ],
+  },
+  'resistencia-insulina': {
+    letter: 'B',
+    ingredients: ['Ácido R-Alfa Lipóico', 'Melão de São Caetano', 'Canela'],
+  },
+  berberina: {
+    letter: 'C',
+    ingredients: ['Berberina', 'Gymnema sylvestre', 'Cromo'],
+  },
+  polivitaminico: {
+    letter: 'D',
+    ingredients: [
+      'Vitamina B12',
+      'Vitamina B9',
+      'Zinco',
+      'Magnésio',
+      'Vitamina D3',
+      'Vitamina K2',
+    ],
+  },
+}
+
 type ProtocolItemBuilt = {
   product_id: string
   product_name: string
@@ -871,8 +906,8 @@ export default function QuizPage() {
         return (
           <QuestionWrapper
             category="ALERGIAS"
-            title="Você tem alergia a algum ingrediente?"
-            subtitle="Confira a composição de cada fórmula e marque as que têm algum ingrediente ao qual você é alérgico. Opcional — deixe tudo desmarcado se não tiver alergias."
+            title="Você tem alergia a algum suplemento?"
+            subtitle="Confira abaixo os compostos que poderão fazer parte da sua suplementação e informe caso tenha alergia a algum deles."
             showContinue
             onContinue={finishTriage}
             onBack={goBack}
@@ -880,10 +915,63 @@ export default function QuizPage() {
             loading={loading}
           >
             <div className="space-y-2">
-              {ALLERGY_SUPPLEMENTS.map((supp, idx) => {
+              <button
+                type="button"
+                onClick={() =>
+                  setForm((prev) => ({
+                    ...prev,
+                    allergic_supplement_slugs: [],
+                  }))
+                }
+                aria-pressed={form.allergic_supplement_slugs.length === 0}
+                className={`w-full text-left rounded-xl border px-4 py-3 transition-all ${
+                  form.allergic_supplement_slugs.length === 0
+                    ? 'border-[#13244f] bg-[#13244f]/5'
+                    : 'border-gray-200 bg-white hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center transition-all ${
+                      form.allergic_supplement_slugs.length === 0
+                        ? 'border-[#13244f] bg-[#13244f]'
+                        : 'border-gray-300'
+                    }`}
+                  >
+                    {form.allergic_supplement_slugs.length === 0 && (
+                      <svg
+                        width="10"
+                        height="8"
+                        viewBox="0 0 10 8"
+                        fill="none"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M1 4l2.5 2.5L9 1"
+                          stroke="white"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    )}
+                  </span>
+                  <p
+                    className={`text-sm font-semibold ${
+                      form.allergic_supplement_slugs.length === 0
+                        ? 'text-[#13244f]'
+                        : 'text-[#13244f]/70'
+                    }`}
+                  >
+                    Não tenho alergia a suplementos
+                  </p>
+                </div>
+              </button>
+              {ALLERGY_SUPPLEMENTS.map((supp) => {
                 const selected = form.allergic_supplement_slugs.includes(
                   supp.slug,
                 )
+                const composto = ALLERGY_COMPOSTOS[supp.slug]
                 return (
                   <button
                     key={supp.slug}
@@ -927,17 +1015,17 @@ export default function QuizPage() {
                           selected ? 'text-[#13244f]' : 'text-[#13244f]/50'
                         }`}
                       >
-                        Fórmula {idx + 1} — tenho alergia a algum ingrediente
+                        COMPOSTOS {composto?.letter} — Marque se tiver alergia a
+                        algum destes componentes
                       </p>
                     </div>
                     <ul className="space-y-1 pl-7">
-                      {supp.composition.map((c) => (
+                      {(composto?.ingredients ?? []).map((name) => (
                         <li
-                          key={`${supp.slug}-${c.ativo}`}
+                          key={`${supp.slug}-${name}`}
                           className="text-sm text-gray-700 leading-relaxed"
                         >
-                          {c.ativo}
-                          {c.dose ? ` — ${c.dose}` : ''}
+                          {name}
                         </li>
                       ))}
                     </ul>
