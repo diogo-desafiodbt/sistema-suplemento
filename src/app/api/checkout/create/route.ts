@@ -80,15 +80,7 @@ const checkoutSchema = z.object({
   }),
   payment_method: z.enum(['credit_card', 'pix']),
   terms_accepted: z.literal(true),
-  card: z
-    .object({
-      number: z.string(),
-      holder_name: z.string(),
-      exp_month: z.string(),
-      exp_year: z.string(),
-      cvv: z.string(),
-    })
-    .optional(),
+  card_token: z.string().min(5).optional(),
   cpf: z.string(),
 })
 
@@ -263,19 +255,12 @@ async function createSubscriptionRow(
   return subscription
 }
 
-type PagarmeCard = {
-  number: string
-  holder_name: string
-  exp_month: number
-  exp_year: number
-  cvv: string
-  billing_address: {
-    zip_code: string
-    city: string
-    state: string
-    country: string
-    line_1: string
-  }
+type PagarmeBillingAddress = {
+  zip_code: string
+  city: string
+  state: string
+  country: string
+  line_1: string
 }
 
 type ChargeAttemptResult = {
@@ -301,19 +286,17 @@ async function chargeOneTimeOrder(opts: {
   installments: number
   customer: Record<string, unknown>
   metadata: Record<string, unknown>
-  card: PagarmeCard | null
+  cardToken: string | null
+  billingAddress: PagarmeBillingAddress | null
   pagarmeHeaders: Record<string, string>
 }): Promise<ChargeAttemptResult> {
   let payments: Array<Record<string, unknown>>
   if (opts.paymentMethod === 'pix') {
     payments = [{ payment_method: 'pix' as const, pix: { expires_in: 3600 } }]
   } else {
-    if (!opts.card) {
-      // O caller (route handler) já valida isso antes de chamar esta função
-      // (payment_method === 'credit_card' exige data.card), mas checamos de
-      // novo aqui pra nunca mandar um card nulo pro Pagarme silenciosamente.
+    if (!opts.cardToken || !opts.billingAddress) {
       throw new Error(
-        'chargeOneTimeOrder: card é obrigatório quando paymentMethod é credit_card',
+        'chargeOneTimeOrder: card_token e billing_address são obrigatórios quando paymentMethod é credit_card',
       )
     }
     payments = [
@@ -323,7 +306,11 @@ async function chargeOneTimeOrder(opts: {
           recurrence: false,
           installments: opts.installments,
           statement_descriptor: 'DESAF DIABETS',
-          card: opts.card,
+          card_token: opts.cardToken,
+          // billing_address não é tokenizado — vai em card{} junto do token
+          card: {
+            billing_address: opts.billingAddress,
+          },
         },
       },
     ]
@@ -400,7 +387,8 @@ async function chargeSubscription(opts: {
   serverTotal: number
   customer: Record<string, unknown>
   metadata: Record<string, unknown>
-  card: PagarmeCard
+  cardToken: string
+  billingAddress: PagarmeBillingAddress
   pagarmeHeaders: Record<string, string>
 }): Promise<ChargeAttemptResult> {
   const pagarmeSubscriptionPayload = {
@@ -412,7 +400,7 @@ async function chargeSubscription(opts: {
     installments: 1,
     items: [
       {
-        name: planItemName(opts.planType),
+        description: planItemName(opts.planType),
         quantity: 1,
         pricing_scheme: {
           scheme_type: 'unit',
@@ -421,7 +409,10 @@ async function chargeSubscription(opts: {
       },
     ],
     customer: opts.customer,
-    card: opts.card,
+    card_token: opts.cardToken,
+    card: {
+      billing_address: opts.billingAddress,
+    },
     metadata: opts.metadata,
   }
 
@@ -718,9 +709,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (data.payment_method === 'credit_card' && !data.card) {
+    if (data.payment_method === 'credit_card' && !data.card_token) {
       return NextResponse.json(
-        { error: 'Dados do cartão são obrigatórios' },
+        { error: 'Token do cartão é obrigatório' },
         { status: 400 },
       )
     }
@@ -790,12 +781,6 @@ export async function POST(request: NextRequest) {
     const forwardedFor = request.headers.get('x-forwarded-for')
     const ipAddress = forwardedFor?.split(',')[0]?.trim() || null
 
-    const expYear = data.card
-      ? data.card.exp_year.length === 2
-        ? 2000 + parseInt(data.card.exp_year, 10)
-        : parseInt(data.card.exp_year, 10)
-      : 0
-
     const pagarmeAuth = `Basic ${Buffer.from(`${process.env.PAGARME_API_KEY}:`).toString('base64')}`
     const pagarmeHeaders = {
       'Content-Type': 'application/json',
@@ -831,22 +816,18 @@ export async function POST(request: NextRequest) {
       },
     }
 
-    const card: PagarmeCard | null = data.card
-      ? {
-          number: data.card.number.replace(/\s/g, ''),
-          holder_name: data.card.holder_name,
-          exp_month: parseInt(data.card.exp_month, 10),
-          exp_year: expYear,
-          cvv: data.card.cvv,
-          billing_address: {
+    const billingAddress: PagarmeBillingAddress | null =
+      data.payment_method === 'credit_card'
+        ? {
             zip_code: data.address.zip_code,
             city: data.address.city,
             state: data.address.state,
             country: 'BR',
             line_1: `${data.address.number}, ${data.address.street}, ${data.address.neighborhood}`,
-          },
-        }
-      : null
+          }
+        : null
+
+    const cardToken = data.card_token ?? null
 
     const priced = await computeServerCheckoutTotal(admin, {
       planType,
@@ -916,7 +897,8 @@ export async function POST(request: NextRequest) {
           serverTotal,
           customer,
           metadata,
-          card: card!,
+          cardToken: cardToken!,
+          billingAddress: billingAddress!,
           pagarmeHeaders,
         })
       : await chargeOneTimeOrder({
@@ -928,7 +910,8 @@ export async function POST(request: NextRequest) {
           installments,
           customer,
           metadata,
-          card,
+          cardToken,
+          billingAddress,
           pagarmeHeaders,
         })
 

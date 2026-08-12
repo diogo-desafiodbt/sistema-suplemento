@@ -441,12 +441,6 @@ export default function CheckoutPage() {
     setProcessingPayment(true)
     setPixExpired(false)
 
-    const [expMonth, expYearRaw] = cardExpiry.split('/')
-    const expYear =
-      expYearRaw?.trim().length === 2
-        ? `20${expYearRaw.trim()}`
-        : expYearRaw?.trim()
-
     try {
       const quiz = buildQuizPayload()
       if (!quiz?.diagnosis_type) {
@@ -491,13 +485,64 @@ export default function CheckoutPage() {
       }
 
       if (method === 'credit_card') {
-        body.card = {
-          number: cardNumber,
-          holder_name: cardName,
-          exp_month: expMonth?.trim(),
-          exp_year: expYear,
-          cvv: cardCvv,
+        const publicKey = process.env.NEXT_PUBLIC_PAGARME_PUBLIC_KEY
+        if (!publicKey) {
+          toast.error(
+            'Pagamento com cartão indisponível no momento. Tente novamente mais tarde.',
+          )
+          return
         }
+
+        const [expMonth, expYearRaw] = cardExpiry.split('/')
+        const expYear =
+          expYearRaw?.trim().length === 2
+            ? `20${expYearRaw.trim()}`
+            : expYearRaw?.trim()
+
+        if (
+          !cardNumber.replace(/\s/g, '') ||
+          !cardName.trim() ||
+          !expMonth?.trim() ||
+          !expYear ||
+          !cardCvv.trim()
+        ) {
+          toast.error('Preencha todos os dados do cartão.')
+          return
+        }
+
+        // Tokeniza no submit (token expira em 60s e é de uso único).
+        // Número/CVV nunca vão pro nosso servidor — só o token.
+        const tokenRes = await fetch(
+          `https://api.pagar.me/core/v5/tokens?appId=${publicKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'card',
+              card: {
+                number: cardNumber.replace(/\s/g, ''),
+                holder_name: cardName.trim(),
+                exp_month: Number(expMonth.trim()),
+                exp_year: Number(expYear),
+                cvv: cardCvv.trim(),
+              },
+            }),
+          },
+        )
+
+        const tokenData = (await tokenRes.json()) as {
+          id?: string
+          message?: string
+        }
+
+        if (!tokenRes.ok || !tokenData.id) {
+          toast.error(
+            'Não foi possível validar o cartão, confira os dados.',
+          )
+          return
+        }
+
+        body.card_token = tokenData.id
       }
 
       const res = await fetch('/api/checkout/create', {
