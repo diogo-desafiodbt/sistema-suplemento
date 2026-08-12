@@ -844,14 +844,6 @@ export default function QuizPage() {
             stepIndex={stepIndex}
             loading={loading}
           >
-            {MEDICATION_OPTIONS.map((opt) => (
-              <CheckOption
-                key={opt.value}
-                label={opt.label}
-                selected={form.medications.includes(opt.value)}
-                onClick={() => toggleMedication(opt.value)}
-              />
-            ))}
             <CheckOption
               label="Não utilizo nenhum medicamento"
               selected={form.medications_none}
@@ -864,6 +856,14 @@ export default function QuizPage() {
                 setTimeout(goNext, 120)
               }}
             />
+            {MEDICATION_OPTIONS.map((opt) => (
+              <CheckOption
+                key={opt.value}
+                label={opt.label}
+                selected={form.medications.includes(opt.value)}
+                onClick={() => toggleMedication(opt.value)}
+              />
+            ))}
           </QuestionWrapper>
         )
 
