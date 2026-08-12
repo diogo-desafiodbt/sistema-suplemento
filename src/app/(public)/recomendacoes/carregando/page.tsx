@@ -14,7 +14,7 @@ const STATUS_MESSAGES = [
 ] as const
 
 const INSTITUTIONAL_TEXT =
-  'Desenvolvido por Dr. Turí Souza, o Desafio Diabetes dispõe de formulações exclusivas, pensadas para a saúde do diabético. Toda nossa produção é feita por uma das maiores farmácias de manipulação do Brasil, com estrutura internacional de insumos e produção de alta capacidade.'
+  'Desenvolvido por Dr. Turí Souza, com as maiores farmácias de manipulação do Brasil.'
 
 /** Ease-out cúbico: rápido no início, desacelera perto do fim. */
 function easeOutCubic(t: number): number {
