@@ -154,7 +154,7 @@ const howItWorks = [
     step: 1,
     title: 'Questionário',
     detail:
-      'Responde a triagem clínica, sem ver produto antes.',
+      'Responde a triagem clínica para selecionarmos os melhores suplementos para você.',
     icon: (
       <svg
         width="22"
