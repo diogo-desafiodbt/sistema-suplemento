@@ -1244,9 +1244,11 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            <div className="bg-[#13244f]/5 rounded-xl px-4 py-3 text-xs text-[#13244f] leading-relaxed">
-              Planos flexíveis — cancele, pause ou adie quando quiser
-            </div>
+            {plan === 'assinatura_mensal' && (
+              <div className="bg-[#13244f]/5 rounded-xl px-4 py-3 text-xs text-[#13244f] leading-relaxed">
+                Assinatura mensal — cancele quando quiser
+              </div>
+            )}
           </div>
         </div>
       </main>
