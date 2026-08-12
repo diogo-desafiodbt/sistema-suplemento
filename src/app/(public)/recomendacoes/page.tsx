@@ -320,9 +320,8 @@ export default function RecomendacoesPage() {
                 ) : null}
               </p>
               <p className="text-[#13244f]/70 text-sm mt-3">
-                {activeItems.length === 1
-                  ? 'Já selecionamos o suplemento para seu perfil.'
-                  : `Já selecionamos os ${activeItems.length} suplementos para seu perfil.`}
+                Selecionamos o mais recomendado para seu perfil, mas você pode
+                adicionar outros se quiser.
               </p>
               <p className="text-[#13244f]/50 text-xs mt-2">
                 * A composição final passa por avaliação de um profissional
