@@ -210,9 +210,7 @@ export function PrescriptionDocument({ data }: { data: PrescriptionData }) {
             <>
               <View style={styles.row}>
                 <Text style={styles.label}>
-                  {informedAge != null
-                    ? 'Idade informada (anos):'
-                    : 'Idade:'}
+                  {informedAge != null ? 'Idade informada (anos):' : 'Idade:'}
                 </Text>
                 <Text style={styles.value}>
                   {informedAge != null

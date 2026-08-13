@@ -135,13 +135,26 @@
    Entrada em cascata: logo, frase, apoio, botão. Cada elemento entra depois
    do anterior, o que dá ritmo sem parecer carregamento lento. */
 @keyframes entra {
-  from { opacity: 0; transform: translateY(14px); }
-  to   { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 @keyframes respira {
-  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.22; }
-  50%      { transform: translate(-50%, -50%) scale(1.12); opacity: 0.32; }
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.22;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.12);
+    opacity: 0.32;
+  }
 }
 
 .logo-entrada,
@@ -152,10 +165,18 @@
   animation: entra 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.logo-entrada     { animation-delay: 0.1s; }
-.frase-entrada    { animation-delay: 0.45s; }
-.frase-entrada-2  { animation-delay: 0.7s; }
-.botao-entrada    { animation-delay: 0.95s; }
+.logo-entrada {
+  animation-delay: 0.1s;
+}
+.frase-entrada {
+  animation-delay: 0.45s;
+}
+.frase-entrada-2 {
+  animation-delay: 0.7s;
+}
+.botao-entrada {
+  animation-delay: 0.95s;
+}
 
 /* Quem pediu menos movimento no sistema recebe tudo estático, sem atraso. */
 @media (prefers-reduced-motion: reduce) {

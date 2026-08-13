@@ -3,8 +3,8 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
-import { supplements } from '@/lib/supplements-content'
 import { getProductDisplayName } from '@/lib/product-display-names'
+import { supplements } from '@/lib/supplements-content'
 
 type Product = {
   id: string
@@ -171,7 +171,7 @@ export default function CategoryCarousel() {
                       Saiba mais
                     </Link>
                     <Link
-                      href="/quiz"
+                      href="/suplementos/quiz"
                       className="flex-1 inline-flex justify-center items-center min-h-12 bg-[#f4001e] hover:bg-[#a30000] text-white rounded-full px-4 py-3 font-semibold text-base transition focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-[#13244f]"
                     >
                       Fazer avaliação

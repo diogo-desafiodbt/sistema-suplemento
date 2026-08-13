@@ -49,8 +49,7 @@ export const supplements: SupplementContent[] = [
         dose: '300 mg',
       },
       {
-        ativo:
-          'Canela (Cinnamomum verum ou cassia) extrato seco padronizado',
+        ativo: 'Canela (Cinnamomum verum ou cassia) extrato seco padronizado',
         dose: '300 mg',
       },
     ],
@@ -103,8 +102,7 @@ export const supplements: SupplementContent[] = [
     slug: 'polivitaminico',
     name: 'Metabolic Multivit',
     headline: 'Vitaminas e minerais essenciais para o metabolismo saudável.',
-    description:
-      'Vitaminas e minerais essenciais para o metabolismo saudável.',
+    description: 'Vitaminas e minerais essenciais para o metabolismo saudável.',
     composition: [
       {
         ativo: 'Vitamina B12 — Metilcobalamina (forma ativa)',

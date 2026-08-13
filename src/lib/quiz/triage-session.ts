@@ -19,7 +19,9 @@ function getSecret(): string {
   const secret =
     process.env.TRIAGE_SESSION_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!secret) {
-    throw new Error('TRIAGE_SESSION_SECRET ou SUPABASE_SERVICE_ROLE_KEY ausente')
+    throw new Error(
+      'TRIAGE_SESSION_SECRET ou SUPABASE_SERVICE_ROLE_KEY ausente',
+    )
   }
   return secret
 }
@@ -44,7 +46,9 @@ export function createTriageSessionToken(
     diagnosis_type: answers.diagnosis_type,
     allowed: [...allowed].sort(),
   }
-  const body = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url')
+  const body = Buffer.from(JSON.stringify(payload), 'utf8').toString(
+    'base64url',
+  )
   return `${body}.${signBody(body)}`
 }
 

@@ -4,8 +4,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 const tabs = [
-  { label: 'Pendentes', href: '/profissional/fila' },
-  { label: 'Assinados', href: '/profissional/assinados' },
+  { label: 'Pendentes', href: '/suplementos/profissional/fila' },
+  { label: 'Assinados', href: '/suplementos/profissional/assinados' },
 ]
 
 export function ProfessionalNav() {

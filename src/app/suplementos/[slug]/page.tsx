@@ -164,7 +164,7 @@ export default function SupplementPage() {
                 </p>
 
                 <Link
-                  href="/quiz"
+                  href="/suplementos/quiz"
                   className="inline-flex justify-center items-center bg-[#f4001e] hover:bg-[#a30000] text-white rounded-md px-5 py-3 font-semibold text-sm transition"
                 >
                   Descubra sua suplementação ideal
@@ -377,7 +377,7 @@ export default function SupplementPage() {
                 Quer saber quais suplementos fazem sentido para o seu perfil?
               </p>
               <Link
-                href="/quiz"
+                href="/suplementos/quiz"
                 className="inline-flex justify-center bg-[#f4001e] hover:bg-[#a30000] text-white rounded-full px-8 py-3.5 font-semibold text-sm transition"
               >
                 Descubra sua suplementação ideal

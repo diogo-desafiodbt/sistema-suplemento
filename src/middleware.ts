@@ -72,14 +72,14 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const path = request.nextUrl.pathname
-  const isAdmin = path.startsWith('/admin')
-  const isProfessional = path.startsWith('/profissional')
-  const isDashboard = path.startsWith('/dashboard')
+  const isAdmin = path.startsWith('/suplementos/admin')
+  const isProfessional = path.startsWith('/suplementos/profissional')
+  const isDashboard = path.startsWith('/suplementos/dashboard')
   const isProtected = isAdmin || isProfessional || isDashboard
 
   if (isProtected && !user) {
     const url = request.nextUrl.clone()
-    url.pathname = '/login'
+    url.pathname = '/suplementos/login'
     return NextResponse.redirect(url)
   }
 
@@ -92,7 +92,7 @@ export async function middleware(request: NextRequest) {
 
     if (isAdmin && profile?.role !== 'admin') {
       const url = request.nextUrl.clone()
-      url.pathname = '/dashboard'
+      url.pathname = '/suplementos/dashboard'
       return NextResponse.redirect(url)
     }
 
@@ -102,14 +102,14 @@ export async function middleware(request: NextRequest) {
       profile?.role !== 'admin'
     ) {
       const url = request.nextUrl.clone()
-      url.pathname = '/dashboard'
+      url.pathname = '/suplementos/dashboard'
       return NextResponse.redirect(url)
     }
   }
 
-  if (user && path === '/login') {
+  if (user && path === '/suplementos/login') {
     const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
+    url.pathname = '/suplementos/dashboard'
     return NextResponse.redirect(url)
   }
 

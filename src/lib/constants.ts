@@ -1,1 +1,1 @@
-export const QUIZ_URL = '/quiz'
+export const QUIZ_URL = '/suplementos/quiz'

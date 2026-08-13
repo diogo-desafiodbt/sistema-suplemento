@@ -3,12 +3,13 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
+import imgLogoPrincipal from '@/../public/logo-principal.png'
 import PromoBar from '@/components/PromoBar'
 
 const menuItems = [
   { label: 'Suplementos', href: '/suplementos' },
-  { label: 'Termos de Uso', href: '/termos-de-uso' },
-  { label: 'Entrar', href: '/login' },
+  { label: 'Termos de Uso', href: '/suplementos/termos-de-uso' },
+  { label: 'Entrar', href: '/suplementos/login' },
 ] as const
 
 export default function Header() {
@@ -52,7 +53,7 @@ export default function Header() {
             onClick={() => setMenuOpen(false)}
           >
             <Image
-              src="/logo-principal.png"
+              src={imgLogoPrincipal}
               alt="Desafio Diabetes"
               width={600}
               height={196}
@@ -65,7 +66,7 @@ export default function Header() {
             ref={menuRef}
           >
             <a
-              href="/quiz"
+              href="/suplementos/quiz"
               className="hidden sm:inline-flex items-center justify-center min-h-11 px-5 py-2.5 rounded-full bg-[#f4001e] text-white text-sm font-bold hover:bg-[#a30000] transition focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-[#13244f]"
             >
               Começar avaliação
@@ -119,7 +120,7 @@ export default function Header() {
                 className="absolute right-0 top-full mt-2 w-56 bg-white rounded-lg shadow-lg border border-[#ececec] divide-y divide-[#ececec] overflow-hidden"
               >
                 <a
-                  href="/quiz"
+                  href="/suplementos/quiz"
                   role="menuitem"
                   className="block px-4 py-3 text-sm font-bold text-[#f4001e] hover:bg-[#ececec] transition sm:hidden"
                   onClick={() => setMenuOpen(false)}

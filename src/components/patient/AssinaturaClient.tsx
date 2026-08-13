@@ -95,7 +95,7 @@ export function AssinaturaClient({ subscription, payments }: Props) {
           Você não tem uma assinatura ativa.
         </p>
         <Link
-          href="/recomendacoes"
+          href="/suplementos/recomendacoes"
           className="inline-block bg-[#f4001e] text-white px-6 py-3 rounded-full text-sm font-bold hover:bg-[#a30000] transition"
         >
           Iniciar tratamento
@@ -153,7 +153,7 @@ export function AssinaturaClient({ subscription, payments }: Props) {
             <p className="text-sm text-gray-400">
               Renovação cancelada. Seu acesso continua até {expiresAt}.{' '}
               <Link
-                href="/recomendacoes"
+                href="/suplementos/recomendacoes"
                 className="text-[#f4001e] hover:underline font-medium"
               >
                 Reativar tratamento
@@ -163,7 +163,7 @@ export function AssinaturaClient({ subscription, payments }: Props) {
 
           {currentStatus === 'expired' && !canceled && (
             <Link
-              href="/recomendacoes"
+              href="/suplementos/recomendacoes"
               className="inline-block text-sm text-[#f4001e] font-semibold hover:underline"
             >
               Reativar tratamento →

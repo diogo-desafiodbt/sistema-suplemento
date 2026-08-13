@@ -1,4 +1,5 @@
 import Image from 'next/image'
+import imgLogoBranca from '@/../public/logo-branca.png'
 import { FormAcesso } from './form-acesso'
 
 export const metadata = {
@@ -29,7 +30,7 @@ export default function EmBrevePage() {
       <div className="relative flex flex-col items-center">
         <div className="logo-entrada">
           <Image
-            src="/logo-branca.png"
+            src={imgLogoBranca}
             alt="Desafio Diabetes"
             width={260}
             height={80}

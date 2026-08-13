@@ -4,21 +4,21 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 const tabs = [
-  { label: 'Visão Geral', href: '/admin' },
-  { label: 'Clientes', href: '/admin/clientes' },
-  { label: 'Pedidos', href: '/admin/pedidos' },
-  { label: 'Suporte', href: '/admin/suporte' },
-  { label: 'Usuários', href: '/admin/usuarios' },
-  { label: 'Cupons', href: '/admin/cupons' },
-  { label: 'Config', href: '/admin/config' },
-  { label: 'Auditoria', href: '/admin/auditoria' },
+  { label: 'Visão Geral', href: '/suplementos/admin' },
+  { label: 'Clientes', href: '/suplementos/admin/clientes' },
+  { label: 'Pedidos', href: '/suplementos/admin/pedidos' },
+  { label: 'Suporte', href: '/suplementos/admin/suporte' },
+  { label: 'Usuários', href: '/suplementos/admin/usuarios' },
+  { label: 'Cupons', href: '/suplementos/admin/cupons' },
+  { label: 'Config', href: '/suplementos/admin/config' },
+  { label: 'Auditoria', href: '/suplementos/admin/auditoria' },
 ]
 
 export function AdminNav() {
   const pathname = usePathname()
 
   function isActive(href: string): boolean {
-    if (href === '/admin') return pathname === '/admin'
+    if (href === '/suplementos/admin') return pathname === '/suplementos/admin'
     return pathname === href || pathname.startsWith(`${href}/`)
   }
 

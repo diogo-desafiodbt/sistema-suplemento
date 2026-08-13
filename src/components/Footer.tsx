@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
+import imgLogoPrincipal from '@/../public/logo-principal.png'
 
 export default function Footer() {
   return (
@@ -52,7 +53,7 @@ export default function Footer() {
           </div>
           <div className="flex flex-col gap-3">
             <Image
-              src="/logo-principal.png"
+              src={imgLogoPrincipal}
               alt="Desafio Diabetes"
               width={600}
               height={196}
@@ -111,7 +112,7 @@ export default function Footer() {
               Política de privacidade
             </span>
             <Link
-              href="/termos-de-uso"
+              href="/suplementos/termos-de-uso"
               className="text-xs opacity-60 hover:opacity-100"
             >
               Termos de Uso

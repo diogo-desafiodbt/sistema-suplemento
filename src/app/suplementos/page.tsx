@@ -2,6 +2,8 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
+import imgDrTuri from '@/../public/dr-turi.png'
+import imgMarcaDagua from '@/../public/marca-dagua.png'
 import Footer from '@/components/Footer'
 import Header from '@/components/Header'
 
@@ -191,7 +193,13 @@ const howItWorks = [
         fill="none"
         aria-hidden="true"
       >
-        <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.8" />
+        <circle
+          cx="12"
+          cy="8"
+          r="3.5"
+          stroke="currentColor"
+          strokeWidth="1.8"
+        />
         <path
           d="M5 19c1.5-3.5 4-5 7-5s5.5 1.5 7 5"
           stroke="currentColor"
@@ -255,7 +263,7 @@ const howItWorks = [
 function QuizCta({ className = '' }: { className?: string }) {
   return (
     <Link
-      href="/quiz"
+      href="/suplementos/quiz"
       className={`inline-flex items-center justify-center min-h-14 px-8 py-4 rounded-full font-bold text-lg transition focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-[#13244f] ${className}`}
     >
       Descubra sua suplementação ideal
@@ -277,7 +285,7 @@ export default function SuplementosPage() {
           />
 
           <Image
-            src="/marca-dagua.png"
+            src={imgMarcaDagua}
             alt=""
             aria-hidden="true"
             width={319}
@@ -293,7 +301,7 @@ export default function SuplementosPage() {
                 para diabéticos
               </h1>
               <Link
-                href="/quiz"
+                href="/suplementos/quiz"
                 className="inline-flex justify-center bg-[#a30000] hover:opacity-90 text-white rounded-full px-8 py-3.5 font-semibold text-base transition"
               >
                 Descubra sua suplementação ideal
@@ -302,7 +310,7 @@ export default function SuplementosPage() {
 
             <div className="order-2 self-end flex justify-center md:justify-end mt-2 md:mt-0">
               <Image
-                src="/dr-turi.png"
+                src={imgDrTuri}
                 alt="Dr. Turí Souza"
                 width={1945}
                 height={2328}
