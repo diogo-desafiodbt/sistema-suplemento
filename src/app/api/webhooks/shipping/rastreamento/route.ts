@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { isBearerOrQueryTokenAuthorized } from '@/lib/security/token'
+import { isBearerTokenAuthorizedComTransicao } from '@/lib/security/token'
 import { summarizeShippingWebhookPayload } from '@/lib/security/webhook-payload'
 import { mergeTrackingEvents } from '@/lib/shipping/create-label'
 import {
@@ -10,8 +10,15 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import type { WebhookRastreamentoPayload } from '@/types/shipping'
 
 export async function POST(request: NextRequest) {
+  // Só header Authorization: token em query string vaza para log de acesso,
+  // proxy e referrer. O ..._ANTERIOR mantém a credencial antiga válida enquanto
+  // a Envie Agora não atualiza o painel; apagar essa variável fecha a janela.
   if (
-    !isBearerOrQueryTokenAuthorized(request, process.env.SHIPPING_WEBHOOK_TOKEN)
+    !isBearerTokenAuthorizedComTransicao(
+      request,
+      process.env.SHIPPING_WEBHOOK_TOKEN,
+      process.env.SHIPPING_WEBHOOK_TOKEN_ANTERIOR,
+    )
   ) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

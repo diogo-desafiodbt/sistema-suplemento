@@ -8,8 +8,9 @@ import {
   computePackageDimensions,
   type PackageItem,
 } from '@/lib/shipping/package'
+import { escolherTiers } from '@/lib/shipping/tiers'
 import type { createAdminClient } from '@/lib/supabase/admin'
-import type { ShippingSelection } from '@/types/shipping'
+import type { ShippingSelection, ShippingTier } from '@/types/shipping'
 
 type AdminClient = ReturnType<typeof createAdminClient>
 
@@ -30,6 +31,10 @@ export type PricedCheckout = {
  * Recalcula total a partir do DB + cotação fresca.
  * Não confia em total_amount / shipping.valor / price_* do cliente.
  *
+ * O cliente informa apenas o nível de frete que escolheu — preço, prazo e
+ * transportadora saem daqui, da cotação fresca. Não há nada vindo do navegador
+ * que possa baratear o pedido.
+ *
  * `includeShipping: false` → shipping.valor = 0 (subtotal só de produtos).
  */
 export async function computeServerCheckoutTotal(
@@ -37,7 +42,7 @@ export async function computeServerCheckoutTotal(
   params: {
     planType: string
     protocolItems: ProtocolItemInput[]
-    shipping: ShippingSelection
+    shipping: { tier: ShippingTier }
     address: { zip_code: string; state: string }
     includeShipping?: boolean
   },
@@ -107,8 +112,10 @@ export async function computeServerCheckoutTotal(
         serverTotal: productsSubtotal,
         productsSubtotal,
         shipping: {
-          ...params.shipping,
+          tier: params.shipping.tier,
           valor: 0,
+          prazoDias: 0,
+          codigoServico: '',
         },
       },
     }
@@ -126,22 +133,23 @@ export async function computeServerCheckoutTotal(
     return { ok: false, error: 'Não foi possível cotar o frete' }
   }
 
-  const match =
-    quotes.find(
-      (q) =>
-        q.codigoServico === params.shipping.codigoServico &&
-        (!params.shipping.transportadora ||
-          q.transportadora === params.shipping.transportadora) &&
-        (!params.shipping.nomeServico ||
-          q.nomeServico === params.shipping.nomeServico),
-    ) ?? quotes.find((q) => q.codigoServico === params.shipping.codigoServico)
+  // O cliente escolheu um nível ("mais rápido"), não um serviço — ele nem sabe
+  // qual transportadora existe do outro lado. Recotamos e reaplicamos a mesma
+  // regra de níveis para descobrir qual serviço contratar agora.
+  //
+  // Efeito colateral desejado: se a cotação mudou desde que a tela carregou, o
+  // nível continua valendo e o preço vem do servidor. O guard de total no
+  // /api/checkout/create é quem avisa o cliente quando o valor mudou.
+  const match = escolherTiers(quotes).find(
+    (t) => t.tier === params.shipping.tier,
+  )?.quote
 
   if (!match) {
     return { ok: false, error: 'Opção de frete inválida ou expirada' }
   }
 
   const shipping: ShippingSelection = {
-    tipo: params.shipping.tipo,
+    tier: params.shipping.tier,
     valor: match.valor,
     prazoDias: match.prazoDias,
     codigoServico: match.codigoServico,

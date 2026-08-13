@@ -5,9 +5,10 @@ import {
   computePackageDimensions,
   type PackageItem,
 } from '@/lib/shipping/package'
+import { escolherTiers } from '@/lib/shipping/tiers'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
-import { type ShippingOptionPublic, shippingQuoteKey } from '@/types/shipping'
+import type { ShippingOptionPublic } from '@/types/shipping'
 
 const bodySchema = z.object({
   cepdestino: z.string().min(8),
@@ -74,37 +75,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ options: [], erro: true })
     }
 
-    const economica = quotes.reduce((a, b) => (a.valor <= b.valor ? a : b))
-    const expressa = quotes.reduce((a, b) => {
-      if (a.prazoDias < b.prazoDias) return a
-      if (b.prazoDias < a.prazoDias) return b
-      return a.valor <= b.valor ? a : b
-    })
-
-    // Todas as cotações da Envie Agora — transportadora/serviço visíveis pra validação.
-    const sorted = [...quotes].sort((a, b) => {
-      if (a.valor !== b.valor) return a.valor - b.valor
-      return a.prazoDias - b.prazoDias
-    })
-
-    const economicaKey = shippingQuoteKey(economica)
-    const expressaKey = shippingQuoteKey(expressa)
-
-    const options: ShippingOptionPublic[] = sorted.map((q) => {
-      const key = shippingQuoteKey(q)
-      let tipo: ShippingOptionPublic['tipo'] = 'padrao'
-      if (key === economicaKey) tipo = 'economica'
-      else if (key === expressaKey) tipo = 'expressa'
-
-      return {
-        tipo,
-        valor: q.valor,
-        prazoDias: q.prazoDias,
-        codigoServico: q.codigoServico,
-        transportadora: q.transportadora,
-        nomeServico: q.nomeServico,
-      }
-    })
+    // Só os três níveis, e sem identificar a transportadora: o cliente escolhe
+    // por prazo e preço. O serviço concreto é redescoberto no servidor na hora
+    // de fechar o pedido, recotando e reaplicando esta mesma função.
+    const options: ShippingOptionPublic[] = escolherTiers(quotes).map(
+      ({ tier, quote }) => ({
+        tier,
+        valor: quote.valor,
+        prazoDias: quote.prazoDias,
+      }),
+    )
 
     return NextResponse.json({ options, erro: false })
   } catch (error) {

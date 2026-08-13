@@ -1,13 +1,23 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { isBearerOrQueryTokenAuthorized } from '@/lib/security/token'
+import { isBearerTokenAuthorizedComTransicao } from '@/lib/security/token'
 import { summarizePharmacyWebhookPayload } from '@/lib/security/webhook-payload'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function POST(request: NextRequest) {
+  // Credencial própria da Miligrama. Antes disto, quando FARMACIA_WEBHOOK_TOKEN
+  // estava vazio, o fallback era o FARMACIA_API_TOKEN — o mesmo segredo que nós
+  // enviamos a eles nas nossas chamadas, validando as chamadas deles para nós.
+  // Um token fazendo dois trabalhos opostos: girar um quebrava o outro.
+  //
+  // Só header Authorization. Token em query string vaza para log de acesso,
+  // proxy e referrer, e não há motivo para carregar esse risco numa credencial
+  // que está nascendo agora.
   if (
-    !isBearerOrQueryTokenAuthorized(
+    !isBearerTokenAuthorizedComTransicao(
       request,
-      process.env.FARMACIA_WEBHOOK_TOKEN ?? process.env.FARMACIA_API_TOKEN,
+      process.env.FARMACIA_WEBHOOK_TOKEN,
+      process.env.FARMACIA_WEBHOOK_TOKEN_ANTERIOR ??
+        process.env.FARMACIA_API_TOKEN,
     )
   ) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

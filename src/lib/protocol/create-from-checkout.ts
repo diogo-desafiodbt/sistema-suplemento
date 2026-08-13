@@ -2,6 +2,7 @@ import { claimOnce, releaseClaim } from '@/lib/idempotency'
 import { getPharmacyCycleMultiplier } from '@/lib/plans'
 import { productKeyFromName } from '@/lib/protocol/triage'
 import type { createAdminClient } from '@/lib/supabase/admin'
+import type { ShippingSelection } from '@/types/shipping'
 
 type CheckoutSource = 'full_quiz' | 'mini_quiz'
 
@@ -18,12 +19,9 @@ type PendingProtocolItem = {
 export type PendingCheckoutPayload = {
   source: CheckoutSource
   plan_type: '1mes' | 'assinatura_mensal' | '3meses' | '6meses' | '1ano'
-  shipping?: {
-    tipo: 'economica' | 'expressa' | 'padrao'
-    valor: number
-    prazoDias: number
-    codigoServico: string
-  }
+  // O envio já resolvido pelo servidor, com transportadora e serviço — é daqui
+  // que a etiqueta e a farmácia tiram o que precisam. Nunca vem do cliente.
+  shipping?: ShippingSelection
   quiz: {
     full_name: string
     age: number

@@ -138,8 +138,16 @@ export type PackageDimensions = {
   peso: number
 }
 
+/** Como a opção é apresentada ao cliente — pelo benefício, não pela empresa. */
+export type ShippingTier = 'rapido' | 'barato' | 'custo_beneficio'
+
+/**
+ * O envio já resolvido: qual serviço de qual transportadora foi contratado.
+ * Vive no servidor e no banco, é o que a etiqueta e a farmácia precisam.
+ * Nunca é enviado ao navegador do cliente.
+ */
 export type ShippingSelection = {
-  tipo: 'economica' | 'expressa' | 'padrao'
+  tier: ShippingTier
   valor: number
   prazoDias: number
   codigoServico: string
@@ -147,14 +155,19 @@ export type ShippingSelection = {
   nomeServico?: string
 }
 
+/**
+ * O que o cliente recebe. Sem transportadora, sem nome nem código de serviço:
+ * esses campos identificam a empresa, e a decisão de escondê-la não valeria
+ * nada se eles continuassem trafegando para o navegador.
+ *
+ * O cliente devolve apenas o `tier`. O servidor recota e redescobre o serviço
+ * correspondente — ver `escolherTiers` em `@/lib/shipping/tiers`.
+ */
 export type ShippingOptionPublic = {
-  /** econômica = menor preço; expressa = menor prazo; demais = todas as cotações. */
-  tipo: 'economica' | 'expressa' | 'padrao'
+  tier: ShippingTier
   valor: number
+  /** Prazo cru do transporte. A margem de segurança é somada só na exibição. */
   prazoDias: number
-  codigoServico: string
-  transportadora: string
-  nomeServico: string
 }
 
 /** Identidade estável de uma cotação (codigoServico sozinho pode colidir). */

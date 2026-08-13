@@ -45,3 +45,27 @@ export function isBearerTokenAuthorized(
     allowQueryToken: false,
   })
 }
+
+/**
+ * Aceita o token novo ou o anterior, para trocar credencial com um parceiro
+ * sem combinar o minuto exato da virada.
+ *
+ * O problema que isto resolve: no instante em que gravamos a credencial nova,
+ * o parceiro passa a ser recusado até atualizar o painel dele. Já custou cinco
+ * dias sem a farmácia puxar pedido. Com os dois aceitos, ele troca quando
+ * puder e nada para no meio.
+ *
+ * A janela é temporária por construção: enquanto `...\_ANTERIOR` existir no
+ * ambiente, a credencial velha continua valendo. **Apagar a variável fecha a
+ * janela**, sem deploy de código — e é o que deve ser feito assim que o
+ * parceiro confirmar a troca. Deixá-la para sempre anula a rotação.
+ */
+export function isBearerTokenAuthorizedComTransicao(
+  request: NextRequest,
+  expectedEnvValue: string | undefined,
+  previousEnvValue: string | undefined,
+): boolean {
+  if (isBearerTokenAuthorized(request, expectedEnvValue)) return true
+  if (!previousEnvValue) return false
+  return isBearerTokenAuthorized(request, previousEnvValue)
+}

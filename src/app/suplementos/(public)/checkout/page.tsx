@@ -41,11 +41,25 @@ type LocalProtocolItem = {
 
 type CheckoutSource = 'full_quiz' | 'mini_quiz'
 
-const FALLBACK_SHIPPING: ShippingSelection = {
-  tipo: 'padrao',
+// Usado quando a cotação falha no navegador. O cliente segue o checkout e o
+// servidor recota na hora de fechar — por isso o nível aqui precisa ser um
+// padrão defensável, e o mais barato é o que não surpreende ninguém.
+const FALLBACK_SHIPPING: ShippingOptionPublic = {
+  tier: 'barato',
   valor: 0,
   prazoDias: 0,
-  codigoServico: '',
+}
+
+const TIER_TEXTO: Record<
+  ShippingOptionPublic['tier'],
+  { titulo: string; apoio: string }
+> = {
+  rapido: { titulo: 'Mais rápido', apoio: 'Chega no menor prazo disponível' },
+  barato: { titulo: 'Mais barato', apoio: 'O menor valor de frete para o seu CEP' },
+  custo_beneficio: {
+    titulo: 'Melhor custo-benefício',
+    apoio: 'Equilíbrio entre prazo e preço',
+  },
 }
 
 type PaymentMethod = 'credit_card' | 'pix'
@@ -117,7 +131,8 @@ export default function CheckoutPage() {
   const [shippingOptions, setShippingOptions] = useState<
     ShippingOptionPublic[]
   >([])
-  const [shipping, setShipping] = useState<ShippingSelection>(FALLBACK_SHIPPING)
+  const [shipping, setShipping] =
+    useState<ShippingOptionPublic>(FALLBACK_SHIPPING)
   const [loadingShipping, setLoadingShipping] = useState(false)
   const [shippingError, setShippingError] = useState(false)
 
@@ -391,16 +406,10 @@ export default function CheckoutPage() {
       }
 
       setShippingOptions(options)
-      const preferred =
-        options.find((o) => o.tipo === 'economica') ?? options[0]
-      setShipping({
-        tipo: preferred.tipo,
-        valor: preferred.valor,
-        prazoDias: preferred.prazoDias,
-        codigoServico: preferred.codigoServico,
-        transportadora: preferred.transportadora,
-        nomeServico: preferred.nomeServico,
-      })
+      // Mantém o mais barato pré-selecionado, como era antes de os níveis
+      // existirem: quem quiser pagar mais escolhe, ninguém é empurrado.
+      const preferred = options.find((o) => o.tier === 'barato') ?? options[0]
+      setShipping(preferred)
       setShippingError(false)
     } catch {
       setShippingOptions([])
@@ -818,26 +827,18 @@ export default function CheckoutPage() {
                   {!loadingShipping && shippingOptions.length > 0 && (
                     <div className="grid gap-2 max-h-80 overflow-y-auto pr-1">
                       {shippingOptions.map((opt) => {
-                        const selected =
-                          shippingQuoteKey(shipping) === shippingQuoteKey(opt)
-                        const tipoLabel =
-                          opt.tipo === 'economica'
-                            ? 'Mais barata'
-                            : opt.tipo === 'expressa'
-                              ? 'Mais rápida'
-                              : null
+                        const selected = shipping.tier === opt.tier
+                        const { titulo, apoio } = TIER_TEXTO[opt.tier]
+                        const dias = estimateCustomerDeliveryDays(opt.prazoDias)
                         return (
                           <button
-                            key={shippingQuoteKey(opt)}
+                            key={opt.tier}
                             type="button"
                             onClick={() =>
                               setShipping({
-                                tipo: opt.tipo,
+                                tier: opt.tier,
                                 valor: opt.valor,
                                 prazoDias: opt.prazoDias,
-                                codigoServico: opt.codigoServico,
-                                transportadora: opt.transportadora,
-                                nomeServico: opt.nomeServico,
                               })
                             }
                             className={`w-full text-left rounded-xl border px-4 py-3 transition ${
@@ -848,26 +849,15 @@ export default function CheckoutPage() {
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <p className="text-sm font-bold text-[#13244f] truncate">
-                                    {opt.transportadora || 'Transportadora'}
-                                  </p>
-                                  {tipoLabel && (
-                                    <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#13244f]/10 text-[#13244f]">
-                                      {tipoLabel}
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-xs text-gray-600 mt-0.5 truncate">
-                                  {opt.nomeServico || opt.codigoServico}
+                                <p className="text-sm font-bold text-[#13244f]">
+                                  {titulo}
+                                </p>
+                                <p className="text-xs text-gray-600 mt-0.5">
+                                  {apoio}
                                 </p>
                                 <p className="text-xs text-gray-500 mt-0.5">
-                                  {(() => {
-                                    const dias = estimateCustomerDeliveryDays(
-                                      opt.prazoDias,
-                                    )
-                                    return `chega em até ${dias} ${dias === 1 ? 'dia útil' : 'dias úteis'} · serviço ${opt.codigoServico}`
-                                  })()}
+                                  chega em até {dias}{' '}
+                                  {dias === 1 ? 'dia útil' : 'dias úteis'}
                                 </p>
                               </div>
                               <p className="text-sm font-bold text-[#13244f] flex-shrink-0">

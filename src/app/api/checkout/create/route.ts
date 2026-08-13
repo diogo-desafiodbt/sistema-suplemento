@@ -61,13 +61,11 @@ const checkoutSchema = z.object({
     allergies: z.string().nullable().optional(),
   }),
   protocol_items: z.array(protocolItemSchema).min(1),
+  // Só o nível escolhido. Preço, prazo e serviço vêm da recotação no servidor
+  // (computeServerCheckoutTotal), então nada aqui precisa ser confiável — e a
+  // transportadora nunca chegou ao cliente para poder voltar.
   shipping: z.object({
-    tipo: z.enum(['economica', 'expressa', 'padrao']),
-    valor: z.number().nonnegative(),
-    prazoDias: z.number().nonnegative(),
-    codigoServico: z.string(),
-    transportadora: z.string().optional(),
-    nomeServico: z.string().optional(),
+    tier: z.enum(['rapido', 'barato', 'custo_beneficio']),
   }),
   address: z.object({
     zip_code: z.string(),
