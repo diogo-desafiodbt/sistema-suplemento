@@ -1,6 +1,8 @@
 # Troca de credenciais dos webhooks — Miligrama e Envie Agora
 
-Estado: **credenciais geradas, código pronto, ainda não aplicadas em produção.**
+Estado: **aplicadas em produção em 13/08/2026 e verificadas** — credencial atual
+e nova aceitas, query string recusada. Falta os parceiros trocarem e as
+variáveis `..._ANTERIOR` serem apagadas.
 
 ## O que mudou no sistema
 
@@ -35,10 +37,14 @@ Estado: **credenciais geradas, código pronto, ainda não aplicadas em produçã
 
 ## Sobre enviar o token
 
-**Não colar a credencial no mesmo e-mail/mensagem.** Mandar o texto abaixo por
-um canal e o valor por outro (telefone, ou o canal seguro que o parceiro
-oferecer). Se o parceiro tiver um painel onde nós mesmos cadastramos o token,
-melhor ainda: cadastra direto e não envia nada.
+Os textos abaixo levam a credencial no corpo, por decisão do Diogo — é o que
+faz o parceiro conseguir agir sem uma segunda troca de mensagens.
+
+A contrapartida: e-mail fica arquivado nos dois lados por tempo indeterminado.
+Se houver suspeita de vazamento, **girar a credencial é rápido**: gravar um
+valor novo em `FARMACIA_WEBHOOK_TOKEN` / `SHIPPING_WEBHOOK_TOKEN`, mover o
+atual para o `..._ANTERIOR` correspondente e publicar. O parceiro continua
+funcionando enquanto atualiza.
 
 ---
 
@@ -61,10 +67,8 @@ melhor ainda: cadastra direto e não envia nada.
 > **Como enviar:** no header HTTP
 >
 > ```
-> Authorization: Bearer SEU_TOKEN
+> Authorization: Bearer ddbt_miligrama_thK0KGOW6DYqVvi2DvUoznFeNRrw53uz9dkKOgcIhho
 > ```
->
-> O token vai em mensagem separada.
 >
 > **Importante:** o envio do token pela query string (`?token=`) deixa de ser
 > aceito. Se a integração de vocês estiver usando esse formato, é preciso mudar
@@ -96,10 +100,8 @@ melhor ainda: cadastra direto e não envia nada.
 > **Como enviar:** no header HTTP
 >
 > ```
-> Authorization: Bearer SEU_TOKEN
+> Authorization: Bearer ddbt_envieagora_q5bObtLFbrslW_92v471Uul1lSsi6aRQNffngv9IhDU
 > ```
->
-> O token vai em mensagem separada.
 >
 > **Importante:** o envio do token pela query string (`?token=`) deixa de ser
 > aceito. Se a integração de vocês estiver usando esse formato, é preciso mudar
