@@ -1,6 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import imgLogoBranca from '@/../public/logo-branca.png'
 import {
   calcAge,
@@ -78,9 +78,11 @@ export default async function ProtocoloPage({
 
   const admin = createAdminClient()
 
-  const { data: protocol } = await admin
-    .from('protocols')
-    .select(`
+  // Dado clínico não pode chegar à memória se o profissional não puder ver
+  // este prontuário (fila aberta ou histórico que ele mesmo assinou). Admin
+  // fica de fora dessa restrição. Inexistente e sem permissão devolvem o
+  // mesmo 404 — diferenciar vaza quais IDs existem.
+  const protocolSelect = `
       id,
       status,
       generated_at,
@@ -115,11 +117,18 @@ export default async function ProtocoloPage({
           name
         )
       )
-    `)
-    .eq('id', id)
-    .single()
+    `
 
-  if (!protocol) redirect('/suplementos/profissional/fila')
+  const protocolQuery = admin.from('protocols').select(protocolSelect).eq('id', id)
+
+  const { data: protocol } =
+    profile?.role === 'admin'
+      ? await protocolQuery.maybeSingle()
+      : await protocolQuery
+          .or(`status.eq.pending_signature,signed_by.eq.${user.id}`)
+          .maybeSingle()
+
+  if (!protocol) notFound()
 
   const protocolData = protocol as unknown as ProtocolDetail
   const activeItems = protocolData.protocol_items?.filter(

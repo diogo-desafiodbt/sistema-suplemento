@@ -44,7 +44,8 @@ export default async function AssinadosPage() {
 
   const admin = createAdminClient()
 
-  const { data: protocols } = await admin
+  // Histórico do profissional: só o que ele assinou. Admin vê todos.
+  let signedQuery = admin
     .from('protocols')
     .select(`
       id,
@@ -65,6 +66,12 @@ export default async function AssinadosPage() {
     `)
     .eq('status', 'signed')
     .order('signed_at', { ascending: false })
+
+  if (profile?.role !== 'admin') {
+    signedQuery = signedQuery.eq('signed_by', user.id)
+  }
+
+  const { data: protocols } = await signedQuery
 
   const signedProtocols = (protocols ?? []) as unknown as SignedProtocol[]
 
