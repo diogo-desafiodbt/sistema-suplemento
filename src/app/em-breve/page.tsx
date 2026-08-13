@@ -39,8 +39,8 @@ export default function EmBrevePage() {
           />
         </div>
 
-        <h1 className="frase-entrada mt-10 max-w-[18ch] text-balance font-semibold text-3xl text-[#f5f0eb] leading-[1.15] tracking-tight sm:text-4xl">
-          A reversão começa antes do primeiro comprimido.
+        <h1 className="frase-entrada mt-10 max-w-[22ch] text-balance font-semibold text-3xl text-[#f5f0eb] leading-[1.15] tracking-tight sm:text-4xl">
+          Suplemento comum, não é suplemento para DIABÉTICO
         </h1>
 
         <p className="frase-entrada-2 mt-4 max-w-[38ch] text-[#f5f0eb]/60 text-sm sm:text-base">

@@ -34,8 +34,12 @@ export function FormAcesso() {
       return
     }
 
+    // O portão substitui o conteúdo sem mudar o endereço, então a barra do
+    // navegador ainda tem o destino original (/suplementos, /suplementos/quiz
+    // etc.). Recarregar a própria URL devolve a pessoa exatamente para onde
+    // ela tentava ir — mandar para a raiz perderia esse destino.
     router.refresh()
-    window.location.href = '/'
+    window.location.reload()
   }
 
   if (!aberto) {
