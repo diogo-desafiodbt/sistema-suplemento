@@ -1,9 +1,14 @@
 import { redirect } from 'next/navigation'
+import {
+  type IntegridadePdf,
+  verificarIntegridadePdf,
+} from '@/lib/pdf/verificar-integridade'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 type AuditLogRow = {
   id: string
+  protocol_id: string
   signed_at: string
   pdf_hash: string
   professionals: {
@@ -12,6 +17,21 @@ type AuditLogRow = {
   protocols: {
     users: { full_name: string } | null
   } | null
+}
+
+const INTEGRIDADE_LABEL: Record<IntegridadePdf, string> = {
+  integro: 'Íntegro',
+  alterado: 'Alterado',
+  indisponivel: 'Não verificável',
+  sem_registro: 'Sem registro',
+}
+
+const INTEGRIDADE_BADGE: Record<IntegridadePdf, string> = {
+  integro: 'bg-green-50 text-green-700',
+  alterado: 'bg-red-50 text-red-700',
+  // Âmbar, não vermelho: não conferimos, e isso é diferente de acusar.
+  indisponivel: 'bg-amber-50 text-amber-700',
+  sem_registro: 'bg-gray-100 text-gray-600',
 }
 
 export default async function AdminAuditoriaPage() {
@@ -33,7 +53,7 @@ export default async function AdminAuditoriaPage() {
   const { data: logs } = await admin
     .from('prescription_audit_logs')
     .select(`
-      id, signed_at, pdf_hash,
+      id, protocol_id, signed_at, pdf_hash,
       professionals (
         users ( full_name )
       ),
@@ -45,6 +65,19 @@ export default async function AdminAuditoriaPage() {
     .limit(100)
 
   const auditLogs = (logs ?? []) as unknown as AuditLogRow[]
+  const protocolIds = [
+    ...new Set(auditLogs.map((log) => log.protocol_id).filter(Boolean)),
+  ]
+  const integridadeEntries = await Promise.all(
+    protocolIds.map(async (protocolId) => {
+      const estado = await verificarIntegridadePdf(admin, protocolId)
+      return [protocolId, estado] as const
+    }),
+  )
+  const integridadePorProtocolo = Object.fromEntries(integridadeEntries) as Record<
+    string,
+    IntegridadePdf
+  >
 
   return (
     <main className="max-w-6xl mx-auto px-6 py-8">
@@ -78,20 +111,26 @@ export default async function AdminAuditoriaPage() {
               <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">
                 Hash do PDF
               </th>
+              <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">
+                Integridade
+              </th>
             </tr>
           </thead>
           <tbody>
             {auditLogs.length === 0 ? (
               <tr>
                 <td
-                  colSpan={4}
+                  colSpan={5}
                   className="px-5 py-12 text-center text-gray-400 text-sm"
                 >
                   Nenhum registro de auditoria ainda.
                 </td>
               </tr>
             ) : (
-              auditLogs.map((log) => (
+              auditLogs.map((log) => {
+                const estado =
+                  integridadePorProtocolo[log.protocol_id] ?? 'sem_registro'
+                return (
                 <tr
                   key={log.id}
                   className="border-b border-gray-50 hover:bg-[#f5f0eb]/50 transition-colors"
@@ -108,8 +147,16 @@ export default async function AdminAuditoriaPage() {
                   <td className="px-5 py-4 font-mono text-xs text-gray-400 break-all max-w-xs">
                     {log.pdf_hash}
                   </td>
+                  <td className="px-5 py-4">
+                    <span
+                      className={`text-xs font-bold px-2.5 py-1 rounded-full ${INTEGRIDADE_BADGE[estado]}`}
+                    >
+                      {INTEGRIDADE_LABEL[estado]}
+                    </span>
+                  </td>
                 </tr>
-              ))
+                )
+              })
             )}
           </tbody>
         </table>
