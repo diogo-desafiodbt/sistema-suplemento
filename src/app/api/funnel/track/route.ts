@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 
 const VALID_TYPES = [
   'quiz_started',
@@ -22,13 +22,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'payload inválido' }, { status: 400 })
     }
 
-    const admin = createAdminClient()
-    await admin
+    // Insert simples, não upsert: o PostgREST exige privilégio de UPDATE para
+    // qualquer upsert — inclusive com ignoreDuplicates, que não atualiza nada.
+    // Conceder UPDATE ao anon só para satisfazer isso deixaria um visitante
+    // reescrever evento de funil alheio. A idempotência vem da restrição
+    // UNIQUE (session_id, event_type): evento repetido devolve 23505, que é
+    // exatamente o "já registrado" que o upsert silenciava.
+    const supabase = await createClient()
+    const { error } = await supabase
       .from('funnel_events')
-      .upsert(
-        { session_id, event_type },
-        { onConflict: 'session_id,event_type', ignoreDuplicates: true },
-      )
+      .insert({ session_id, event_type })
+
+    if (error && error.code !== '23505') {
+      console.error('funnel/track insert:', error.code, error.message)
+    }
 
     return NextResponse.json({ ok: true })
   } catch (error) {

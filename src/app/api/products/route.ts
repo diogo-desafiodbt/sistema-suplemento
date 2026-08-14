@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 
 export async function GET() {
   try {
-    const admin = createAdminClient()
-    const { data: products, error } = await admin
+    const supabase = await createClient()
+    const { data: products, error } = await supabase
       .from('products')
       .select(
         'id, name, price_monthly, price_quarterly, price_yearly, is_fixed, is_active',
