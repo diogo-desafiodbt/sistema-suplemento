@@ -141,7 +141,6 @@ export const pharmacyOrder = inngest.createFunction(
           )
         ),
         protocols!inner (
-          prescription_pdf_url,
           protocol_items (
             product_id,
             removed_by_patient,
@@ -203,7 +202,6 @@ export const pharmacyOrder = inngest.createFunction(
     }
 
     const protocol = subscription.protocols as unknown as {
-      prescription_pdf_url: string | null
       protocol_items: ProtocolItemRow[]
     }
 
@@ -442,7 +440,7 @@ export const pharmacyOrder = inngest.createFunction(
         productsSubtotal,
         freteValor,
         prazoDias,
-        prescriptionPdfUrl: protocol.prescription_pdf_url ?? '',
+        prescriptionPdfUrl: '',
         pharmacyCarrierCode: parseInt(
           configMap.pharmacy_carrier_code ?? '24',
           10,

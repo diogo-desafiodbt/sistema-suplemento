@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { CopyButton } from '@/components/CopyButton'
 import { RFM_TIER_BADGE, RFM_TIER_LABEL } from '@/lib/admin/rfm-tier'
+import { createPrescriptionPdfSignedUrl } from '@/lib/pdf/signed-url'
 import { PLAN_LABELS } from '@/lib/plans'
 import { getProductDisplayName } from '@/lib/product-display-names'
 import { isNorteNordeste } from '@/lib/shipping/sender-region'
@@ -74,7 +75,8 @@ type ProtocolRow = {
   generated_at: string | null
   signed_at: string | null
   signed_by: string | null
-  prescription_pdf_url: string | null
+  prescription_pdf_path: string | null
+  prescription_pdf_signed_url: string | null
   protocol_items: Array<{
     id: string
     is_required: boolean
@@ -277,7 +279,7 @@ export default async function AdminClienteDetalhePage({
     admin
       .from('protocols')
       .select(`
-        id, status, generated_at, signed_at, signed_by, prescription_pdf_url,
+        id, status, generated_at, signed_at, signed_by, prescription_pdf_path,
         protocol_items (
           id, is_required, removed_by_patient, activation_reason,
           products ( name )
@@ -313,7 +315,18 @@ export default async function AdminClienteDetalhePage({
   const addressList = (addresses ?? []) as AddressRow[]
   const subList = (subscriptions ?? []) as SubscriptionRow[]
   const orderList = (orders ?? []) as unknown as OrderRow[]
-  const protocolList = (protocols ?? []) as unknown as ProtocolRow[]
+  const protocolList = await Promise.all(
+    ((protocols ?? []) as unknown as Omit<
+      ProtocolRow,
+      'prescription_pdf_signed_url'
+    >[]).map(async (p) => ({
+      ...p,
+      prescription_pdf_signed_url: await createPrescriptionPdfSignedUrl(
+        admin,
+        p.prescription_pdf_path,
+      ),
+    })),
+  )
   const quizList = (quizResponses ?? []) as Record<string, unknown>[]
   const healthList = (healthRecords ?? []) as Record<string, unknown>[]
   const notifList = (notificationLogs ?? []) as Record<string, unknown>[]
@@ -678,9 +691,9 @@ export default async function AdminClienteDetalhePage({
                 >
                   {PROTOCOL_STATUS_LABEL[protocol.status] ?? protocol.status}
                 </span>
-                {protocol.prescription_pdf_url && (
+                {protocol.prescription_pdf_signed_url && (
                   <a
-                    href={protocol.prescription_pdf_url}
+                    href={protocol.prescription_pdf_signed_url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs font-bold text-[#13244f] bg-[#13244f]/5 hover:bg-[#13244f]/10 px-3 py-1.5 rounded-lg transition"

@@ -1,4 +1,8 @@
 import { type NextRequest, NextResponse } from 'next/server'
+import {
+  createPrescriptionPdfSignedUrl,
+  injectPrescriptionPdfUrl,
+} from '@/lib/pdf/signed-url'
 import { isFarmaciaAuthorized, parseDateRange } from '@/lib/pharmacy/pull-api'
 import { createAdminClient } from '@/lib/supabase/admin'
 
@@ -8,7 +12,7 @@ type OrderRow = {
   status: string
   pharmacy_json: unknown
   subscriptions: {
-    protocols: { status: string } | null
+    protocols: { status: string; prescription_pdf_path: string | null } | null
   } | null
 }
 
@@ -39,7 +43,8 @@ export async function GET(request: NextRequest) {
         pharmacy_json,
         subscriptions!inner (
           protocols!inner (
-            status
+            status,
+            prescription_pdf_path
           )
         )
       `,
@@ -65,12 +70,18 @@ export async function GET(request: NextRequest) {
       isSignedProtocol,
     )
 
-    const result = signed.map((o) => ({
-      numero_pedido: o.id,
-      data_compra: o.created_at,
-      status: o.status,
-      pedido: o.pharmacy_json,
-    }))
+    const result = await Promise.all(
+      signed.map(async (o) => {
+        const path = o.subscriptions?.protocols?.prescription_pdf_path
+        const signedUrl = await createPrescriptionPdfSignedUrl(admin, path)
+        return {
+          numero_pedido: o.id,
+          data_compra: o.created_at,
+          status: o.status,
+          pedido: injectPrescriptionPdfUrl(o.pharmacy_json, signedUrl),
+        }
+      }),
+    )
 
     await admin.from('pharmacy_api_logs').insert({
       endpoint: 'json',

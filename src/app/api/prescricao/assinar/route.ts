@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { generatePrescriptionPdf } from '@/lib/pdf/generator'
+import { createPrescriptionPdfSignedUrl } from '@/lib/pdf/signed-url'
 import { sendToPharmacyWithPdf } from '@/lib/pharmacy/sender'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
@@ -144,19 +145,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Erro ao salvar PDF' }, { status: 500 })
     }
 
-    const { data: signedUrl } = await admin.storage
-      .from('prescricoes')
-      .createSignedUrl(fileName, 60 * 60 * 24 * 30)
-
-    const pdfUrl = signedUrl?.signedUrl ?? ''
-
     const { error: updateError } = await admin
       .from('protocols')
       .update({
         status: 'signed',
         signed_at: signedAt,
         signed_by: professional.id,
-        prescription_pdf_url: pdfUrl,
+        prescription_pdf_path: fileName,
       })
       .eq('id', protocol_id)
 
@@ -167,6 +162,9 @@ export async function POST(request: NextRequest) {
         { status: 500 },
       )
     }
+
+    const pdfUrl =
+      (await createPrescriptionPdfSignedUrl(admin, fileName)) ?? ''
 
     const { error: auditError } = await admin
       .from('prescription_audit_logs')
