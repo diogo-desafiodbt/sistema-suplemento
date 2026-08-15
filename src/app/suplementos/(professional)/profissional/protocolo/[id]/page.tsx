@@ -2,13 +2,13 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import imgLogoBranca from '@/../public/logo-branca.png'
+import { getSql } from '@/lib/db'
 import {
   calcAge,
   DIAGNOSIS_LABELS,
   HEPATIC_LABELS,
   RENAL_LABELS,
 } from '@/lib/protocol/triage'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { AssinarButton } from './AssinarButton'
 
@@ -76,61 +76,86 @@ export default async function ProtocoloPage({
     redirect('/suplementos/dashboard')
   }
 
-  const admin = createAdminClient()
-
-  // Dado clínico não pode chegar à memória se o profissional não puder ver
-  // este prontuário (fila aberta ou histórico que ele mesmo assinou). Admin
-  // fica de fora dessa restrição. Inexistente e sem permissão devolvem o
-  // mesmo 404 — diferenciar vaza quais IDs existem.
-  const protocolSelect = `
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
       id,
-      status,
-      generated_at,
-      source,
-      users (
-        full_name,
-        email,
-        client_code
-      ),
-      quiz_responses (
-        age,
-        birth_date,
-        sex,
-        is_pregnant_or_breastfeeding,
-        renal_conditions,
-        hepatic_conditions,
-        diagnosis_type,
-        medications,
-        years_diagnosed,
-        allergies,
-        conditions_serious,
-        hba1c_range,
-        fasting_glucose,
-        symptoms
-      ),
-      protocol_items (
-        id,
-        is_required,
-        removed_by_patient,
-        activation_reason,
-        products (
-          name
+    )
+  ) {
+    notFound()
+  }
+
+  const isAdmin = profile?.role === 'admin'
+  const sql = getSql()
+
+  // Autorização na própria consulta: profissional só vê fila aberta ou o
+  // que ele assinou. Admin vê qualquer um. Inexistente e sem permissão
+  // devolvem o mesmo 404.
+  const rows = await sql<ProtocolDetail[]>`
+    SELECT
+      p.id,
+      p.status,
+      p.generated_at,
+      p.source,
+      CASE
+        WHEN u.id IS NULL THEN NULL
+        ELSE jsonb_build_object(
+          'full_name', u.full_name,
+          'email', u.email,
+          'client_code', u.client_code
         )
+      END AS users,
+      CASE
+        WHEN q.id IS NULL THEN NULL
+        ELSE jsonb_build_object(
+          'age', q.age,
+          'birth_date', q.birth_date,
+          'sex', q.sex,
+          'is_pregnant_or_breastfeeding', q.is_pregnant_or_breastfeeding,
+          'renal_conditions', q.renal_conditions,
+          'hepatic_conditions', q.hepatic_conditions,
+          'diagnosis_type', q.diagnosis_type,
+          'medications', q.medications,
+          'years_diagnosed', q.years_diagnosed,
+          'allergies', q.allergies,
+          'conditions_serious', q.conditions_serious,
+          'hba1c_range', q.hba1c_range,
+          'fasting_glucose', q.fasting_glucose,
+          'symptoms', q.symptoms
+        )
+      END AS quiz_responses,
+      COALESCE(items.items, '[]'::jsonb) AS protocol_items
+    FROM protocols p
+    LEFT JOIN users u ON u.id = p.user_id
+    LEFT JOIN quiz_responses q ON q.id = p.quiz_response_id
+    LEFT JOIN LATERAL (
+      SELECT jsonb_agg(
+        jsonb_build_object(
+          'id', pi.id,
+          'is_required', pi.is_required,
+          'removed_by_patient', pi.removed_by_patient,
+          'activation_reason', pi.activation_reason,
+          'products', CASE
+            WHEN pr.id IS NULL THEN NULL
+            ELSE jsonb_build_object('name', pr.name)
+          END
+        )
+        ORDER BY pi.id
+      ) AS items
+      FROM protocol_items pi
+      LEFT JOIN products pr ON pr.id = pi.product_id
+      WHERE pi.protocol_id = p.id
+    ) items ON true
+    WHERE p.id = ${id}::uuid
+      AND (
+        ${isAdmin}::boolean
+        OR p.status = 'pending_signature'
+        OR p.signed_by = ${user.id}::uuid
       )
-    `
+    LIMIT 1
+  `
 
-  const protocolQuery = admin.from('protocols').select(protocolSelect).eq('id', id)
-
-  const { data: protocol } =
-    profile?.role === 'admin'
-      ? await protocolQuery.maybeSingle()
-      : await protocolQuery
-          .or(`status.eq.pending_signature,signed_by.eq.${user.id}`)
-          .maybeSingle()
-
-  if (!protocol) notFound()
-
-  const protocolData = protocol as unknown as ProtocolDetail
+  const protocolData = rows[0] ?? null
+  if (!protocolData) notFound()
   const activeItems = protocolData.protocol_items?.filter(
     (item) => !item.removed_by_patient,
   )
