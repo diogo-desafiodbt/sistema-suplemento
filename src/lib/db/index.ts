@@ -36,3 +36,10 @@ export function withTransaction<T>(
 ) {
   return getSql().begin(fn)
 }
+
+/** `numeric` no postgres.js volta string; conta com isso vira concatenação. */
+export function asNumber(value: unknown): number {
+  if (value == null || value === '') return 0
+  const n = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(n) ? n : 0
+}

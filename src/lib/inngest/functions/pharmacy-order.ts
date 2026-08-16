@@ -1,4 +1,5 @@
 import { claimOnce, markClaimCompleted, releaseClaim } from '@/lib/idempotency'
+import { asNumber, getSql } from '@/lib/db'
 import {
   buildPharmacyItem,
   buildPharmacyJson,
@@ -31,6 +32,60 @@ type ProtocolItemRow = {
     price_yearly: number | null
     box_type: string | null
   } | null
+}
+
+type SubscriptionRow = {
+  id: string
+  plan_type: string
+  user_id: string
+  protocol_id: string | null
+  pending_checkout: {
+    shipping?: ShippingSelection
+    protocol_items?: Array<{
+      product_id?: string
+      removed?: boolean
+      blocked?: boolean
+    }>
+    fulfillment_locked_at?: string
+  } | null
+  users: {
+    id: string
+    full_name: string
+    email: string
+    cpf: string | null
+    phone: string | null
+    client_code: string
+    addresses: Array<{
+      zip_code: string
+      street: string
+      number: string
+      complement?: string
+      neighborhood: string
+      city: string
+      state: string
+      is_default: boolean
+    }>
+  }
+  protocols: {
+    protocol_items: ProtocolItemRow[]
+  }
+}
+
+function coerceProductPrices(
+  products: ProtocolItemRow['products'],
+): ProtocolItemRow['products'] {
+  if (!products) return null
+  return {
+    ...products,
+    price_monthly:
+      products.price_monthly == null ? null : asNumber(products.price_monthly),
+    price_quarterly:
+      products.price_quarterly == null
+        ? null
+        : asNumber(products.price_quarterly),
+    price_yearly:
+      products.price_yearly == null ? null : asNumber(products.price_yearly),
+  }
 }
 
 type AdminClient = ReturnType<typeof createAdminClient>
@@ -114,59 +169,55 @@ export const pharmacyOrder = inngest.createFunction(
       }
     }
 
-    const { data: subscription, error: subError } = await admin
-      .from('subscriptions')
-      .select(`
-        id,
-        plan_type,
-        user_id,
-        protocol_id,
-        pending_checkout,
-        users!inner (
-          id,
-          full_name,
-          email,
-          cpf,
-          phone,
-          client_code,
-          addresses (
-            zip_code,
-            street,
-            number,
-            complement,
-            neighborhood,
-            city,
-            state,
-            is_default
-          )
-        ),
-        protocols!inner (
-          protocol_items (
-            product_id,
-            removed_by_patient,
-            quantity,
-            products (
-              name,
-              pharmacy_sku_monthly,
-              pharmacy_sku_quarterly,
-              pharmacy_sku_yearly,
-              pharmacy_code,
-              price_monthly,
-              price_quarterly,
-              price_yearly,
-              box_type
-            )
-          )
-        )
-      `)
-      .eq('id', subscription_id)
-      .eq('user_id', user_id)
-      .single()
+    const sql = getSql()
+    const rows = await sql<SubscriptionRow[]>`
+      SELECT
+        s.id, s.plan_type, s.user_id, s.protocol_id, s.pending_checkout,
+        jsonb_build_object(
+          'id', u.id, 'full_name', u.full_name, 'email', u.email,
+          'cpf', u.cpf, 'phone', u.phone, 'client_code', u.client_code,
+          'addresses', COALESCE(addr.list, '[]'::jsonb)
+        ) AS users,
+        jsonb_build_object('protocol_items', COALESCE(items.list, '[]'::jsonb)) AS protocols
+      FROM subscriptions s
+      JOIN users u ON u.id = s.user_id
+      JOIN protocols p ON p.id = s.protocol_id
+      LEFT JOIN LATERAL (
+        SELECT jsonb_agg(jsonb_build_object(
+          'zip_code', a.zip_code, 'street', a.street, 'number', a.number,
+          'complement', a.complement, 'neighborhood', a.neighborhood,
+          'city', a.city, 'state', a.state, 'is_default', a.is_default
+        ) ORDER BY a.id) AS list
+        FROM addresses a WHERE a.user_id = u.id
+      ) addr ON true
+      LEFT JOIN LATERAL (
+        SELECT jsonb_agg(jsonb_build_object(
+          'product_id', pi.product_id,
+          'removed_by_patient', pi.removed_by_patient,
+          'quantity', pi.quantity,
+          'products', CASE WHEN pr.id IS NULL THEN NULL ELSE jsonb_build_object(
+            'name', pr.name,
+            'pharmacy_sku_monthly', pr.pharmacy_sku_monthly,
+            'pharmacy_sku_quarterly', pr.pharmacy_sku_quarterly,
+            'pharmacy_sku_yearly', pr.pharmacy_sku_yearly,
+            'pharmacy_code', pr.pharmacy_code,
+            'price_monthly', pr.price_monthly,
+            'price_quarterly', pr.price_quarterly,
+            'price_yearly', pr.price_yearly,
+            'box_type', pr.box_type
+          ) END
+        ) ORDER BY pi.id) AS list
+        FROM protocol_items pi
+        LEFT JOIN products pr ON pr.id = pi.product_id
+        WHERE pi.protocol_id = p.id
+      ) items ON true
+      WHERE s.id = ${subscription_id}::uuid AND s.user_id = ${user_id}::uuid
+      LIMIT 1
+    `
 
-    if (subError || !subscription) {
-      throw new Error(
-        `Assinatura não encontrada: ${subError?.message ?? subscription_id}`,
-      )
+    const subscription = rows[0]
+    if (!subscription) {
+      throw new Error(`Assinatura não encontrada: ${subscription_id}`)
     }
 
     if (!payment?.id) {
@@ -177,46 +228,26 @@ export const pharmacyOrder = inngest.createFunction(
       )
     }
 
-    const user = subscription.users as unknown as {
-      id: string
-      full_name: string
-      email: string
-      cpf: string | null
-      phone: string | null
-      client_code: string
-      addresses: Array<{
-        zip_code: string
-        street: string
-        number: string
-        complement?: string
-        neighborhood: string
-        city: string
-        state: string
-        is_default: boolean
-      }>
-    }
+    const user = subscription.users
 
     const address = user.addresses?.find((a) => a.is_default)
     if (!address) {
       throw new Error(`Endereço padrão não encontrado para usuário ${user_id}`)
     }
 
-    const protocol = subscription.protocols as unknown as {
-      protocol_items: ProtocolItemRow[]
+    const protocol = {
+      protocol_items: (subscription.protocols.protocol_items ?? []).map(
+        (item) => ({
+          ...item,
+          products: coerceProductPrices(item.products),
+        }),
+      ),
     }
 
-    const planType = subscription.plan_type as string
+    const planType = subscription.plan_type
     const skuKey = getPharmacySkuKey(planType)
 
-    const pending = subscription.pending_checkout as {
-      shipping?: ShippingSelection
-      protocol_items?: Array<{
-        product_id?: string
-        removed?: boolean
-        blocked?: boolean
-      }>
-      fulfillment_locked_at?: string
-    } | null
+    const pending = subscription.pending_checkout
     const shipping = pending?.shipping
 
     // Prefer snapshot do pagamento (itens travados) — não confiar em edits pós-pago.

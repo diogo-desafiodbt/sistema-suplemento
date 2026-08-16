@@ -1,19 +1,15 @@
 import { type NextRequest, NextResponse } from 'next/server'
+import { getSql } from '@/lib/db'
 import { isFarmaciaAuthorized, parseDateRange } from '@/lib/pharmacy/pull-api'
-import { createAdminClient } from '@/lib/supabase/admin'
 
 type OrderRow = {
   id: string
-  created_at: string
+  created_at: Date | string
   status: string
-  subscriptions: {
-    protocols: { status: string } | null
-  } | null
 }
 
-function isSignedProtocol(order: OrderRow): boolean {
-  const protocol = order.subscriptions?.protocols
-  return protocol?.status === 'signed'
+function toIso(value: Date | string): string {
+  return value instanceof Date ? value.toISOString() : value
 }
 
 export async function GET(request: NextRequest) {
@@ -27,52 +23,35 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: range.invalid }, { status: 400 })
     }
 
-    const admin = createAdminClient()
-    let query = admin
-      .from('orders')
-      .select(
-        `
-        id,
-        created_at,
-        status,
-        subscriptions!inner (
-          protocols!inner (
-            status
-          )
-        )
-      `,
-      )
-      .eq('subscriptions.protocols.status', 'signed')
-      .order('created_at', { ascending: true })
+    const sql = getSql()
+    const gte = range.gte ?? null
+    const lt = range.lt ?? null
 
-    if (range.gte) query = query.gte('created_at', range.gte)
-    if (range.lt) query = query.lt('created_at', range.lt)
+    const orders = await sql<OrderRow[]>`
+      SELECT o.id, o.created_at, o.status
+      FROM orders o
+      JOIN subscriptions s ON s.id = o.subscription_id
+      JOIN protocols p ON p.id = s.protocol_id
+      WHERE p.status = 'signed'
+        AND (${gte}::timestamptz IS NULL OR o.created_at >= ${gte}::timestamptz)
+        AND (${lt}::timestamptz IS NULL OR o.created_at < ${lt}::timestamptz)
+      ORDER BY o.created_at ASC
+    `
 
-    const { data: orders, error } = await query
-    if (error) {
-      console.error('farmacia/pedidos error:', error)
-      return NextResponse.json(
-        { error: 'Erro ao buscar pedidos' },
-        { status: 500 },
-      )
-    }
-
-    // Defesa em profundidade: omitir não assinados (não é erro)
-    const signed = ((orders ?? []) as unknown as OrderRow[]).filter(
-      isSignedProtocol,
-    )
-
-    const result = signed.map((o) => ({
+    const result = orders.map((o) => ({
       numero_pedido: o.id,
-      data_compra: o.created_at,
+      data_compra: toIso(o.created_at),
       status: o.status,
     }))
 
-    await admin.from('pharmacy_api_logs').insert({
-      endpoint: 'listagem',
-      query_params: range.params,
-      order_ids_returned: result.map((r) => r.numero_pedido),
-    })
+    await sql`
+      INSERT INTO pharmacy_api_logs (endpoint, query_params, order_ids_returned)
+      VALUES (
+        'listagem',
+        ${sql.json(range.params)},
+        ${sql.json(result.map((r) => r.numero_pedido))}
+      )
+    `
 
     return NextResponse.json(result)
   } catch (error) {
