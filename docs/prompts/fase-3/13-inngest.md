@@ -120,10 +120,15 @@ Conversão direta, sem transação nova:
 
 Cuidados pontuais:
 
-- **`rfm-recalc.ts`** faz `upsert` em `user_rfm_scores`. Confira se existe
-  restrição única na coluna de conflito antes de escrever `ON CONFLICT`; se não
-  existir, **não invente uma migração** — converta mantendo o padrão atual e me
-  diga, que eu avalio o índice separado, como fiz com `user_entitlements`.
+- **`rfm-recalc.ts`** faz `upsert` em `user_rfm_scores` com
+  `{ onConflict: 'user_id' }` — e **isso falha hoje**, para todo usuário. Não
+  havia restrição única em `user_id`, então o Postgres recusava com `42P10`; a
+  tabela está com zero linhas desde sempre, e é por isso que a coluna de tier na
+  tela de clientes nunca mostrou nada. O erro some porque o `try/catch` por
+  usuário dentro do job só faz `console.error` e segue.
+  Já criei o índice (`20260816010000_user_rfm_scores_unique.sql`), apliquei e
+  propaguei para o RDS — confirmei que o upsert passa a funcionar. Converta para
+  `INSERT ... ON CONFLICT (user_id) DO UPDATE` normalmente.
 - **`payment-retry.ts`** mexe em `subscriptions` e `user_entitlements`. O
   entitlement agora tem índice único em `(user_id, product_key)`: se houver
   ali o mesmo "procura, senão insere", troque por
