@@ -1,0 +1,12 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Sid": "ConectarComoAppWeb",
+    "Effect": "Allow",
+    "Action": "rds-db:connect",
+    "Resource": [
+      "arn:aws:rds-db:us-east-1:768102455037:dbuser:db-P6QCFNC4S6YPKUHNS3IRHA46IU/app_web",
+      "arn:aws:rds-db:us-east-1:768102455037:dbuser:db-P6QCFNC4S6YPKUHNS3IRHA46IU/job_interno"
+    ]
+  }]
+}
