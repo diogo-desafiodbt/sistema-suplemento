@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
+import { getSql } from '@/lib/db'
 import { isBearerTokenAuthorizedComTransicao } from '@/lib/security/token'
 import { summarizeShippingWebhookPayload } from '@/lib/security/webhook-payload'
 import { mergeTrackingEvents } from '@/lib/shipping/create-label'
@@ -25,6 +26,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const admin = createAdminClient()
+    const sql = getSql()
     let payload: WebhookRastreamentoPayload
 
     try {
@@ -33,16 +35,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    const { data: log } = await admin
-      .from('webhook_logs')
-      .insert({
-        source: 'shipping',
-        event_type: 'rastreamento_atualizado',
-        payload: summarizeShippingWebhookPayload(payload),
-        processed: false,
-      })
-      .select('id')
-      .single()
+    const logRows = await sql<{ id: string }[]>`
+      INSERT INTO webhook_logs (source, event_type, payload, processed)
+      VALUES (
+        'shipping',
+        'rastreamento_atualizado',
+        ${sql.json(summarizeShippingWebhookPayload(payload) as never)},
+        false
+      )
+      RETURNING id
+    `
+    const log = logRows[0]
+    if (!log) {
+      throw new Error('webhook rastreamento: insert webhook_logs sem id')
+    }
 
     const eventos = payload.eventos ?? []
     const idReq = eventos.find((e) => e.id_requisicao)?.id_requisicao
@@ -55,11 +61,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    const { data: order } = await admin
-      .from('orders')
-      .select('id, shipping_json')
-      .eq('shipping_request_id', idReq)
-      .maybeSingle()
+    const orderRows = await sql<{ id: string; shipping_json: unknown }[]>`
+      SELECT id, shipping_json FROM orders
+      WHERE shipping_request_id = ${idReq}
+      LIMIT 1
+    `
+    const order = orderRows[0] ?? null
 
     if (!order) {
       console.error('Pedido não encontrado para rastreio', idReq)
@@ -75,24 +82,22 @@ export async function POST(request: NextRequest) {
       eventos as unknown as Array<Record<string, unknown>>,
     )
 
-    const updates: Record<string, unknown> = { shipping_json: merged }
     if (eventos.some((e) => e.finalizado === 1)) {
-      updates.status = 'delivered'
+      await sql`
+        UPDATE orders
+        SET
+          shipping_json = ${sql.json(merged as never)},
+          status = 'delivered'
+        WHERE id = ${order.id}::uuid
+      `
+    } else {
+      await sql`
+        UPDATE orders
+        SET shipping_json = ${sql.json(merged as never)}
+        WHERE id = ${order.id}::uuid
+      `
     }
 
-    const { error: updateError } = await admin
-      .from('orders')
-      .update(updates)
-      .eq('id', order.id)
-
-    if (updateError) {
-      throw new Error(
-        `webhook rastreamento: falha ao persistir shipping_json: ${updateError.message}`,
-      )
-    }
-
-    // Preferir eventos ainda ausentes no JSON; se o merge já rodou num retry
-    // anterior, notifica pelo payload (claims pulam o que já foi enviado).
     const newEvents = getNewTrackingEvents(order.shipping_json, eventos)
     await notifyNewTrackingEvents(
       admin,
@@ -100,12 +105,9 @@ export async function POST(request: NextRequest) {
       newEvents.length > 0 ? newEvents : eventos,
     )
 
-    if (log?.id) {
-      await admin
-        .from('webhook_logs')
-        .update({ processed: true })
-        .eq('id', log.id)
-    }
+    await sql`
+      UPDATE webhook_logs SET processed = true WHERE id = ${log.id}::uuid
+    `
 
     return NextResponse.json({ ok: true })
   } catch (error) {

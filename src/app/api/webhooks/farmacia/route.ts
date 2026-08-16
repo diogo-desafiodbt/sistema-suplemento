@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
+import { getSql } from '@/lib/db'
 import { isBearerTokenAuthorizedComTransicao } from '@/lib/security/token'
 import { summarizePharmacyWebhookPayload } from '@/lib/security/webhook-payload'
-import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function POST(request: NextRequest) {
   // Credencial própria da Miligrama. Antes disto, quando FARMACIA_WEBHOOK_TOKEN
@@ -25,18 +25,22 @@ export async function POST(request: NextRequest) {
 
   try {
     const payload = await request.json()
-    const admin = createAdminClient()
+    const sql = getSql()
 
-    const { data: webhookLog } = await admin
-      .from('webhook_logs')
-      .insert({
-        source: 'pharmacy',
-        event_type: 'order.dispatched',
-        payload: summarizePharmacyWebhookPayload(payload),
-        processed: false,
-      })
-      .select('id')
-      .single()
+    const logRows = await sql<{ id: string }[]>`
+      INSERT INTO webhook_logs (source, event_type, payload, processed)
+      VALUES (
+        'pharmacy',
+        'order.dispatched',
+        ${sql.json(summarizePharmacyWebhookPayload(payload) as never)},
+        false
+      )
+      RETURNING id
+    `
+    const webhookLog = logRows[0]
+    if (!webhookLog) {
+      throw new Error('farmacia webhook: insert webhook_logs sem id')
+    }
 
     const { NumeroObjeto, CodigoPedido } = payload
 
@@ -44,20 +48,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    await admin
-      .from('orders')
-      .update({
-        tracking_code: NumeroObjeto,
-        status: 'dispatched',
-      })
-      .eq('id', CodigoPedido)
+    await sql`
+      UPDATE orders
+      SET tracking_code = ${NumeroObjeto}, status = 'dispatched'
+      WHERE id = ${CodigoPedido}::uuid
+    `
 
-    if (webhookLog?.id) {
-      await admin
-        .from('webhook_logs')
-        .update({ processed: true })
-        .eq('id', webhookLog.id)
-    }
+    await sql`
+      UPDATE webhook_logs SET processed = true WHERE id = ${webhookLog.id}::uuid
+    `
 
     return NextResponse.json({ ok: true })
   } catch (error) {

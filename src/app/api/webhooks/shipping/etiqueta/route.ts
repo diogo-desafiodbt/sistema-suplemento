@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
+import { getSql } from '@/lib/db'
 import { isBearerTokenAuthorizedComTransicao } from '@/lib/security/token'
 import { summarizeShippingWebhookPayload } from '@/lib/security/webhook-payload'
 import { notifyShippingUpdate } from '@/lib/shipping/notify'
@@ -21,6 +22,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const admin = createAdminClient()
+    const sql = getSql()
     let payload: WebhookEtiquetaPayload
 
     try {
@@ -29,16 +31,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    const { data: log } = await admin
-      .from('webhook_logs')
-      .insert({
-        source: 'shipping',
-        event_type: 'etiqueta_gerada',
-        payload: summarizeShippingWebhookPayload(payload),
-        processed: false,
-      })
-      .select('id')
-      .single()
+    const logRows = await sql<{ id: string }[]>`
+      INSERT INTO webhook_logs (source, event_type, payload, processed)
+      VALUES (
+        'shipping',
+        'etiqueta_gerada',
+        ${sql.json(summarizeShippingWebhookPayload(payload) as never)},
+        false
+      )
+      RETURNING id
+    `
+    const log = logRows[0]
+    if (!log) {
+      throw new Error('webhook etiqueta: insert webhook_logs sem id')
+    }
 
     const idReq = payload.id_requisicao
     if (!idReq) {
@@ -49,30 +55,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    const { data: order } = await admin
-      .from('orders')
-      .select('id, shipping_json')
-      .eq('shipping_request_id', idReq)
-      .maybeSingle()
+    const orderRows = await sql<{ id: string }[]>`
+      SELECT id FROM orders
+      WHERE shipping_request_id = ${idReq}
+      LIMIT 1
+    `
+    const order = orderRows[0] ?? null
 
     if (!order) {
       console.error('Pedido não encontrado para id_requisicao', idReq)
       return NextResponse.json({ ok: true })
     }
 
-    const prev =
-      order.shipping_json && typeof order.shipping_json === 'object'
-        ? (order.shipping_json as Record<string, unknown>)
-        : {}
-
-    await admin
-      .from('orders')
-      .update({
-        tracking_code: payload.numero_etiqueta,
-        status: 'dispatched',
-        shipping_json: { ...prev, ...payload, etiqueta_webhook: payload },
-      })
-      .eq('id', order.id)
+    const patch = { ...payload, etiqueta_webhook: payload }
+    await sql`
+      UPDATE orders
+      SET
+        tracking_code = ${payload.numero_etiqueta},
+        status = 'dispatched',
+        shipping_json = COALESCE(shipping_json, '{}'::jsonb) || ${sql.json(patch as never)}
+      WHERE id = ${order.id}::uuid
+    `
 
     await notifyShippingUpdate(admin, {
       orderId: order.id,
@@ -81,12 +84,9 @@ export async function POST(request: NextRequest) {
       trackingCode: payload.numero_etiqueta,
     })
 
-    if (log?.id) {
-      await admin
-        .from('webhook_logs')
-        .update({ processed: true })
-        .eq('id', log.id)
-    }
+    await sql`
+      UPDATE webhook_logs SET processed = true WHERE id = ${log.id}::uuid
+    `
 
     return NextResponse.json({ ok: true })
   } catch (error) {

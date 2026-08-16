@@ -167,29 +167,12 @@ async function activateSubscriptionRow(opts: {
     WHERE id = ${opts.subscriptionId}::uuid
   `
 
-  const existing = await sql<{ id: string }[]>`
-    SELECT id FROM user_entitlements
-    WHERE user_id = ${opts.userId}::uuid AND product_key = 'treatment'
-    LIMIT 1
+  await sql`
+    INSERT INTO user_entitlements (user_id, product_key, status, expires_at, is_permanent)
+    VALUES (${opts.userId}::uuid, 'treatment', 'active', ${expiresAt}::timestamptz, false)
+    ON CONFLICT (user_id, product_key)
+    DO UPDATE SET status = EXCLUDED.status, expires_at = EXCLUDED.expires_at
   `
-
-  if (existing[0]) {
-    await sql`
-      UPDATE user_entitlements
-      SET status = 'active', expires_at = ${expiresAt}
-      WHERE id = ${existing[0].id}::uuid
-    `
-  } else {
-    await sql`
-      INSERT INTO user_entitlements ${sql({
-        user_id: opts.userId,
-        product_key: 'treatment',
-        status: 'active',
-        expires_at: expiresAt,
-        is_permanent: false,
-      })}
-    `
-  }
 }
 
 async function finalizePaidSubscription(

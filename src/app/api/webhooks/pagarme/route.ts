@@ -1,5 +1,6 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
 import { type NextRequest, NextResponse } from 'next/server'
+import postgres from 'postgres'
+import { asNumber, getSql } from '@/lib/db'
 import { inngest } from '@/lib/inngest/client'
 import { addPlanPeriod } from '@/lib/plans'
 import { ensureProtocolAfterPayment } from '@/lib/protocol/create-from-checkout'
@@ -89,7 +90,7 @@ export function extractAmountFromPayload(payload: PagarmePayload): number {
 
   for (const raw of candidates) {
     if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) {
-      return raw / 100
+      return asNumber(raw) / 100
     }
   }
   console.error(
@@ -100,7 +101,6 @@ export function extractAmountFromPayload(payload: PagarmePayload): number {
 }
 
 async function shouldDispatchPharmacy(
-  admin: SupabaseClient,
   subscriptionId: string,
   eventType: string | undefined,
 ): Promise<boolean> {
@@ -111,17 +111,25 @@ async function shouldDispatchPharmacy(
 
   if (!triggersPharmacy) return false
 
-  const { data: sub } = await admin
-    .from('subscriptions')
-    .select('id, protocol_id, pending_checkout')
-    .eq('id', subscriptionId)
-    .maybeSingle()
+  const sql = getSql()
+  const subRows = await sql<
+    {
+      id: string
+      protocol_id: string | null
+      pending_checkout: {
+        skip_pharmacy_webhook?: boolean
+        shipping_payment_pending?: boolean
+      } | null
+    }[]
+  >`
+    SELECT id, protocol_id, pending_checkout
+    FROM subscriptions
+    WHERE id = ${subscriptionId}::uuid
+    LIMIT 1
+  `
+  const sub = subRows[0] ?? null
 
-  // Flags legado (carrinho misto antigo) — manter para segurança em rows antigas.
-  const pending = sub?.pending_checkout as {
-    skip_pharmacy_webhook?: boolean
-    shipping_payment_pending?: boolean
-  } | null
+  const pending = sub?.pending_checkout
   if (pending?.skip_pharmacy_webhook) {
     console.log(
       `Farmácia não disparada — subscription ${subscriptionId} marcada skip_pharmacy_webhook`,
@@ -140,26 +148,25 @@ async function shouldDispatchPharmacy(
 
   const subscriptionIds = new Set<string>([subscriptionId])
   if (sub?.protocol_id) {
-    const { data: siblings } = await admin
-      .from('subscriptions')
-      .select('id')
-      .eq('protocol_id', sub.protocol_id)
-    for (const s of siblings ?? []) {
-      if (s.id) subscriptionIds.add(s.id as string)
+    const siblings = await sql<{ id: string }[]>`
+      SELECT id FROM subscriptions
+      WHERE protocol_id = ${sub.protocol_id}::uuid
+    `
+    for (const s of siblings) {
+      if (s.id) subscriptionIds.add(s.id)
     }
   }
 
   const ids = [...subscriptionIds]
-  const { data: recentOrder } = await admin
-    .from('orders')
-    .select('id')
-    .in('subscription_id', ids)
-    .or('pharmacy_sent_at.not.is.null,pharmacy_json.not.is.null')
-    .gte('created_at', since.toISOString())
-    .limit(1)
-    .maybeSingle()
+  const recentOrder = await sql<{ id: string }[]>`
+    SELECT id FROM orders
+    WHERE subscription_id = ANY(${sql.array(ids)}::uuid[])
+      AND (pharmacy_sent_at IS NOT NULL OR pharmacy_json IS NOT NULL)
+      AND created_at >= ${since.toISOString()}::timestamptz
+    LIMIT 1
+  `
 
-  if (recentOrder) {
+  if (recentOrder[0]) {
     console.log(
       `Farmácia não disparada — pedido recente já existe para protocol/subscription (${ids.join(', ')})`,
     )
@@ -170,13 +177,14 @@ async function shouldDispatchPharmacy(
 }
 
 async function handlePaymentSucceeded(
-  admin: SupabaseClient,
   metadata: Record<string, string>,
   chargeId: string | undefined,
   webhookLogId: string | undefined,
   dispatchPharmacy: boolean,
   payload: PagarmePayload,
 ): Promise<void> {
+  const sql = getSql()
+  const admin = createAdminClient()
   const subscriptionId = metadata.subscription_id
   const userId = metadata.user_id
   const planType = metadata.plan_type ?? '1mes'
@@ -187,16 +195,23 @@ async function handlePaymentSucceeded(
   }
 
   const chargeIds = getChargeIdCandidates(payload)
-  const { data: existingPaid } = await admin
-    .from('payments')
-    .select('id, pagarme_charge_id, paid_at, created_at')
-    .eq('subscription_id', subscriptionId)
-    .eq('status', 'paid')
-    .limit(20)
+  const existingPaid = await sql<
+    {
+      id: string
+      pagarme_charge_id: string | null
+      paid_at: string | Date | null
+      created_at: string | Date
+    }[]
+  >`
+    SELECT id, pagarme_charge_id, paid_at, created_at
+    FROM payments
+    WHERE subscription_id = ${subscriptionId}::uuid AND status = 'paid'
+    LIMIT 20
+  `
 
   const duplicateWindowMs = 2 * 60 * 60 * 1000
   const now = Date.now()
-  const hasOtherPaidCharge = (existingPaid ?? []).some((p) => {
+  const hasOtherPaidCharge = existingPaid.some((p) => {
     const id = p.pagarme_charge_id
     if (typeof id !== 'string' || !id) return false
     if (chargeId && id === chargeId) return false
@@ -206,9 +221,6 @@ async function handlePaymentSucceeded(
     return now - new Date(when).getTime() < duplicateWindowMs
   })
 
-  // Já houve fulfillment recente nesta subscription (outro charge pago) — evita
-  // recriar protocolo / reenviar farmácia (ex.: webhook duplicado). Renovações
-  // (>2h) seguem o fluxo normal.
   const skipFulfillment = hasOtherPaidCharge
   if (skipFulfillment) {
     console.warn(
@@ -217,69 +229,66 @@ async function handlePaymentSucceeded(
         subscriptionId,
         chargeId,
         chargeIds,
-        existingPaid: existingPaid?.map((p) => p.pagarme_charge_id),
+        existingPaid: existingPaid.map((p) => p.pagarme_charge_id),
       },
     )
   }
 
-  // Model A: a cada cobrança paga, avança expires_at e next_billing_at pelo período do plano.
   const expiresAt = addPlanPeriod(new Date(), planType)
 
-  await admin
-    .from('subscriptions')
-    .update({
-      status: 'active',
-      expires_at: expiresAt.toISOString(),
-      next_billing_at: expiresAt.toISOString(),
-    })
-    .eq('id', subscriptionId)
+  await sql`
+    UPDATE subscriptions
+    SET
+      status = 'active',
+      expires_at = ${expiresAt.toISOString()},
+      next_billing_at = ${expiresAt.toISOString()}
+    WHERE id = ${subscriptionId}::uuid
+  `
 
   let paymentId: string | undefined
 
   if (chargeId) {
     const paidAt = new Date().toISOString()
 
-    // Tenta marcar como pago por qualquer ID conhecido da cobrança.
     for (const candidateId of chargeIds) {
-      const { data: updated, error: updateError } = await admin
-        .from('payments')
-        .update({
-          status: 'paid',
-          paid_at: paidAt,
-        })
-        .eq('pagarme_charge_id', candidateId)
-        .select('id')
-
-      if (updateError) {
+      try {
+        const updated = await sql<{ id: string }[]>`
+          UPDATE payments
+          SET status = 'paid', paid_at = ${paidAt}
+          WHERE pagarme_charge_id = ${candidateId}
+          RETURNING id
+        `
+        if (updated.length > 0) {
+          paymentId = updated[0].id
+          break
+        }
+      } catch (updateError) {
         console.error('Webhook payments.update error:', updateError, {
           candidateId,
         })
-        continue
-      }
-      if (updated && updated.length > 0) {
-        paymentId = updated[0].id
-        // Não sobrescrever pagarme_charge_id com getChargeId() — em
-        // subscription.payment_succeeded o 1º candidato antigo (data.id) pode
-        // ser subscription/invoice, não o charge que o checkout gravou.
-        // Próximas entregas já batem em todos os candidates.
-        break
       }
     }
 
     if (!paymentId) {
-      // Checkout pode ter gravado cycle.id ≠ charge.id do webhook.
-      // Só reaproveita pending se houver correlação com esta cobrança.
       const since = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
       const chargeIdSet = new Set(chargeIds)
 
-      const { data: pendingPayments } = await admin
-        .from('payments')
-        .select('id, pagarme_charge_id, amount, webhook_payload')
-        .eq('subscription_id', subscriptionId)
-        .eq('status', 'pending')
-        .gte('created_at', since)
-        .order('created_at', { ascending: false })
-        .limit(10)
+      const pendingPayments = await sql<
+        {
+          id: string
+          pagarme_charge_id: string | null
+          amount: string | number | null
+          webhook_payload: unknown
+        }[]
+      >`
+        SELECT id, pagarme_charge_id, amount, webhook_payload
+        FROM payments
+        WHERE subscription_id = ${subscriptionId}::uuid
+          AND status = 'pending'
+          AND created_at >= ${since}::timestamptz
+        ORDER BY created_at DESC
+        LIMIT 10
+      `
 
       const payloadMentionsCharge = (webhookPayload: unknown): boolean => {
         if (!webhookPayload || typeof webhookPayload !== 'object') return false
@@ -287,82 +296,88 @@ async function handlePaymentSucceeded(
         return chargeIds.some((id) => raw.includes(id))
       }
 
-      // Só por correlação de charge id / payload — nunca só por valor.
       const matchedPending =
-        pendingPayments?.find(
+        pendingPayments.find(
           (p) =>
             typeof p.pagarme_charge_id === 'string' &&
             chargeIdSet.has(p.pagarme_charge_id),
         ) ??
-        pendingPayments?.find((p) => payloadMentionsCharge(p.webhook_payload))
+        pendingPayments.find((p) => payloadMentionsCharge(p.webhook_payload))
 
       if (matchedPending?.id) {
-        const { data: updatedPending, error: pendingErr } = await admin
-          .from('payments')
-          .update({
-            status: 'paid',
-            paid_at: paidAt,
-            // chargeId já prioriza charges[0]/invoice.charge (não data.id de subscription).
-            pagarme_charge_id: chargeId,
-          })
-          .eq('id', matchedPending.id)
-          .eq('status', 'pending')
-          .select('id')
-          .maybeSingle()
-
-        if (pendingErr) {
-          if (pendingErr.code === '23505') {
-            const { data: existingPayment } = await admin
-              .from('payments')
-              .select('id')
-              .eq('pagarme_charge_id', chargeId)
-              .maybeSingle()
-            paymentId = existingPayment?.id
+        try {
+          const updatedPending = await sql<{ id: string }[]>`
+            UPDATE payments
+            SET
+              status = 'paid',
+              paid_at = ${paidAt},
+              pagarme_charge_id = ${chargeId}
+            WHERE id = ${matchedPending.id}::uuid AND status = 'pending'
+            RETURNING id
+          `
+          if (updatedPending[0]?.id) {
+            paymentId = updatedPending[0].id
+          }
+        } catch (pendingErr) {
+          if (
+            pendingErr instanceof postgres.PostgresError &&
+            pendingErr.code === '23505'
+          ) {
+            const existingPayment = await sql<{ id: string }[]>`
+              SELECT id FROM payments
+              WHERE pagarme_charge_id = ${chargeId}
+              LIMIT 1
+            `
+            paymentId = existingPayment[0]?.id
           } else {
             console.error('Webhook payments.pending update error:', pendingErr)
           }
-        } else if (updatedPending?.id) {
-          paymentId = updatedPending.id
         }
-      } else if ((pendingPayments?.length ?? 0) > 0) {
+      } else if (pendingPayments.length > 0) {
         console.warn(
           'Webhook: pending payments existem mas nenhum correlaciona com chargeIds',
           {
             subscriptionId,
             chargeIds,
-            pendingIds: pendingPayments?.map((p) => p.id),
+            pendingIds: pendingPayments.map((p) => p.id),
           },
         )
       }
     }
 
     if (!paymentId) {
-      // Cobrança nova (renovação) — charge_id ainda não existia na tabela.
-      const { data: inserted, error: insertError } = await admin
-        .from('payments')
-        .insert({
-          subscription_id: subscriptionId,
-          pagarme_charge_id: chargeId,
-          amount: extractAmountFromPayload(payload),
-          status: 'paid',
-          paid_at: paidAt,
-        })
-        .select('id')
-        .single()
-
-      if (insertError) {
-        if (insertError.code === '23505') {
-          const { data: existingPayment } = await admin
-            .from('payments')
-            .select('id')
-            .eq('pagarme_charge_id', chargeId)
-            .maybeSingle()
-          paymentId = existingPayment?.id
+      try {
+        const inserted = await sql<{ id: string }[]>`
+          INSERT INTO payments (
+            subscription_id, pagarme_charge_id, amount, status, paid_at
+          )
+          VALUES (
+            ${subscriptionId}::uuid,
+            ${chargeId},
+            ${extractAmountFromPayload(payload)},
+            'paid',
+            ${paidAt}
+          )
+          RETURNING id
+        `
+        paymentId = inserted[0]?.id
+        if (!paymentId) {
+          throw new Error('Webhook payments.insert não retornou id')
+        }
+      } catch (insertError) {
+        if (
+          insertError instanceof postgres.PostgresError &&
+          insertError.code === '23505'
+        ) {
+          const existingPayment = await sql<{ id: string }[]>`
+            SELECT id FROM payments
+            WHERE pagarme_charge_id = ${chargeId}
+            LIMIT 1
+          `
+          paymentId = existingPayment[0]?.id
         } else {
           console.error('Webhook payments.insert error:', insertError)
         }
-      } else {
-        paymentId = inserted?.id
       }
     }
   } else {
@@ -372,52 +387,32 @@ async function handlePaymentSucceeded(
     )
   }
 
-  const { data: existing } = await admin
-    .from('user_entitlements')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('product_key', 'treatment')
-    .maybeSingle()
-
-  if (existing) {
-    await admin
-      .from('user_entitlements')
-      .update({
-        status: 'active',
-        expires_at: expiresAt.toISOString(),
-      })
-      .eq('id', existing.id)
-  } else {
-    await admin.from('user_entitlements').insert({
-      user_id: userId,
-      product_key: 'treatment',
-      status: 'active',
-      expires_at: expiresAt.toISOString(),
-      is_permanent: false,
-    })
-  }
+  await sql`
+    INSERT INTO user_entitlements (user_id, product_key, status, expires_at, is_permanent)
+    VALUES (${userId}::uuid, 'treatment', 'active', ${expiresAt.toISOString()}::timestamptz, false)
+    ON CONFLICT (user_id, product_key)
+    DO UPDATE SET status = EXCLUDED.status, expires_at = EXCLUDED.expires_at
+  `
 
   if (!skipFulfillment) {
     await ensureProtocolAfterPayment(admin, subscriptionId, userId)
   }
 
   if (webhookLogId) {
-    await admin
-      .from('webhook_logs')
-      .update({ processed: true })
-      .eq('id', webhookLogId)
+    await sql`
+      UPDATE webhook_logs SET processed = true WHERE id = ${webhookLogId}::uuid
+    `
   }
 
   if (!skipFulfillment && dispatchPharmacy) {
-    const { data: sub } = await admin
-      .from('subscriptions')
-      .select('protocol_id')
-      .eq('id', subscriptionId)
-      .maybeSingle()
+    const subRows = await sql<{ protocol_id: string | null }[]>`
+      SELECT protocol_id FROM subscriptions
+      WHERE id = ${subscriptionId}::uuid
+      LIMIT 1
+    `
+    const sub = subRows[0] ?? null
 
     if (!sub?.protocol_id) {
-      // Faz o webhook falhar pra o Pagar.me retentar — criação pode ainda estar
-      // em andamento (outro worker) ou ter demorado mais que o wait local.
       throw new Error(
         `Farmácia não disparada — protocolo ainda ausente para subscription ${subscriptionId}`,
       )
@@ -439,30 +434,35 @@ async function handlePaymentSucceeded(
 }
 
 async function handleSubscriptionPaymentFailed(
-  admin: SupabaseClient,
   metadata: Record<string, string>,
   chargeId: string | undefined,
   webhookLogId: string | undefined,
 ): Promise<void> {
+  const sql = getSql()
   const subscriptionId = metadata.subscription_id
   if (!subscriptionId) return
 
   if (chargeId) {
-    await admin
-      .from('payments')
-      .update({ status: 'failed' })
-      .eq('pagarme_charge_id', chargeId)
+    await sql`
+      UPDATE payments SET status = 'failed'
+      WHERE pagarme_charge_id = ${chargeId}
+    `
   }
 
-  const { data: sub } = await admin
-    .from('subscriptions')
-    .select('user_id, plan_type')
-    .eq('id', subscriptionId)
-    .single()
+  const subRows = await sql<{ user_id: string; plan_type: string }[]>`
+    SELECT user_id, plan_type FROM subscriptions
+    WHERE id = ${subscriptionId}::uuid
+  `
+  const sub = subRows[0]
+  if (!sub) {
+    throw new Error(
+      `subscription.payment_failed: subscription ${subscriptionId} não encontrada`,
+    )
+  }
 
-  if (sub?.plan_type === '1mes') return
+  if (sub.plan_type === '1mes') return
 
-  const userId = metadata.user_id ?? sub?.user_id
+  const userId = metadata.user_id ?? sub.user_id
 
   if (!userId) {
     console.error('subscription.payment_failed sem user_id:', metadata)
@@ -479,10 +479,9 @@ async function handleSubscriptionPaymentFailed(
   }
 
   if (webhookLogId) {
-    await admin
-      .from('webhook_logs')
-      .update({ processed: true })
-      .eq('id', webhookLogId)
+    await sql`
+      UPDATE webhook_logs SET processed = true WHERE id = ${webhookLogId}::uuid
+    `
   }
 }
 
@@ -494,19 +493,23 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const admin = createAdminClient()
     const payload = (await request.json()) as PagarmePayload
+    const sql = getSql()
 
-    const { data: webhookLog } = await admin
-      .from('webhook_logs')
-      .insert({
-        source: 'pagarme',
-        event_type: payload.type ?? 'unknown',
-        payload: summarizePagarmePayload(payload),
-        processed: false,
-      })
-      .select('id')
-      .single()
+    const logRows = await sql<{ id: string }[]>`
+      INSERT INTO webhook_logs (source, event_type, payload, processed)
+      VALUES (
+        'pagarme',
+        ${payload.type ?? 'unknown'},
+        ${sql.json(summarizePagarmePayload(payload) as never)},
+        false
+      )
+      RETURNING id
+    `
+    const webhookLog = logRows[0]
+    if (!webhookLog) {
+      throw new Error('pagarme webhook: insert webhook_logs sem id')
+    }
 
     const eventType = payload.type
     const metadata = extractMetadata(payload)
@@ -518,18 +521,13 @@ export async function POST(request: NextRequest) {
       eventType === 'subscription.payment_succeeded'
     ) {
       const dispatchPharmacy = metadata.subscription_id
-        ? await shouldDispatchPharmacy(
-            admin,
-            metadata.subscription_id,
-            eventType,
-          )
+        ? await shouldDispatchPharmacy(metadata.subscription_id, eventType)
         : false
 
       await handlePaymentSucceeded(
-        admin,
         metadata,
         chargeId,
-        webhookLog?.id,
+        webhookLog.id,
         dispatchPharmacy,
         payload,
       )
@@ -537,17 +535,15 @@ export async function POST(request: NextRequest) {
 
     if (eventType === 'subscription.payment_failed') {
       await handleSubscriptionPaymentFailed(
-        admin,
         metadata,
         chargeId,
-        webhookLog?.id,
+        webhookLog.id,
       )
     }
 
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('Webhook error:', error)
-    // 500 pra o Pagar.me retentar (ex.: protocolo ainda em criação).
     return NextResponse.json(
       { error: 'Webhook processing failed' },
       { status: 500 },
