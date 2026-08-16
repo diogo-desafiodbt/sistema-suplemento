@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { asNumber, getSql } from '@/lib/db'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -67,7 +68,7 @@ function daysAgoIso(days: number): string {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
 }
 
-function daysBetween(fromIso: string): number {
+function daysBetween(fromIso: string | Date): number {
   return Math.floor(
     (Date.now() - new Date(fromIso).getTime()) / (1000 * 60 * 60 * 24),
   )
@@ -223,66 +224,102 @@ export default async function AdminVisaoGeralPage({
   const twoDaysAgo = daysAgoIso(2)
   const sevenDaysAgo = daysAgoIso(7)
   const oneDayAgo = daysAgoIso(1)
+  const sql = getSql()
 
-  const { data: stuckProtocolsRaw } = await admin
-    .from('protocols')
-    .select('id, user_id, generated_at, users ( full_name )')
-    .eq('status', 'pending_signature')
-    .lt('generated_at', threeDaysAgo)
-    .order('generated_at', { ascending: true })
-    .limit(20)
-
-  const stuckProtocols: StuckProtocol[] = (
-    (stuckProtocolsRaw ?? []) as Array<{
+  const [
+    stuckProtocolsRaw,
+    stuckOrdersRaw,
+    reconRows,
+    failedPaymentsRaw,
+  ] = await Promise.all([
+    sql<{
       id: string
       user_id: string
-      generated_at: string
-      users: { full_name: string } | { full_name: string }[] | null
-    }>
-  ).map((p) => {
-    const u = p.users
-    const name = Array.isArray(u) ? u[0]?.full_name : u?.full_name
-    return {
-      id: p.id,
-      user_id: p.user_id,
-      generated_at: p.generated_at,
-      days: daysBetween(p.generated_at),
-      patientName: name ?? 'Paciente',
-    }
-  })
-
-  const { data: stuckOrdersRaw } = await admin
-    .from('orders')
-    .select('id, created_at, users ( full_name )')
-    .is('pharmacy_sent_at', null)
-    .lt('created_at', twoDaysAgo)
-    .order('created_at', { ascending: true })
-    .limit(20)
-
-  const stuckOrders: StuckOrder[] = (
-    (stuckOrdersRaw ?? []) as Array<{
+      generated_at: string | Date
+      users: { full_name: string } | null
+    }[]>`
+      SELECT p.id, p.user_id, p.generated_at,
+        CASE WHEN u.id IS NULL THEN NULL
+          ELSE jsonb_build_object('full_name', u.full_name) END AS users
+      FROM protocols p
+      LEFT JOIN users u ON u.id = p.user_id
+      WHERE p.status = 'pending_signature' AND p.generated_at < ${threeDaysAgo}::timestamptz
+      ORDER BY p.generated_at ASC
+      LIMIT 20
+    `,
+    sql<{
       id: string
-      created_at: string
-      users: { full_name: string } | { full_name: string }[] | null
-    }>
-  ).map((o) => {
-    const u = o.users
-    const name = Array.isArray(u) ? u[0]?.full_name : u?.full_name
-    return {
-      id: o.id,
-      created_at: o.created_at,
-      days: daysBetween(o.created_at),
-      patientName: name ?? 'Paciente',
-    }
-  })
+      created_at: string | Date
+      users: { full_name: string } | null
+    }[]>`
+      SELECT o.id, o.created_at,
+        CASE WHEN u.id IS NULL THEN NULL
+          ELSE jsonb_build_object('full_name', u.full_name) END AS users
+      FROM orders o
+      LEFT JOIN users u ON u.id = o.user_id
+      WHERE o.pharmacy_sent_at IS NULL AND o.created_at < ${twoDaysAgo}::timestamptz
+      ORDER BY o.created_at ASC
+      LIMIT 20
+    `,
+    sql<{
+      id: string
+      status: string
+      completed_at: string | Date | null
+      started_at: string | Date | null
+      payload: unknown
+    }[]>`
+      SELECT id, status, completed_at, started_at, payload
+      FROM background_jobs
+      WHERE job_type = 'pharmacy_reconciliation'
+      ORDER BY completed_at DESC NULLS LAST
+      LIMIT 1
+    `,
+    sql<{
+      id: string
+      amount: string | number | null
+      created_at: string | Date
+      subscription_id: string | null
+      subscriptions: {
+        user_id: string
+        users: { full_name: string } | null
+      } | null
+    }[]>`
+      SELECT pay.id, pay.amount, pay.created_at, pay.subscription_id,
+        CASE WHEN s.id IS NULL THEN NULL ELSE jsonb_build_object(
+          'user_id', s.user_id,
+          'users', CASE WHEN u.id IS NULL THEN NULL
+            ELSE jsonb_build_object('full_name', u.full_name) END) END AS subscriptions
+      FROM payments pay
+      LEFT JOIN subscriptions s ON s.id = pay.subscription_id
+      LEFT JOIN users u ON u.id = s.user_id
+      WHERE pay.status = 'failed' AND pay.created_at >= ${sevenDaysAgo}::timestamptz
+      ORDER BY pay.created_at DESC
+      LIMIT 20
+    `,
+  ])
 
-  const { data: latestRecon } = await admin
-    .from('background_jobs')
-    .select('id, status, completed_at, started_at, payload')
-    .eq('job_type', 'pharmacy_reconciliation')
-    .order('completed_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  const stuckProtocols: StuckProtocol[] = stuckProtocolsRaw.map((p) => ({
+    id: p.id,
+    user_id: p.user_id,
+    generated_at:
+      p.generated_at instanceof Date
+        ? p.generated_at.toISOString()
+        : String(p.generated_at),
+    days: daysBetween(p.generated_at),
+    patientName: p.users?.full_name ?? 'Paciente',
+  }))
+
+  const stuckOrders: StuckOrder[] = stuckOrdersRaw.map((o) => ({
+    id: o.id,
+    created_at:
+      o.created_at instanceof Date
+        ? o.created_at.toISOString()
+        : String(o.created_at),
+    days: daysBetween(o.created_at),
+    patientName: o.users?.full_name ?? 'Paciente',
+  }))
+
+  const latestRecon = reconRows[0] ?? null
 
   const reconAt = latestRecon?.completed_at ?? latestRecon?.started_at ?? null
   const reconFresh = reconAt
@@ -298,46 +335,19 @@ export default async function AdminVisaoGeralPage({
         ? 'Nenhuma reconciliação nas últimas 24h.'
         : null
 
-  const { data: failedPaymentsRaw } = await admin
-    .from('payments')
-    .select(
-      'id, amount, created_at, subscription_id, subscriptions ( user_id, users ( full_name ) )',
-    )
-    .eq('status', 'failed')
-    .gte('created_at', sevenDaysAgo)
-    .order('created_at', { ascending: false })
-    .limit(20)
-
-  const failedPayments: FailedPayment[] = (
-    (failedPaymentsRaw ?? []) as Array<{
-      id: string
-      amount: number | null
-      created_at: string
-      subscriptions:
-        | {
-            user_id: string
-            users: { full_name: string } | { full_name: string }[] | null
-          }
-        | {
-            user_id: string
-            users: { full_name: string } | { full_name: string }[] | null
-          }[]
-        | null
-    }>
-  ).map((p) => {
-    const sub = Array.isArray(p.subscriptions)
-      ? p.subscriptions[0]
-      : p.subscriptions
-    const u = sub?.users
-    const name = Array.isArray(u) ? u[0]?.full_name : u?.full_name
+  const failedPayments: FailedPayment[] = failedPaymentsRaw.map((p) => {
+    const sub = p.subscriptions
     return {
       id: p.id,
-      amount: p.amount,
-      created_at: p.created_at,
+      amount: p.amount == null ? null : asNumber(p.amount),
+      created_at:
+        p.created_at instanceof Date
+          ? p.created_at.toISOString()
+          : String(p.created_at),
       clientHref: sub?.user_id
         ? `/suplementos/admin/clientes/${sub.user_id}`
         : null,
-      patientName: name ?? 'Cliente',
+      patientName: sub?.users?.full_name ?? 'Cliente',
     }
   })
 

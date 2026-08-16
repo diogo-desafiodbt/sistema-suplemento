@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { PedidosActions } from '@/components/admin/PedidosActions'
+import { asNumber, getSql } from '@/lib/db'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -33,16 +34,22 @@ export default async function AdminPedidosPage() {
 
   if (profile?.role !== 'admin') redirect('/suplementos/dashboard')
 
-  const { data: orders } = await admin
-    .from('orders')
-    .select(`
-      id, status, created_at, tracking_code, total_amount, shipping_request_id,
-      users ( full_name, email, client_code )
-    `)
-    .order('created_at', { ascending: false })
-    .limit(50)
+  const sql = getSql()
+  const orders = await sql<OrderRow[]>`
+    SELECT o.id, o.status, o.created_at, o.tracking_code, o.total_amount,
+           o.shipping_request_id,
+      CASE WHEN u.id IS NULL THEN NULL ELSE jsonb_build_object(
+        'full_name', u.full_name, 'email', u.email, 'client_code', u.client_code) END AS users
+    FROM orders o
+    LEFT JOIN users u ON u.id = o.user_id
+    ORDER BY o.created_at DESC
+    LIMIT 50
+  `
 
-  const orderList = (orders ?? []) as unknown as OrderRow[]
+  const orderList = orders.map((o) => ({
+    ...o,
+    total_amount: asNumber(o.total_amount),
+  }))
 
   return (
     <main className="max-w-6xl mx-auto px-6 py-8">

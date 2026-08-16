@@ -3,12 +3,12 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import imgLogoAzul from '@/../public/logo-azul.png'
 import { DashboardNav } from '@/components/patient/DashboardNav'
+import { asNumber, getSql } from '@/lib/db'
 import {
   getPatientOrderStatus,
   getPatientOrderStatusColor,
 } from '@/lib/order-status'
 import { getProductDisplayName } from '@/lib/product-display-names'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { findSupplementImageByProductName } from '@/lib/supplements-content'
 
@@ -36,21 +36,32 @@ export default async function PedidosPage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/suplementos/login')
 
-  const admin = createAdminClient()
+  const sql = getSql()
+  const orders = await sql<Order[]>`
+    SELECT o.id, o.status, o.created_at, o.tracking_code, o.pharmacy_sent_at,
+           o.total_amount,
+      COALESCE(it.list, '[]'::jsonb) AS order_items
+    FROM orders o
+    LEFT JOIN LATERAL (
+      SELECT jsonb_agg(jsonb_build_object(
+        'id', oi.id, 'quantity', oi.quantity, 'unit_price', oi.unit_price,
+        'products', CASE WHEN pr.id IS NULL THEN NULL
+          ELSE jsonb_build_object('name', pr.name) END
+      ) ORDER BY oi.id) AS list
+      FROM order_items oi LEFT JOIN products pr ON pr.id = oi.product_id
+      WHERE oi.order_id = o.id) it ON true
+    WHERE o.user_id = ${user.id}::uuid
+    ORDER BY o.created_at DESC
+  `
 
-  const { data: orders } = await admin
-    .from('orders')
-    .select(`
-      id, status, created_at, tracking_code, pharmacy_sent_at, total_amount,
-      order_items (
-        id, quantity, unit_price,
-        products ( name )
-      )
-    `)
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-
-  const orderList = (orders ?? []) as unknown as Order[]
+  const orderList = orders.map((order) => ({
+    ...order,
+    total_amount: asNumber(order.total_amount),
+    order_items: (order.order_items ?? []).map((item) => ({
+      ...item,
+      unit_price: asNumber(item.unit_price),
+    })),
+  }))
 
   return (
     <div className="min-h-screen bg-[#f5f0eb]">

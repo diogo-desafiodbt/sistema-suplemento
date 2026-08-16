@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { getSql } from '@/lib/db'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -30,17 +31,23 @@ export default async function AdminUsuariosPage() {
 
   if (profile?.role !== 'admin') redirect('/suplementos/dashboard')
 
-  const { data: users } = await admin
-    .from('users')
-    .select(`
-      id, full_name, email, client_code, role, created_at,
-      user_entitlements ( product_key, status ),
-      subscriptions ( plan_type, status )
-    `)
-    .order('created_at', { ascending: false })
-    .limit(50)
-
-  const userList = (users ?? []) as unknown as UserRow[]
+  const sql = getSql()
+  const userList = await sql<UserRow[]>`
+    SELECT u.id, u.full_name, u.email, u.client_code, u.role, u.created_at,
+      COALESCE(ent.list, '[]'::jsonb) AS user_entitlements,
+      COALESCE(sub.list, '[]'::jsonb) AS subscriptions
+    FROM users u
+    LEFT JOIN LATERAL (
+      SELECT jsonb_agg(jsonb_build_object('product_key', e.product_key, 'status', e.status)
+             ORDER BY e.product_key) AS list
+      FROM user_entitlements e WHERE e.user_id = u.id) ent ON true
+    LEFT JOIN LATERAL (
+      SELECT jsonb_agg(jsonb_build_object('plan_type', s.plan_type, 'status', s.status)
+             ORDER BY s.id) AS list
+      FROM subscriptions s WHERE s.user_id = u.id) sub ON true
+    ORDER BY u.created_at DESC
+    LIMIT 50
+  `
 
   return (
     <main className="max-w-6xl mx-auto px-6 py-8">

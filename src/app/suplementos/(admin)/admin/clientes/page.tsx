@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { RFM_TIER_BADGE, RFM_TIER_LABEL } from '@/lib/admin/rfm-tier'
+import { asNumber, getSql } from '@/lib/db'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -45,31 +46,32 @@ export default async function AdminClientesPage({
 
   const params = await searchParams
   const q = (params.q ?? '').trim()
+  const search = q ? q.replace(/[%_]/g, '') : null
   const page = Math.max(1, parseInt(params.page ?? '1', 10) || 1)
   const from = (page - 1) * PAGE_SIZE
 
-  let query = admin
-    .from('users')
-    .select(
-      `
-      id, full_name, email, cpf, client_code, created_at,
-      user_rfm_scores ( tier )
-    `,
-      { count: 'exact' },
+  const sql = getSql()
+  const rows = await sql<(ClientRow & { total: string | number })[]>`
+    SELECT u.id, u.full_name, u.email, u.cpf, u.client_code, u.created_at,
+      COALESCE(rfm.list, '[]'::jsonb) AS user_rfm_scores,
+      COUNT(*) OVER() AS total
+    FROM users u
+    LEFT JOIN LATERAL (
+      SELECT jsonb_agg(jsonb_build_object('tier', r.tier) ORDER BY r.user_id) AS list
+      FROM user_rfm_scores r WHERE r.user_id = u.id) rfm ON true
+    WHERE (
+      ${search}::text IS NULL
+      OR u.full_name ILIKE '%' || ${search} || '%'
+      OR u.email ILIKE '%' || ${search} || '%'
+      OR u.cpf ILIKE '%' || ${search} || '%'
+      OR u.client_code ILIKE '%' || ${search} || '%'
     )
-    .order('created_at', { ascending: false })
-    .range(from, from + PAGE_SIZE - 1)
+    ORDER BY u.created_at DESC
+    LIMIT ${PAGE_SIZE} OFFSET ${from}
+  `
 
-  if (q) {
-    const like = `%${q.replace(/[%_]/g, '')}%`
-    query = query.or(
-      `full_name.ilike.${like},email.ilike.${like},cpf.ilike.${like},client_code.ilike.${like}`,
-    )
-  }
-
-  const { data: users, count } = await query
-  const clientList = (users ?? []) as unknown as ClientRow[]
-  const total = count ?? clientList.length
+  const clientList: ClientRow[] = rows.map(({ total: _total, ...row }) => row)
+  const total = rows[0] ? asNumber(rows[0].total) : 0
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   function pageHref(p: number) {

@@ -9,11 +9,11 @@ import {
   getPatientOrderStatusColor,
 } from '@/lib/order-status'
 import { getProductDisplayName } from '@/lib/product-display-names'
+import { asNumber, getSql } from '@/lib/db'
 import {
   addBusinessDays,
   estimateCustomerDeliveryDays,
 } from '@/lib/shipping/estimate'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { findSupplementImageByProductName } from '@/lib/supplements-content'
 
@@ -96,26 +96,38 @@ export default async function PedidoDetalhePage({
   } = await supabase.auth.getUser()
   if (!user) redirect('/suplementos/login')
 
-  const admin = createAdminClient()
+  const sql = getSql()
   const { id } = await params
 
-  const { data: order } = await admin
-    .from('orders')
-    .select(`
-      id, status, created_at, total_amount, tracking_code, pharmacy_sent_at,
-      subscription_id, shipping_quote_json, shipping_json, pharmacy_json,
-      order_items (
-        id, quantity, unit_price,
-        products ( name )
-      )
-    `)
-    .eq('id', id)
-    .eq('user_id', user.id)
-    .maybeSingle()
+  const orderRows = await sql<OrderDetail[]>`
+    SELECT o.id, o.status, o.created_at, o.total_amount, o.tracking_code,
+           o.pharmacy_sent_at, o.subscription_id, o.shipping_quote_json,
+           o.shipping_json, o.pharmacy_json,
+      COALESCE(it.list, '[]'::jsonb) AS order_items
+    FROM orders o
+    LEFT JOIN LATERAL (
+      SELECT jsonb_agg(jsonb_build_object(
+        'id', oi.id, 'quantity', oi.quantity, 'unit_price', oi.unit_price,
+        'products', CASE WHEN pr.id IS NULL THEN NULL
+          ELSE jsonb_build_object('name', pr.name) END
+      ) ORDER BY oi.id) AS list
+      FROM order_items oi LEFT JOIN products pr ON pr.id = oi.product_id
+      WHERE oi.order_id = o.id) it ON true
+    WHERE o.id = ${id}::uuid AND o.user_id = ${user.id}::uuid
+    LIMIT 1
+  `
 
+  const order = orderRows[0] ?? null
   if (!order) notFound()
 
-  const orderData = order as unknown as OrderDetail
+  const orderData: OrderDetail = {
+    ...order,
+    total_amount: order.total_amount == null ? null : asNumber(order.total_amount),
+    order_items: (order.order_items ?? []).map((item) => ({
+      ...item,
+      unit_price: asNumber(item.unit_price),
+    })),
+  }
   const statusMessage = getPatientOrderStatus(
     orderData.status,
     orderData.tracking_code,
@@ -146,14 +158,16 @@ export default async function PedidoDetalhePage({
   // Forma de pagamento: inspeciona o payload do pagamento da mesma subscription
   let paymentMethod: 'credit_card' | 'pix' | null = null
   if (orderData.subscription_id) {
-    const { data: payment } = await admin
-      .from('payments')
-      .select('webhook_payload')
-      .eq('subscription_id', orderData.subscription_id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    paymentMethod = extractPaymentMethod(payment?.webhook_payload)
+    const paymentRows = await sql<{ webhook_payload: unknown }[]>`
+      SELECT pay.webhook_payload
+      FROM payments pay
+      JOIN subscriptions s ON s.id = pay.subscription_id
+      WHERE pay.subscription_id = ${orderData.subscription_id}::uuid
+        AND s.user_id = ${user.id}::uuid
+      ORDER BY pay.created_at DESC
+      LIMIT 1
+    `
+    paymentMethod = extractPaymentMethod(paymentRows[0]?.webhook_payload)
   }
 
   const freteValor = orderData.shipping_quote_json?.valor

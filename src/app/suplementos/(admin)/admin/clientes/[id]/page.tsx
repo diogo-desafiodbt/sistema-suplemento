@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { CopyButton } from '@/components/CopyButton'
 import { RFM_TIER_BADGE, RFM_TIER_LABEL } from '@/lib/admin/rfm-tier'
+import { asNumber, getSql } from '@/lib/db'
 import { createPrescriptionPdfSignedUrl } from '@/lib/pdf/signed-url'
 import { PLAN_LABELS } from '@/lib/plans'
 import { getProductDisplayName } from '@/lib/product-display-names'
@@ -90,7 +91,7 @@ type ProfessionalRow = {
   id: string
   crm: string | null
   crm_state: string | null
-  users: { full_name: string } | { full_name: string }[] | null
+  users: { full_name: string } | null
 }
 
 type TermsRow = {
@@ -143,12 +144,12 @@ const PROTOCOL_STATUS_BADGE: Record<string, string> = {
   rejected: 'bg-red-50 text-red-700',
 }
 
-function fmtDate(value: string | null | undefined): string {
+function fmtDate(value: string | Date | null | undefined): string {
   if (!value) return '—'
   return new Date(value).toLocaleDateString('pt-BR')
 }
 
-function fmtDateTime(value: string | null | undefined): string {
+function fmtDateTime(value: string | Date | null | undefined): string {
   if (!value) return '—'
   return new Date(value).toLocaleString('pt-BR')
 }
@@ -239,87 +240,112 @@ export default async function AdminClienteDetalhePage({
   if (profile?.role !== 'admin') redirect('/suplementos/dashboard')
 
   const { id } = await params
+  const sql = getSql()
 
-  const { data: client } = await admin
-    .from('users')
-    .select('id, full_name, email, phone, cpf, client_code, role, created_at')
-    .eq('id', id)
-    .maybeSingle()
-
+  const clientRows = await sql<
+    {
+      id: string
+      full_name: string
+      email: string
+      phone: string | null
+      cpf: string | null
+      client_code: string
+      role: string
+      created_at: string | Date
+    }[]
+  >`
+    SELECT id, full_name, email, phone, cpf, client_code, role, created_at
+    FROM users
+    WHERE id = ${id}::uuid
+    LIMIT 1
+  `
+  const client = clientRows[0] ?? null
   if (!client) notFound()
 
   const [
-    { data: rfm },
-    { data: addresses },
-    { data: subscriptions },
-    { data: orders },
-    { data: protocols },
-    { data: quizResponses },
-    { data: healthRecords },
-    { data: notificationLogs },
-    { data: loginHistory },
-    { data: termsAcceptances },
+    rfmRows,
+    addresses,
+    subscriptions,
+    orders,
+    protocols,
+    quizResponses,
+    healthRecords,
+    notificationLogs,
+    loginHistory,
+    termsAcceptances,
   ] = await Promise.all([
-    admin.from('user_rfm_scores').select('*').eq('user_id', id).maybeSingle(),
-    admin
-      .from('addresses')
-      .select('*')
-      .eq('user_id', id)
-      .order('is_default', { ascending: false }),
-    admin
-      .from('subscriptions')
-      .select('*')
-      .eq('user_id', id)
-      .order('created_at', { ascending: false }),
-    admin
-      .from('orders')
-      .select('*')
-      .eq('user_id', id)
-      .order('created_at', { ascending: false }),
-    admin
-      .from('protocols')
-      .select(`
-        id, status, generated_at, signed_at, signed_by, prescription_pdf_path,
-        protocol_items (
-          id, is_required, removed_by_patient, activation_reason,
-          products ( name )
-        )
-      `)
-      .eq('user_id', id)
-      .order('generated_at', { ascending: false }),
-    admin
-      .from('quiz_responses')
-      .select('*')
-      .eq('user_id', id)
-      .order('completed_at', { ascending: false, nullsFirst: false }),
-    admin.from('health_records').select('*').eq('user_id', id),
-    admin
-      .from('notification_logs')
-      .select('*')
-      .eq('user_id', id)
-      .order('sent_at', { ascending: false })
-      .limit(20),
-    admin
-      .from('user_login_history')
-      .select('*')
-      .eq('user_id', id)
-      .order('logged_at', { ascending: false })
-      .limit(20),
-    admin
-      .from('terms_acceptances')
-      .select('*')
-      .eq('user_id', id)
-      .order('accepted_at', { ascending: false }),
+    sql<{ tier?: string }[]>`
+      SELECT * FROM user_rfm_scores WHERE user_id = ${id}::uuid LIMIT 1
+    `,
+    sql<AddressRow[]>`
+      SELECT * FROM addresses
+      WHERE user_id = ${id}::uuid
+      ORDER BY is_default DESC
+    `,
+    sql<SubscriptionRow[]>`
+      SELECT * FROM subscriptions
+      WHERE user_id = ${id}::uuid
+      ORDER BY created_at DESC
+    `,
+    sql<OrderRow[]>`
+      SELECT * FROM orders
+      WHERE user_id = ${id}::uuid
+      ORDER BY created_at DESC
+    `,
+    sql<Omit<ProtocolRow, 'prescription_pdf_signed_url'>[]>`
+      SELECT p.id, p.status, p.generated_at, p.signed_at, p.signed_by,
+             p.prescription_pdf_path,
+        COALESCE(it.list, '[]'::jsonb) AS protocol_items
+      FROM protocols p
+      LEFT JOIN LATERAL (
+        SELECT jsonb_agg(jsonb_build_object(
+          'id', pi.id, 'is_required', pi.is_required,
+          'removed_by_patient', pi.removed_by_patient,
+          'activation_reason', pi.activation_reason,
+          'products', CASE WHEN pr.id IS NULL THEN NULL
+            ELSE jsonb_build_object('name', pr.name) END
+        ) ORDER BY pi.id) AS list
+        FROM protocol_items pi LEFT JOIN products pr ON pr.id = pi.product_id
+        WHERE pi.protocol_id = p.id) it ON true
+      WHERE p.user_id = ${id}::uuid
+      ORDER BY p.generated_at DESC
+    `,
+    sql<Record<string, unknown>[]>`
+      SELECT * FROM quiz_responses
+      WHERE user_id = ${id}::uuid
+      ORDER BY completed_at DESC NULLS LAST
+    `,
+    sql<Record<string, unknown>[]>`
+      SELECT * FROM health_records WHERE user_id = ${id}::uuid
+    `,
+    sql<Record<string, unknown>[]>`
+      SELECT * FROM notification_logs
+      WHERE user_id = ${id}::uuid
+      ORDER BY sent_at DESC
+      LIMIT 20
+    `,
+    sql<Record<string, unknown>[]>`
+      SELECT * FROM user_login_history
+      WHERE user_id = ${id}::uuid
+      ORDER BY logged_at DESC
+      LIMIT 20
+    `,
+    sql<TermsRow[]>`
+      SELECT * FROM terms_acceptances
+      WHERE user_id = ${id}::uuid
+      ORDER BY accepted_at DESC
+    `,
   ])
 
-  const addressList = (addresses ?? []) as AddressRow[]
-  const subList = (subscriptions ?? []) as SubscriptionRow[]
-  const orderList = (orders ?? []) as unknown as OrderRow[]
+  const rfm = rfmRows[0] ?? null
+  const addressList = addresses
+  const subList = subscriptions
+  const orderList = orders.map((o) => ({
+    ...o,
+    total_amount: o.total_amount == null ? null : asNumber(o.total_amount),
+  }))
   const protocolList = await Promise.all(
-    ((protocols ?? []) as unknown as Omit<
-      ProtocolRow,
-      'prescription_pdf_signed_url'
-    >[]).map(async (p) => ({
+    protocols.map(async (p) => ({
       ...p,
       prescription_pdf_signed_url: await createPrescriptionPdfSignedUrl(
         admin,
@@ -327,13 +353,12 @@ export default async function AdminClienteDetalhePage({
       ),
     })),
   )
-  const quizList = (quizResponses ?? []) as Record<string, unknown>[]
-  const healthList = (healthRecords ?? []) as Record<string, unknown>[]
-  const notifList = (notificationLogs ?? []) as Record<string, unknown>[]
-  const loginList = (loginHistory ?? []) as Record<string, unknown>[]
-  const termsList = (termsAcceptances ?? []) as TermsRow[]
+  const quizList = quizResponses
+  const healthList = healthRecords
+  const notifList = notificationLogs
+  const loginList = loginHistory
+  const termsList = termsAcceptances
 
-  // Pagamentos das assinaturas + profissionais que assinaram (em paralelo)
   const subIds = subList.map((s) => s.id)
   const signerIds = [
     ...new Set(
@@ -341,25 +366,32 @@ export default async function AdminClienteDetalhePage({
     ),
   ]
 
-  const [{ data: payments }, { data: pros }] = await Promise.all([
+  const [payments, pros] = await Promise.all([
     subIds.length > 0
-      ? admin
-          .from('payments')
-          .select('*')
-          .in('subscription_id', subIds)
-          .order('created_at', { ascending: false })
-      : Promise.resolve({ data: [] as PaymentRow[] }),
+      ? sql<PaymentRow[]>`
+          SELECT * FROM payments
+          WHERE subscription_id = ANY(${sql.array(subIds)}::uuid[])
+          ORDER BY created_at DESC
+        `
+      : Promise.resolve([] as PaymentRow[]),
     signerIds.length > 0
-      ? admin
-          .from('professionals')
-          .select('id, crm, crm_state, users ( full_name )')
-          .in('id', signerIds)
-      : Promise.resolve({ data: [] as ProfessionalRow[] }),
+      ? sql<ProfessionalRow[]>`
+          SELECT pf.id, pf.crm, pf.crm_state,
+            CASE WHEN u.id IS NULL THEN NULL
+              ELSE jsonb_build_object('full_name', u.full_name) END AS users
+          FROM professionals pf
+          LEFT JOIN users u ON u.id = pf.user_id
+          WHERE pf.id = ANY(${sql.array(signerIds)}::uuid[])
+        `
+      : Promise.resolve([] as ProfessionalRow[]),
   ])
 
-  const paymentList = (payments ?? []) as PaymentRow[]
+  const paymentList = payments.map((p) => ({
+    ...p,
+    amount: p.amount == null ? null : asNumber(p.amount),
+  }))
   const professionalsById = new Map<string, ProfessionalRow>()
-  for (const pro of (pros ?? []) as unknown as ProfessionalRow[]) {
+  for (const pro of pros) {
     professionalsById.set(pro.id, pro)
   }
 
@@ -367,8 +399,7 @@ export default async function AdminClienteDetalhePage({
     if (!signedBy) return '—'
     const pro = professionalsById.get(signedBy)
     if (!pro) return '—'
-    const u = pro.users
-    const name = Array.isArray(u) ? u[0]?.full_name : u?.full_name
+    const name = pro.users?.full_name
     const crm = pro.crm
       ? ` — CRM ${pro.crm}${pro.crm_state ? `/${pro.crm_state}` : ''}`
       : ''
@@ -382,7 +413,7 @@ export default async function AdminClienteDetalhePage({
       : 'Curitiba'
     : null
 
-  const tier = (rfm as { tier?: string } | null)?.tier ?? null
+  const tier = rfm?.tier ?? null
 
   return (
     <main className="max-w-6xl mx-auto px-6 py-8 space-y-5">
