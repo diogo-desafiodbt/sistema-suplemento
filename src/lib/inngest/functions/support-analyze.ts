@@ -1,4 +1,5 @@
 import { claimByFlag, releaseFlag } from '@/lib/idempotency'
+import { getSql } from '@/lib/db'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { classifySupportThread, draftSupportReply } from '@/lib/support/ai'
 import { fetchSupportFacts, hasRelevantFacts } from '@/lib/support/facts'
@@ -21,13 +22,25 @@ export const supportAnalyze = inngest.createFunction(
     if (!threadId)
       throw new Error('Evento suporte/email-recebido sem thread_id')
 
+    const sql = getSql()
     const admin = createAdminClient()
 
-    const { data: thread } = await admin
-      .from('support_threads')
-      .select('id, from_email, subject, user_id, auto_ack_sent_at, status')
-      .eq('id', threadId)
-      .maybeSingle()
+    const threadRows = await sql<
+      {
+        id: string
+        from_email: string
+        subject: string | null
+        user_id: string | null
+        auto_ack_sent_at: string | Date | null
+        status: string
+      }[]
+    >`
+      SELECT id, from_email, subject, user_id, auto_ack_sent_at, status
+      FROM support_threads
+      WHERE id = ${threadId}::uuid
+      LIMIT 1
+    `
+    const thread = threadRows[0] ?? null
 
     if (!thread) {
       throw new Error(`Thread de suporte não encontrada: ${threadId}`)
@@ -65,11 +78,19 @@ export const supportAnalyze = inngest.createFunction(
       }
     }
 
-    const { data: messages } = await admin
-      .from('support_messages')
-      .select('direction, body_text, from_email, created_at')
-      .eq('thread_id', threadId)
-      .order('created_at', { ascending: true })
+    const messages = await sql<
+      {
+        direction: string
+        body_text: string | null
+        from_email: string | null
+        created_at: string | Date
+      }[]
+    >`
+      SELECT direction, body_text, from_email, created_at
+      FROM support_messages
+      WHERE thread_id = ${threadId}::uuid
+      ORDER BY created_at ASC
+    `
 
     const inboundBodies = (messages ?? [])
       .filter((m) => m.direction === 'inbound')
@@ -83,22 +104,19 @@ export const supportAnalyze = inngest.createFunction(
         bodyTexts: inboundBodies,
       })
       if (userId) {
-        await admin
-          .from('support_threads')
-          .update({ user_id: userId })
-          .eq('id', threadId)
+        await sql`
+          UPDATE support_threads SET user_id = ${userId}::uuid
+          WHERE id = ${threadId}::uuid
+        `
       }
     }
 
     if (!userId) {
-      await admin
-        .from('support_threads')
-        .update({
-          status: 'aguardando_dados',
-          db_facts: null,
-          suggested_reply: null,
-        })
-        .eq('id', threadId)
+      await sql`
+        UPDATE support_threads
+        SET status = 'aguardando_dados', db_facts = NULL, suggested_reply = NULL
+        WHERE id = ${threadId}::uuid
+      `
       return { ok: true, status: 'aguardando_dados' }
     }
 
@@ -112,11 +130,10 @@ export const supportAnalyze = inngest.createFunction(
     const category = await classifySupportThread(threadText)
     const facts = await fetchSupportFacts(userId, category)
 
-    const { data: user } = await admin
-      .from('users')
-      .select('full_name')
-      .eq('id', userId)
-      .maybeSingle()
+    const userRows = await sql<{ full_name: string | null }[]>`
+      SELECT full_name FROM users WHERE id = ${userId}::uuid LIMIT 1
+    `
+    const user = userRows[0] ?? null
 
     // 4.4 — Sugestão
     let suggested: string | null = null
@@ -132,14 +149,14 @@ export const supportAnalyze = inngest.createFunction(
       }
     }
 
-    await admin
-      .from('support_threads')
-      .update({
-        status: 'aguardando_revisao',
-        db_facts: facts,
-        suggested_reply: suggested,
-      })
-      .eq('id', threadId)
+    await sql`
+      UPDATE support_threads
+      SET
+        status = 'aguardando_revisao',
+        db_facts = ${sql.json(facts as never)},
+        suggested_reply = ${suggested}
+      WHERE id = ${threadId}::uuid
+    `
 
     return { ok: true, status: 'aguardando_revisao', category }
   },

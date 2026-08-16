@@ -3,8 +3,34 @@ import {
   fetchAllSalesHistory,
   type HotmartSaleItem,
 } from '@/lib/hotmart/client'
+import { getSql } from '@/lib/db'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { inngest } from '../client'
+
+// As tabelas de conteúdo ainda vivem na Supabase; só o registro do job vai
+// para o RDS. Some quando o banco `conteudo` for migrado.
+
+async function insertBackgroundJob(row: {
+  job_type: string
+  status: string
+  payload: unknown
+  affected_rows: number
+  started_at: string
+  completed_at: string
+}) {
+  const sql = getSql()
+  await sql`
+    INSERT INTO background_jobs (job_type, status, payload, affected_rows, started_at, completed_at)
+    VALUES (
+      ${row.job_type},
+      ${row.status},
+      ${sql.json(row.payload as never)},
+      ${row.affected_rows},
+      ${row.started_at},
+      ${row.completed_at}
+    )
+  `
+}
 
 const SP_OFFSET = '-03:00'
 
@@ -82,7 +108,7 @@ export const hotmartSalesSync = inngest.createFunction(
           windowEnd: window.windowEnd,
           error: 'HOTMART_PRODUCT_ID ausente',
         }
-        await admin.from('background_jobs').insert({
+        await insertBackgroundJob({
           job_type: 'hotmart_sales_sync',
           status: 'failed',
           payload,
@@ -103,7 +129,7 @@ export const hotmartSalesSync = inngest.createFunction(
       } catch (error) {
         const message =
           error instanceof Error ? error.message : String(error)
-        await admin.from('background_jobs').insert({
+        await insertBackgroundJob({
           job_type: 'hotmart_sales_sync',
           status: 'failed',
           payload: {
@@ -134,7 +160,7 @@ export const hotmartSalesSync = inngest.createFunction(
           })
 
         if (upsertError) {
-          await admin.from('background_jobs').insert({
+          await insertBackgroundJob({
             job_type: 'hotmart_sales_sync',
             status: 'failed',
             payload: {
@@ -162,15 +188,16 @@ export const hotmartSalesSync = inngest.createFunction(
         windowEnd: window.windowEnd,
       }
 
-      const { error: jobError } = await admin.from('background_jobs').insert({
-        job_type: 'hotmart_sales_sync',
-        status: 'completed',
-        payload,
-        affected_rows: totalUpserted,
-        started_at: startedAt,
-        completed_at: new Date().toISOString(),
-      })
-      if (jobError) {
+      try {
+        await insertBackgroundJob({
+          job_type: 'hotmart_sales_sync',
+          status: 'completed',
+          payload,
+          affected_rows: totalUpserted,
+          started_at: startedAt,
+          completed_at: new Date().toISOString(),
+        })
+      } catch (jobError) {
         console.error(
           'Erro ao gravar background_jobs do hotmart_sales_sync:',
           jobError,

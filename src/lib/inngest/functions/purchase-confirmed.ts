@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { asNumber, getSql } from '@/lib/db'
 import { claimOnce, markClaimCompleted, releaseClaim } from '@/lib/idempotency'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { inngest } from '../client'
@@ -36,7 +37,7 @@ function formatCurrency(amount: number | null | undefined): string {
   return amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
-function formatDate(iso: string | null | undefined): string {
+function formatDate(iso: string | Date | null | undefined): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('pt-BR')
 }
@@ -45,14 +46,13 @@ async function logNotification(
   userId: string,
   status: 'sent' | 'failed',
 ): Promise<void> {
-  const admin = createAdminClient()
-  const { error } = await admin.from('notification_logs').insert({
-    user_id: userId,
-    type: 'purchase_confirmed',
-    channel: 'email',
-    status,
-  })
-  if (error) {
+  const sql = getSql()
+  try {
+    await sql`
+      INSERT INTO notification_logs (user_id, type, channel, status)
+      VALUES (${userId}::uuid, 'purchase_confirmed', 'email', ${status})
+    `
+  } catch (error) {
     console.error('Erro ao registrar notification_logs:', error)
   }
 }
@@ -142,53 +142,63 @@ export const purchaseConfirmed = inngest.createFunction(
       )
     }
 
+    const sql = getSql()
     const admin = createAdminClient()
 
     let payment: { id: string; amount: number | null } | null = null
 
     if (eventPaymentId) {
-      const { data } = await admin
-        .from('payments')
-        .select('id, amount')
-        .eq('id', eventPaymentId)
-        .eq('subscription_id', subscription_id)
-        .maybeSingle()
-      payment = data
+      const rows = await sql<{ id: string; amount: string | number | null }[]>`
+        SELECT id, amount FROM payments
+        WHERE id = ${eventPaymentId}::uuid
+          AND subscription_id = ${subscription_id}::uuid
+        LIMIT 1
+      `
+      const row = rows[0] ?? null
+      payment = row
+        ? { id: row.id, amount: row.amount == null ? null : asNumber(row.amount) }
+        : null
     } else {
-      // Sem payment_id: pega o pago mais recente que ainda NÃO tem confirmação completa.
-      const { data: candidates } = await admin
-        .from('payments')
-        .select('id, amount')
-        .eq('subscription_id', subscription_id)
-        .eq('status', 'paid')
-        .order('created_at', { ascending: false })
-        .limit(20)
+      const candidates = await sql<
+        { id: string; amount: string | number | null }[]
+      >`
+        SELECT id, amount FROM payments
+        WHERE subscription_id = ${subscription_id}::uuid AND status = 'paid'
+        ORDER BY created_at DESC
+        LIMIT 20
+      `
 
-      for (const candidate of candidates ?? []) {
-        const { data: confirmLog } = await admin
-          .from('purchase_confirmation_logs')
-          .select('completed_at')
-          .eq('payment_id', candidate.id)
-          .maybeSingle()
-        if (!confirmLog?.completed_at) {
-          payment = candidate
+      for (const candidate of candidates) {
+        const confirmLog = await sql<{ completed_at: string | Date | null }[]>`
+          SELECT completed_at FROM purchase_confirmation_logs
+          WHERE payment_id = ${candidate.id}::uuid
+          LIMIT 1
+        `
+        if (!confirmLog[0]?.completed_at) {
+          payment = {
+            id: candidate.id,
+            amount:
+              candidate.amount == null ? null : asNumber(candidate.amount),
+          }
           break
         }
       }
     }
 
-    const [{ data: subscription }, { data: user }] = await Promise.all([
-      admin
-        .from('subscriptions')
-        .select('plan_type, expires_at')
-        .eq('id', subscription_id)
-        .maybeSingle(),
-      admin
-        .from('users')
-        .select('full_name, email')
-        .eq('id', user_id)
-        .maybeSingle(),
+    const [subscriptionRows, userRows] = await Promise.all([
+      sql<{ plan_type: string; expires_at: string | Date | null }[]>`
+        SELECT plan_type, expires_at FROM subscriptions
+        WHERE id = ${subscription_id}::uuid
+        LIMIT 1
+      `,
+      sql<{ full_name: string | null; email: string | null }[]>`
+        SELECT full_name, email FROM users
+        WHERE id = ${user_id}::uuid
+        LIMIT 1
+      `,
     ])
+    const subscription = subscriptionRows[0] ?? null
+    const user = userRows[0] ?? null
 
     if (!user?.email) {
       console.error('purchase-confirmed: usuário sem e-mail', user_id)
@@ -235,11 +245,17 @@ export const purchaseConfirmed = inngest.createFunction(
       },
     )
     if (!won) {
-      const { data: existingClaim } = await admin
-        .from('purchase_confirmation_logs')
-        .select('completed_at, email_sent_at')
-        .eq('payment_id', payment.id)
-        .maybeSingle()
+      const existingClaimRows = await sql<
+        {
+          completed_at: string | Date | null
+          email_sent_at: string | Date | null
+        }[]
+      >`
+        SELECT completed_at, email_sent_at FROM purchase_confirmation_logs
+        WHERE payment_id = ${payment.id}::uuid
+        LIMIT 1
+      `
+      const existingClaim = existingClaimRows[0] ?? null
 
       if (existingClaim?.completed_at) {
         return {
@@ -292,11 +308,13 @@ export const purchaseConfirmed = inngest.createFunction(
     }
 
     // Evidência na própria claim (payment_id) — nunca releaseClaim pós-send.
-    const { error: emailSentError } = await admin
-      .from('purchase_confirmation_logs')
-      .update({ email_sent_at: new Date().toISOString() })
-      .eq('payment_id', payment.id)
-    if (emailSentError) {
+    try {
+      await sql`
+        UPDATE purchase_confirmation_logs
+        SET email_sent_at = ${new Date().toISOString()}
+        WHERE payment_id = ${payment.id}::uuid
+      `
+    } catch (emailSentError) {
       try {
         await markClaimCompleted(
           admin,
@@ -312,7 +330,11 @@ export const purchaseConfirmed = inngest.createFunction(
         )
       }
       throw new Error(
-        `purchase-confirmed: falha ao gravar email_sent_at: ${emailSentError.message}`,
+        `purchase-confirmed: falha ao gravar email_sent_at: ${
+          emailSentError instanceof Error
+            ? emailSentError.message
+            : String(emailSentError)
+        }`,
       )
     }
     await markClaimCompleted(

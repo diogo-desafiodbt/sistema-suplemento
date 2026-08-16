@@ -1,5 +1,5 @@
 import { Resend } from 'resend'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getSql, withTransaction } from '@/lib/db'
 import { inngest } from '../client'
 
 // TODO: trocar pelo link de autoatendimento (/dashboard/assinatura) quando essa página existir
@@ -17,14 +17,15 @@ function escapeHtml(text: string): string {
 }
 
 async function assinaturaAtiva(subscriptionId: string): Promise<boolean> {
-  const admin = createAdminClient()
-  const { data } = await admin
-    .from('subscriptions')
-    .select('status')
-    .eq('id', subscriptionId)
-    .single()
-
-  return data?.status === 'active'
+  const sql = getSql()
+  const rows = await sql<{ status: string }[]>`
+    SELECT status FROM subscriptions WHERE id = ${subscriptionId}::uuid
+  `
+  const data = rows[0]
+  if (!data) {
+    throw new Error(`Assinatura não encontrada: ${subscriptionId}`)
+  }
+  return data.status === 'active'
 }
 
 async function logNotification(
@@ -32,13 +33,11 @@ async function logNotification(
   status: 'sent' | 'failed',
 ): Promise<void> {
   try {
-    const admin = createAdminClient()
-    await admin.from('notification_logs').insert({
-      user_id: userId,
-      type: 'payment_failed',
-      channel: 'email',
-      status,
-    })
+    const sql = getSql()
+    await sql`
+      INSERT INTO notification_logs (user_id, type, channel, status)
+      VALUES (${userId}::uuid, 'payment_failed', 'email', ${status})
+    `
   } catch (error) {
     console.error('Erro ao registrar notification_logs:', error)
   }
@@ -167,12 +166,14 @@ async function sendPaymentFailedEmail(
     return
   }
 
-  const admin = createAdminClient()
-  const { data: user } = await admin
-    .from('users')
-    .select('email, full_name')
-    .eq('id', userId)
-    .single()
+  const sql = getSql()
+  const userRows = await sql<{ email: string | null; full_name: string | null }[]>`
+    SELECT email, full_name FROM users WHERE id = ${userId}::uuid
+  `
+  const user = userRows[0]
+  if (!user) {
+    throw new Error(`Usuário não encontrado: ${userId}`)
+  }
 
   if (!user?.email) {
     console.error('Usuário sem e-mail para régua de cobrança:', userId)
@@ -241,12 +242,14 @@ export const paymentRetry = inngest.createFunction(
     }
 
     const planInfo = await step.run('validar-plano', async () => {
-      const admin = createAdminClient()
-      const { data } = await admin
-        .from('subscriptions')
-        .select('plan_type')
-        .eq('id', subscription_id)
-        .single()
+      const sql = getSql()
+      const rows = await sql<{ plan_type: string }[]>`
+        SELECT plan_type FROM subscriptions WHERE id = ${subscription_id}::uuid
+      `
+      const data = rows[0]
+      if (!data) {
+        throw new Error(`Assinatura não encontrada: ${subscription_id}`)
+      }
       return data
     })
 
@@ -256,17 +259,17 @@ export const paymentRetry = inngest.createFunction(
 
     // D+0: past_due + grace de 20 dias + email neutro
     await step.run('marcar-past-due-e-notificar', async () => {
-      const admin = createAdminClient()
+      const sql = getSql()
       const gracePeriodEnd = new Date()
       gracePeriodEnd.setDate(gracePeriodEnd.getDate() + 20)
 
-      await admin
-        .from('subscriptions')
-        .update({
-          status: 'past_due',
-          grace_period_ends_at: gracePeriodEnd.toISOString(),
-        })
-        .eq('id', subscription_id)
+      await sql`
+        UPDATE subscriptions
+        SET
+          status = 'past_due',
+          grace_period_ends_at = ${gracePeriodEnd.toISOString()}
+        WHERE id = ${subscription_id}::uuid
+      `
 
       await sendPaymentFailedEmail(user_id, 'd0')
     })
@@ -298,12 +301,15 @@ export const paymentRetry = inngest.createFunction(
     }
 
     await step.run('cancelar-no-pagarme', async () => {
-      const admin = createAdminClient()
-      const { data: sub } = await admin
-        .from('subscriptions')
-        .select('pagarme_sub_id')
-        .eq('id', subscription_id)
-        .single()
+      const sql = getSql()
+      const rows = await sql<{ pagarme_sub_id: string | null }[]>`
+        SELECT pagarme_sub_id FROM subscriptions
+        WHERE id = ${subscription_id}::uuid
+      `
+      const sub = rows[0]
+      if (!sub) {
+        throw new Error(`Assinatura não encontrada: ${subscription_id}`)
+      }
 
       if (!sub?.pagarme_sub_id) {
         console.warn(
@@ -316,20 +322,21 @@ export const paymentRetry = inngest.createFunction(
     })
 
     await step.run('cancelar-assinatura', async () => {
-      const admin = createAdminClient()
-
-      await admin
-        .from('subscriptions')
-        .update({ status: 'canceled' })
-        .eq('id', subscription_id)
-
-      await admin
-        .from('user_entitlements')
-        .update({ status: 'canceled' })
-        .eq('user_id', user_id)
-        .eq('product_key', 'treatment')
-        .eq('status', 'active')
-        .eq('is_permanent', false)
+      await withTransaction(async (tx) => {
+        await tx`
+          UPDATE subscriptions
+          SET status = 'canceled'
+          WHERE id = ${subscription_id}::uuid
+        `
+        await tx`
+          UPDATE user_entitlements
+          SET status = 'canceled'
+          WHERE user_id = ${user_id}::uuid
+            AND product_key = 'treatment'
+            AND status = 'active'
+            AND is_permanent = false
+        `
+      })
     })
 
     return { result: 'canceled' }

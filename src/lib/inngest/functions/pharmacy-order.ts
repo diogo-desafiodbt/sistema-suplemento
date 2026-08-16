@@ -1,5 +1,5 @@
 import { claimOnce, markClaimCompleted, releaseClaim } from '@/lib/idempotency'
-import { asNumber, getSql } from '@/lib/db'
+import { asNumber, getSql, withTransaction } from '@/lib/db'
 import {
   buildPharmacyItem,
   buildPharmacyJson,
@@ -88,26 +88,21 @@ function coerceProductPrices(
   }
 }
 
-type AdminClient = ReturnType<typeof createAdminClient>
-
 /** Pedido pronto pra farmácia: tem pharmacy_json e pelo menos 1 item. */
-async function isOrderFullyBuilt(
-  admin: AdminClient,
-  orderId: string,
-): Promise<boolean> {
-  const { data: order } = await admin
-    .from('orders')
-    .select('id, pharmacy_json')
-    .eq('id', orderId)
-    .maybeSingle()
+async function isOrderFullyBuilt(orderId: string): Promise<boolean> {
+  const sql = getSql()
+  const orderRows = await sql<{ id: string; pharmacy_json: unknown }[]>`
+    SELECT id, pharmacy_json FROM orders
+    WHERE id = ${orderId}::uuid
+    LIMIT 1
+  `
+  const order = orderRows[0] ?? null
   if (!order?.pharmacy_json) return false
 
-  const { count } = await admin
-    .from('order_items')
-    .select('id', { count: 'exact', head: true })
-    .eq('order_id', orderId)
-
-  return (count ?? 0) > 0
+  const countRows = await sql<{ n: string | number }[]>`
+    SELECT COUNT(*) AS n FROM order_items WHERE order_id = ${orderId}::uuid
+  `
+  return asNumber(countRows[0]?.n) > 0
 }
 
 export const pharmacyOrder = inngest.createFunction(
@@ -133,43 +128,39 @@ export const pharmacyOrder = inngest.createFunction(
       )
     }
 
+    const sql = getSql()
     const admin = createAdminClient()
 
     let payment: { id: string } | null = null
 
     if (eventPaymentId) {
-      const { data } = await admin
-        .from('payments')
-        .select('id')
-        .eq('id', eventPaymentId)
-        .eq('subscription_id', subscription_id)
-        .maybeSingle()
-      payment = data
+      const rows = await sql<{ id: string }[]>`
+        SELECT id FROM payments
+        WHERE id = ${eventPaymentId}::uuid
+          AND subscription_id = ${subscription_id}::uuid
+        LIMIT 1
+      `
+      payment = rows[0] ?? null
     } else {
-      // Sem payment_id: pega o pago mais recente que ainda NÃO tem despacho completo.
-      // Evita tratar renovação como already_dispatched do ciclo anterior.
-      const { data: candidates } = await admin
-        .from('payments')
-        .select('id')
-        .eq('subscription_id', subscription_id)
-        .eq('status', 'paid')
-        .order('created_at', { ascending: false })
-        .limit(20)
+      const candidates = await sql<{ id: string }[]>`
+        SELECT id FROM payments
+        WHERE subscription_id = ${subscription_id}::uuid AND status = 'paid'
+        ORDER BY created_at DESC
+        LIMIT 20
+      `
 
-      for (const candidate of candidates ?? []) {
-        const { data: dispatchLog } = await admin
-          .from('pharmacy_order_dispatch_logs')
-          .select('completed_at')
-          .eq('payment_id', candidate.id)
-          .maybeSingle()
-        if (!dispatchLog?.completed_at) {
+      for (const candidate of candidates) {
+        const dispatchLog = await sql<{ completed_at: string | Date | null }[]>`
+          SELECT completed_at FROM pharmacy_order_dispatch_logs
+          WHERE payment_id = ${candidate.id}::uuid
+          LIMIT 1
+        `
+        if (!dispatchLog[0]?.completed_at) {
           payment = candidate
           break
         }
       }
     }
-
-    const sql = getSql()
     const rows = await sql<SubscriptionRow[]>`
       SELECT
         s.id, s.plan_type, s.user_id, s.protocol_id, s.pending_checkout,
@@ -273,22 +264,16 @@ export const pharmacyOrder = inngest.createFunction(
       )
     }
 
-    const { data: configs, error: configError } = await admin
-      .from('system_config')
-      .select('key, value')
-      .in('key', [
+    const configs = await sql<{ key: string; value: string }[]>`
+      SELECT key, value FROM system_config
+      WHERE key = ANY(${sql.array([
         'pharmacy_carrier_code',
         'pharmacy_payment_code',
         'pharmacy_company_id',
-      ])
+      ])}::text[])
+    `
 
-    if (configError) {
-      throw new Error(`Erro ao buscar system_config: ${configError.message}`)
-    }
-
-    const configMap = Object.fromEntries(
-      (configs ?? []).map((c) => [c.key, c.value]),
-    )
+    const configMap = Object.fromEntries(configs.map((c) => [c.key, c.value]))
 
     // TODO(Miligrama): 3meses/6meses = N× SKU mensal num único pedido — validar operacionalmente.
     const cycleMult = getPharmacyCycleMultiplier(planType)
@@ -311,30 +296,33 @@ export const pharmacyOrder = inngest.createFunction(
     // Subtotal cobrado = cycleCharge × checkout_qty (= physicalQty / cycleMult).
     const productsSubtotal = activeItems.reduce((sum, item) => {
       const physicalQty =
-        item.quantity && item.quantity > 0 ? item.quantity : cycleDivisor
+        item.quantity && asNumber(item.quantity) > 0
+          ? asNumber(item.quantity)
+          : cycleDivisor
       const checkoutQty = Math.max(1, Math.round(physicalQty / cycleDivisor))
       return (
-        sum + getUnitPriceFromProduct(item.products, planType) * checkoutQty
+        sum +
+        asNumber(getUnitPriceFromProduct(item.products, planType)) * checkoutQty
       )
     }, 0)
 
     const freteValor = shipping?.valor ?? 0
     const prazoDias = shipping?.prazoDias ?? 0
 
-    const { data: priorOrder } = await admin
-      .from('orders')
-      .select('id')
-      .eq('user_id', user_id)
-      .not('pharmacy_sent_at', 'is', null)
-      .limit(1)
-      .maybeSingle()
+    const priorRows = await sql<{ id: string }[]>`
+      SELECT id FROM orders
+      WHERE user_id = ${user_id}::uuid AND pharmacy_sent_at IS NOT NULL
+      LIMIT 1
+    `
+    const priorOrder = priorRows[0] ?? null
 
     const pharmacyItems = activeItems.map((item) => {
       const physicalQty =
-        item.quantity && item.quantity > 0 ? item.quantity : cycleDivisor
+        item.quantity && asNumber(item.quantity) > 0
+          ? asNumber(item.quantity)
+          : cycleDivisor
       const cycleCharge = getUnitPriceFromProduct(item.products, planType)
-      // Preço unitário físico = cobrança do ciclo ÷ unidades do ciclo (não ÷ physicalQty total).
-      const unitForPharmacy = cycleCharge / cycleDivisor
+      const unitForPharmacy = asNumber(cycleCharge) / cycleDivisor
       return buildPharmacyItem({
         sku: item.products?.[skuKey] ?? '',
         pharmacyCode: item.products?.pharmacy_code ?? 0,
@@ -353,11 +341,14 @@ export const pharmacyOrder = inngest.createFunction(
     )
 
     if (!won) {
-      const { data: existingClaim } = await admin
-        .from('pharmacy_order_dispatch_logs')
-        .select('order_id, completed_at')
-        .eq('payment_id', payment.id)
-        .maybeSingle()
+      const existingClaimRows = await sql<
+        { order_id: string | null; completed_at: string | Date | null }[]
+      >`
+        SELECT order_id, completed_at FROM pharmacy_order_dispatch_logs
+        WHERE payment_id = ${payment.id}::uuid
+        LIMIT 1
+      `
+      const existingClaim = existingClaimRows[0] ?? null
 
       if (existingClaim?.completed_at) {
         return {
@@ -373,7 +364,7 @@ export const pharmacyOrder = inngest.createFunction(
       if (
         typeof linkedOrderId === 'string' &&
         linkedOrderId &&
-        (await isOrderFullyBuilt(admin, linkedOrderId))
+        (await isOrderFullyBuilt(linkedOrderId))
       ) {
         await markClaimCompleted(
           admin,
@@ -400,11 +391,12 @@ export const pharmacyOrder = inngest.createFunction(
     // Se o reclaim pegou um pedido já completo (completed_at nunca marcado), não apaga.
     const orphanOrderId = reclaimedStale?.order_id
     if (typeof orphanOrderId === 'string' && orphanOrderId) {
-      if (await isOrderFullyBuilt(admin, orphanOrderId)) {
-        await admin
-          .from('pharmacy_order_dispatch_logs')
-          .update({ order_id: orphanOrderId })
-          .eq('payment_id', payment.id)
+      if (await isOrderFullyBuilt(orphanOrderId)) {
+        await sql`
+          UPDATE pharmacy_order_dispatch_logs
+          SET order_id = ${orphanOrderId}::uuid
+          WHERE payment_id = ${payment.id}::uuid
+        `
         await markClaimCompleted(
           admin,
           'pharmacy_order_dispatch_logs',
@@ -418,113 +410,85 @@ export const pharmacyOrder = inngest.createFunction(
           orderId: orphanOrderId,
         }
       }
-      await admin.from('order_items').delete().eq('order_id', orphanOrderId)
-      await admin.from('orders').delete().eq('id', orphanOrderId)
+      await sql`DELETE FROM order_items WHERE order_id = ${orphanOrderId}::uuid`
+      await sql`DELETE FROM orders WHERE id = ${orphanOrderId}::uuid`
     }
 
-    // Cria o pedido primeiro pra ter o id no CodigoPedidoExterno
-    const { data: order, error: orderError } = await admin
-      .from('orders')
-      .insert({
-        user_id,
-        subscription_id,
-        status: 'pending',
-        total_amount: productsSubtotal + freteValor,
-        shipping_service_code: shipping?.codigoServico ?? '',
-        shipping_quote_json: shipping ?? null,
-      })
-      .select('id')
-      .single()
+    const orderId = crypto.randomUUID()
+    const pharmacyJson = buildPharmacyJson({
+      orderId,
+      clientCode: user.client_code,
+      cpf: user.cpf,
+      fullName: user.full_name,
+      email: user.email,
+      phone: user.phone,
+      address,
+      items: pharmacyItems,
+      productsSubtotal,
+      freteValor,
+      prazoDias,
+      prescriptionPdfUrl: '',
+      pharmacyCarrierCode: parseInt(configMap.pharmacy_carrier_code ?? '24', 10),
+      pharmacyPaymentCode: parseInt(configMap.pharmacy_payment_code ?? '15', 10),
+      pharmacyCompanyId: parseInt(configMap.pharmacy_company_id ?? '2', 10),
+      pesoLiquido: dimensions.peso,
+      clienteExistente: !!priorOrder,
+    })
 
-    if (orderError || !order) {
-      await releaseClaim(
-        admin,
-        'pharmacy_order_dispatch_logs',
-        'payment_id',
-        payment.id,
-      )
-      throw new Error(
-        `Erro ao criar pedido: ${orderError?.message ?? 'unknown'}`,
-      )
-    }
+    const orderItems = activeItems.map((item) => {
+      const physicalQty =
+        item.quantity && asNumber(item.quantity) > 0
+          ? asNumber(item.quantity)
+          : cycleDivisor
+      const cycleCharge = getUnitPriceFromProduct(item.products, planType)
+      const unitPrice = asNumber(cycleCharge) / cycleDivisor
+      return {
+        order_id: orderId,
+        product_id: item.product_id,
+        pharmacy_sku: item.products?.[skuKey] ?? '',
+        quantity: physicalQty,
+        unit_price: unitPrice,
+      }
+    })
 
     try {
-      const { error: claimOrderLinkError } = await admin
-        .from('pharmacy_order_dispatch_logs')
-        .update({ order_id: order.id })
-        .eq('payment_id', payment.id)
-      if (claimOrderLinkError) {
-        throw new Error(
-          `pharmacy-order: falha ao gravar order_id na claim: ${claimOrderLinkError.message}`,
-        )
-      }
-
-      const pharmacyJson = buildPharmacyJson({
-        orderId: order.id,
-        clientCode: user.client_code,
-        cpf: user.cpf,
-        fullName: user.full_name,
-        email: user.email,
-        phone: user.phone,
-        address,
-        items: pharmacyItems,
-        productsSubtotal,
-        freteValor,
-        prazoDias,
-        prescriptionPdfUrl: '',
-        pharmacyCarrierCode: parseInt(
-          configMap.pharmacy_carrier_code ?? '24',
-          10,
-        ),
-        pharmacyPaymentCode: parseInt(
-          configMap.pharmacy_payment_code ?? '15',
-          10,
-        ),
-        pharmacyCompanyId: parseInt(configMap.pharmacy_company_id ?? '2', 10),
-        pesoLiquido: dimensions.peso,
-        clienteExistente: !!priorOrder,
+      await withTransaction(async (tx) => {
+        await tx`
+          INSERT INTO orders (
+            id,
+            user_id,
+            subscription_id,
+            status,
+            total_amount,
+            shipping_service_code,
+            shipping_quote_json,
+            pharmacy_json
+          )
+          VALUES (
+            ${orderId}::uuid,
+            ${user_id}::uuid,
+            ${subscription_id}::uuid,
+            'pending',
+            ${productsSubtotal + freteValor},
+            ${shipping?.codigoServico ?? ''},
+            ${tx.json((shipping ?? null) as never)},
+            ${tx.json(pharmacyJson as never)}
+          )
+        `
+        await tx`
+          UPDATE pharmacy_order_dispatch_logs
+          SET order_id = ${orderId}::uuid
+          WHERE payment_id = ${payment.id}::uuid
+        `
+        await tx`INSERT INTO order_items ${tx(orderItems)}`
       })
-
-      const { error: pharmacyJsonError } = await admin
-        .from('orders')
-        .update({ pharmacy_json: pharmacyJson })
-        .eq('id', order.id)
-
-      if (pharmacyJsonError) {
-        throw new Error(
-          `Erro ao salvar pharmacy_json: ${pharmacyJsonError.message}`,
-        )
-      }
-
-      const { error: itemsError } = await admin.from('order_items').insert(
-        activeItems.map((item) => {
-          const physicalQty =
-            item.quantity && item.quantity > 0 ? item.quantity : cycleDivisor
-          const cycleCharge = getUnitPriceFromProduct(item.products, planType)
-          // Mesma regra do pharmacyItems / productsSubtotal.
-          const unitPrice = cycleCharge / cycleDivisor
-          return {
-            order_id: order.id,
-            product_id: item.product_id,
-            pharmacy_sku: item.products?.[skuKey] ?? '',
-            quantity: physicalQty,
-            unit_price: unitPrice,
-          }
-        }),
-      )
-
-      if (itemsError) {
-        throw new Error(`Erro ao criar itens do pedido: ${itemsError.message}`)
-      }
     } catch (err) {
-      // Claim primeiro: order_id referencia orders (sem ON DELETE CASCADE).
       await releaseClaim(
         admin,
         'pharmacy_order_dispatch_logs',
         'payment_id',
         payment.id,
       )
-      await admin.from('orders').delete().eq('id', order.id)
       throw err
     }
 
@@ -536,6 +500,6 @@ export const pharmacyOrder = inngest.createFunction(
       'completed_at',
     )
 
-    return { orderId: order.id }
+    return { orderId }
   },
 )

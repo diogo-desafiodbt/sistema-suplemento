@@ -1,6 +1,6 @@
+import { getSql } from '@/lib/db'
 import { createShippingLabelForOrder } from '@/lib/shipping/create-label'
 import { addBusinessDays } from '@/lib/shipping/estimate'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { inngest } from '../client'
 
 const PICKUP_DAYS_AFTER_PURCHASE = 2
@@ -24,18 +24,14 @@ export const createShippingLabel = inngest.createFunction(
     }
 
     const pickupDateIso = await step.run('calcular-data-retirada', async () => {
-      const admin = createAdminClient()
-      const { data: sub, error } = await admin
-        .from('subscriptions')
-        .select('created_at')
-        .eq('id', subscription_id)
-        .eq('user_id', user_id)
-        .single()
-
-      if (error || !sub?.created_at) {
-        throw new Error(
-          `Assinatura sem created_at: ${error?.message ?? subscription_id}`,
-        )
+      const sql = getSql()
+      const rows = await sql<{ created_at: string | Date }[]>`
+        SELECT created_at FROM subscriptions
+        WHERE id = ${subscription_id}::uuid AND user_id = ${user_id}::uuid
+      `
+      const sub = rows[0]
+      if (!sub?.created_at) {
+        throw new Error(`Assinatura sem created_at: ${subscription_id}`)
       }
 
       const pickup = addBusinessDays(
@@ -49,18 +45,18 @@ export const createShippingLabel = inngest.createFunction(
 
     try {
       const result = await step.run('criar-etiqueta', async () => {
-        const admin = createAdminClient()
-        const { data: order, error } = await admin
-          .from('orders')
-          .select('id')
-          .eq('subscription_id', subscription_id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
+        const sql = getSql()
+        const orderRows = await sql<{ id: string }[]>`
+          SELECT id FROM orders
+          WHERE subscription_id = ${subscription_id}::uuid
+          ORDER BY created_at DESC
+          LIMIT 1
+        `
+        const order = orderRows[0] ?? null
 
-        if (error || !order) {
+        if (!order) {
           throw new Error(
-            `Pedido não encontrado para subscription ${subscription_id}: ${error?.message ?? 'empty'}`,
+            `Pedido não encontrado para subscription ${subscription_id}`,
           )
         }
 

@@ -1,7 +1,7 @@
-import { createAdminClient } from '@/lib/supabase/admin'
+import { asNumber, getSql } from '@/lib/db'
 import { inngest } from '../client'
 
-function calcRecencyScore(lastLoginAt: string | null): number {
+function calcRecencyScore(lastLoginAt: string | Date | null): number {
   if (!lastLoginAt) return 0
   const days = Math.floor(
     (Date.now() - new Date(lastLoginAt).getTime()) / (1000 * 60 * 60 * 24),
@@ -59,35 +59,33 @@ export const rfmRecalc = inngest.createFunction(
   },
   async ({ step }) => {
     const result = await step.run('recalcular-rfm', async () => {
-      const admin = createAdminClient()
+      const sql = getSql()
       const startedAt = new Date().toISOString()
 
-      const { data: job } = await admin
-        .from('background_jobs')
-        .insert({
-          job_type: 'rfm_recalc',
-          status: 'running',
-          started_at: startedAt,
-        })
-        .select('id')
-        .single()
+      const jobRows = await sql<{ id: string }[]>`
+        INSERT INTO background_jobs (job_type, status, started_at)
+        VALUES ('rfm_recalc', 'running', ${startedAt})
+        RETURNING id
+      `
+      const job = jobRows[0]
+      if (!job) {
+        throw new Error('rfm-recalc: insert background_jobs sem id')
+      }
 
-      const { data: users } = await admin
-        .from('users')
-        .select('id')
-        .not('rfm_recalc_queued_at', 'is', null)
+      const users = await sql<{ id: string }[]>`
+        SELECT id FROM users
+        WHERE rfm_recalc_queued_at IS NOT NULL
+      `
 
-      if (!users || users.length === 0) {
-        if (job?.id) {
-          await admin
-            .from('background_jobs')
-            .update({
-              status: 'completed',
-              completed_at: new Date().toISOString(),
-              affected_rows: 0,
-            })
-            .eq('id', job.id)
-        }
+      if (users.length === 0) {
+        await sql`
+          UPDATE background_jobs
+          SET
+            status = 'completed',
+            completed_at = ${new Date().toISOString()},
+            affected_rows = 0
+          WHERE id = ${job.id}::uuid
+        `
         return { recalculated: 0 }
       }
 
@@ -100,57 +98,67 @@ export const rfmRecalc = inngest.createFunction(
 
       for (const userId of userIds) {
         try {
-          const { data: lastLoginData } = await admin
-            .from('user_login_history')
-            .select('logged_at')
-            .eq('user_id', userId)
-            .order('logged_at', { ascending: false })
-            .limit(1)
-            .maybeSingle()
+          const lastLoginRows = await sql<{ logged_at: string | Date }[]>`
+            SELECT logged_at FROM user_login_history
+            WHERE user_id = ${userId}::uuid
+            ORDER BY logged_at DESC
+            LIMIT 1
+          `
+          const lastLoginData = lastLoginRows[0] ?? null
 
-          const { count: loginCount } = await admin
-            .from('user_login_history')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', userId)
-            .gte('logged_at', ninetyDaysAgo)
+          const countRows = await sql<{ n: string | number }[]>`
+            SELECT COUNT(*) AS n FROM user_login_history
+            WHERE user_id = ${userId}::uuid
+              AND logged_at >= ${ninetyDaysAgo}::timestamptz
+          `
 
-          const { data: subscription } = await admin
-            .from('subscriptions')
-            .select('plan_type, status')
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle()
+          const subRows = await sql<{ plan_type: string; status: string }[]>`
+            SELECT plan_type, status FROM subscriptions
+            WHERE user_id = ${userId}::uuid
+            ORDER BY created_at DESC
+            LIMIT 1
+          `
+          const subscription = subRows[0] ?? null
 
-          const recencyScore = calcRecencyScore(
-            lastLoginData?.logged_at ?? null,
-          )
-          const frequencyScore = calcFrequencyScore(loginCount ?? 0)
+          const recencyScore = calcRecencyScore(lastLoginData?.logged_at ?? null)
+          const frequencyScore = calcFrequencyScore(asNumber(countRows[0]?.n))
           const monetaryScore = calcMonetaryScore(subscription)
           const finalScore = Math.round(
             recencyScore * 0.4 + frequencyScore * 0.3 + monetaryScore * 0.3,
           )
           const tier = calcTier(finalScore)
 
-          const { data: currentRfm } = await admin
-            .from('user_rfm_scores')
-            .select('tier')
-            .eq('user_id', userId)
-            .maybeSingle()
+          const currentRfmRows = await sql<{ tier: string }[]>`
+            SELECT tier FROM user_rfm_scores
+            WHERE user_id = ${userId}::uuid
+            LIMIT 1
+          `
+          const currentRfm = currentRfmRows[0] ?? null
 
-          await admin.from('user_rfm_scores').upsert(
-            {
-              user_id: userId,
-              recency_score: recencyScore,
-              frequency_score: frequencyScore,
-              monetary_score: monetaryScore,
-              final_score: finalScore,
-              tier,
-              previous_tier: currentRfm?.tier ?? null,
-              calculated_at: now.toISOString(),
-            },
-            { onConflict: 'user_id' },
-          )
+          await sql`
+            INSERT INTO user_rfm_scores (
+              user_id, recency_score, frequency_score, monetary_score,
+              final_score, tier, previous_tier, calculated_at
+            )
+            VALUES (
+              ${userId}::uuid,
+              ${recencyScore},
+              ${frequencyScore},
+              ${monetaryScore},
+              ${finalScore},
+              ${tier},
+              ${currentRfm?.tier ?? null},
+              ${now.toISOString()}
+            )
+            ON CONFLICT (user_id) DO UPDATE SET
+              recency_score = EXCLUDED.recency_score,
+              frequency_score = EXCLUDED.frequency_score,
+              monetary_score = EXCLUDED.monetary_score,
+              final_score = EXCLUDED.final_score,
+              previous_tier = user_rfm_scores.tier,
+              tier = EXCLUDED.tier,
+              calculated_at = EXCLUDED.calculated_at
+          `
 
           processed++
         } catch (err) {
@@ -158,21 +166,20 @@ export const rfmRecalc = inngest.createFunction(
         }
       }
 
-      await admin
-        .from('users')
-        .update({ rfm_recalc_queued_at: null })
-        .in('id', userIds)
+      await sql`
+        UPDATE users
+        SET rfm_recalc_queued_at = NULL
+        WHERE id = ANY(${sql.array(userIds)}::uuid[])
+      `
 
-      if (job?.id) {
-        await admin
-          .from('background_jobs')
-          .update({
-            status: 'completed',
-            completed_at: new Date().toISOString(),
-            affected_rows: processed,
-          })
-          .eq('id', job.id)
-      }
+      await sql`
+        UPDATE background_jobs
+        SET
+          status = 'completed',
+          completed_at = ${new Date().toISOString()},
+          affected_rows = ${processed}
+        WHERE id = ${job.id}::uuid
+      `
 
       return { recalculated: processed }
     })

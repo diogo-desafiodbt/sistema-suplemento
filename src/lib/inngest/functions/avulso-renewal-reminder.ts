@@ -1,6 +1,6 @@
 import { Resend } from 'resend'
+import { getSql } from '@/lib/db'
 import { isRecurringPlan } from '@/lib/plans'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { inngest } from '../client'
 
 type ReminderKind = 'd-5' | 'd-1' | 'd+3'
@@ -24,14 +24,15 @@ function getAppBaseUrl(): string {
 }
 
 async function aindaAtivo(userId: string): Promise<boolean> {
-  const admin = createAdminClient()
-  const { data } = await admin
-    .from('user_entitlements')
-    .select('expires_at, status')
-    .eq('user_id', userId)
-    .eq('product_key', 'treatment')
-    .eq('status', 'active')
-    .maybeSingle()
+  const sql = getSql()
+  const rows = await sql<{ expires_at: string | Date; status: string }[]>`
+    SELECT expires_at, status FROM user_entitlements
+    WHERE user_id = ${userId}::uuid
+      AND product_key = 'treatment'
+      AND status = 'active'
+    LIMIT 1
+  `
+  const data = rows[0] ?? null
 
   if (!data) return false
   return new Date(data.expires_at) > new Date()
@@ -42,13 +43,11 @@ async function logNotification(
   status: 'sent' | 'failed',
 ): Promise<void> {
   try {
-    const admin = createAdminClient()
-    await admin.from('notification_logs').insert({
-      user_id: userId,
-      type: 'renewal_reminder',
-      channel: 'email',
-      status,
-    })
+    const sql = getSql()
+    await sql`
+      INSERT INTO notification_logs (user_id, type, channel, status)
+      VALUES (${userId}::uuid, 'renewal_reminder', 'email', ${status})
+    `
   } catch (error) {
     console.error('Erro ao registrar notification_logs:', error)
   }
@@ -167,12 +166,14 @@ async function sendRenewalReminderEmail(
     return
   }
 
-  const admin = createAdminClient()
-  const { data: user } = await admin
-    .from('users')
-    .select('email, full_name')
-    .eq('id', userId)
-    .single()
+  const sql = getSql()
+  const userRows = await sql<{ email: string | null; full_name: string | null }[]>`
+    SELECT email, full_name FROM users WHERE id = ${userId}::uuid
+  `
+  const user = userRows[0]
+  if (!user) {
+    throw new Error(`Usuário não encontrado: ${userId}`)
+  }
 
   if (!user?.email) {
     console.error('Usuário sem e-mail para lembrete de renovação:', userId)
@@ -212,12 +213,21 @@ export const avulsoRenewalReminder = inngest.createFunction(
     }
 
     const sub = await step.run('buscar-assinatura', async () => {
-      const admin = createAdminClient()
-      const { data } = await admin
-        .from('subscriptions')
-        .select('plan_type, expires_at, pagarme_sub_id')
-        .eq('id', subscription_id)
-        .single()
+      const sql = getSql()
+      const rows = await sql<
+        {
+          plan_type: string
+          expires_at: string | Date | null
+          pagarme_sub_id: string | null
+        }[]
+      >`
+        SELECT plan_type, expires_at, pagarme_sub_id FROM subscriptions
+        WHERE id = ${subscription_id}::uuid
+      `
+      const data = rows[0]
+      if (!data) {
+        throw new Error(`Assinatura não encontrada: ${subscription_id}`)
+      }
       return data
     })
 

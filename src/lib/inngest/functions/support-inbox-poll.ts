@@ -1,5 +1,7 @@
 import { ImapFlow } from 'imapflow'
 import { simpleParser } from 'mailparser'
+import postgres from 'postgres'
+import { getSql } from '@/lib/db'
 import { claimOnce, markClaimCompleted, releaseClaim } from '@/lib/idempotency'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { normalizeMessageId } from '@/lib/support/message-id'
@@ -20,46 +22,41 @@ async function resolveThreadId(params: {
   fromEmail: string
   subject: string | null
 }): Promise<string> {
-  const admin = createAdminClient()
+  const sql = getSql()
 
   const candidates = [params.inReplyTo, ...params.references]
     .map((id) => normalizeMessageId(id))
     .filter((id): id is string => Boolean(id))
 
   for (const candidate of candidates) {
-    const { data: existing } = await admin
-      .from('support_messages')
-      .select('thread_id')
-      .eq('message_id', candidate)
-      .maybeSingle()
-    if (existing?.thread_id) return existing.thread_id
+    const existing = await sql<{ thread_id: string }[]>`
+      SELECT thread_id FROM support_messages
+      WHERE message_id = ${candidate}
+      LIMIT 1
+    `
+    if (existing[0]?.thread_id) return existing[0].thread_id
   }
 
-  const { data: thread, error } = await admin
-    .from('support_threads')
-    .insert({
-      thread_key: params.messageId,
-      from_email: params.fromEmail,
-      subject: params.subject,
-      status: 'novo',
-    })
-    .select('id')
-    .single()
-
-  if (error || !thread) {
-    // Race: outra execução já criou a thread com o mesmo thread_key
-    if (error?.code === '23505') {
-      const { data: again } = await admin
-        .from('support_threads')
-        .select('id')
-        .eq('thread_key', params.messageId)
-        .maybeSingle()
-      if (again?.id) return again.id
+  try {
+    const threadRows = await sql<{ id: string }[]>`
+      INSERT INTO support_threads (thread_key, from_email, subject, status)
+      VALUES (${params.messageId}, ${params.fromEmail}, ${params.subject}, 'novo')
+      RETURNING id
+    `
+    const thread = threadRows[0]
+    if (!thread) throw new Error('Falha ao criar support_threads')
+    return thread.id
+  } catch (error) {
+    if (error instanceof postgres.PostgresError && error.code === '23505') {
+      const again = await sql<{ id: string }[]>`
+        SELECT id FROM support_threads
+        WHERE thread_key = ${params.messageId}
+        LIMIT 1
+      `
+      if (again[0]?.id) return again[0].id
     }
-    throw error ?? new Error('Falha ao criar support_threads')
+    throw error
   }
-
-  return thread.id
 }
 
 export const supportInboxPoll = inngest.createFunction(
@@ -78,6 +75,7 @@ export const supportInboxPoll = inngest.createFunction(
       return { ok: true, skipped: 'missing_imap_env' }
     }
 
+    const sql = getSql()
     const admin = createAdminClient()
     const client = new ImapFlow({
       host: imapHost,
@@ -109,11 +107,14 @@ export const supportInboxPoll = inngest.createFunction(
           continue
         }
 
-        const { data: already } = await admin
-          .from('support_messages')
-          .select('id, completed_at')
-          .eq('message_id', messageId)
-          .maybeSingle()
+        const alreadyRows = await sql<
+          { id: string; completed_at: string | Date | null }[]
+        >`
+          SELECT id, completed_at FROM support_messages
+          WHERE message_id = ${messageId}
+          LIMIT 1
+        `
+        const already = alreadyRows[0] ?? null
 
         // Só marca lida se o processamento realmente terminou.
         // Row sem completed_at = em andamento ou claim liberada — não pular.
@@ -193,10 +194,11 @@ export const supportInboxPoll = inngest.createFunction(
         if (won) {
           let eventSent = false
           try {
-            await admin
-              .from('support_threads')
-              .update({ last_message_at: new Date().toISOString() })
-              .eq('id', threadId)
+            await sql`
+              UPDATE support_threads
+              SET last_message_at = ${new Date().toISOString()}
+              WHERE id = ${threadId}::uuid
+            `
 
             await inngest.send({
               name: 'suporte/email-recebido',
@@ -204,11 +206,13 @@ export const supportInboxPoll = inngest.createFunction(
             })
             eventSent = true
             // Evidência antes do stamp — heal stale não reenvia nem dropa.
-            const { error: dispatchedError } = await admin
-              .from('support_messages')
-              .update({ event_dispatched_at: new Date().toISOString() })
-              .eq('message_id', messageId)
-            if (dispatchedError) {
+            try {
+              await sql`
+                UPDATE support_messages
+                SET event_dispatched_at = ${new Date().toISOString()}
+                WHERE message_id = ${messageId}
+              `
+            } catch (dispatchedError) {
               console.error(
                 'support-inbox-poll: falha ao gravar event_dispatched_at:',
                 dispatchedError,
@@ -258,11 +262,19 @@ export const supportInboxPoll = inngest.createFunction(
             }
           }
         } else {
-          const { data: existing } = await admin
-            .from('support_messages')
-            .select('completed_at, event_dispatched_at, created_at')
-            .eq('message_id', messageId)
-            .maybeSingle()
+          const existingRows = await sql<
+            {
+              completed_at: string | Date | null
+              event_dispatched_at: string | Date | null
+              created_at: string | Date
+            }[]
+          >`
+            SELECT completed_at, event_dispatched_at, created_at
+            FROM support_messages
+            WHERE message_id = ${messageId}
+            LIMIT 1
+          `
+          const existing = existingRows[0] ?? null
           if (existing?.completed_at) {
             await client.messageFlagsAdd(message.uid, ['\\Seen'], { uid: true })
           } else if (existing) {
@@ -284,10 +296,11 @@ export const supportInboxPoll = inngest.createFunction(
                 name: 'suporte/email-recebido',
                 data: { thread_id: threadId },
               })
-              await admin
-                .from('support_messages')
-                .update({ event_dispatched_at: new Date().toISOString() })
-                .eq('message_id', messageId)
+              await sql`
+                UPDATE support_messages
+                SET event_dispatched_at = ${new Date().toISOString()}
+                WHERE message_id = ${messageId}
+              `
 
               await markClaimCompleted(
                 admin,

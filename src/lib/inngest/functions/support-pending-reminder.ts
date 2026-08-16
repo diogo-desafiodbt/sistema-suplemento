@@ -1,5 +1,5 @@
 import { Resend } from 'resend'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { asNumber, getSql } from '@/lib/db'
 import { inngest } from '../client'
 
 function getAppBaseUrl(): string {
@@ -25,15 +25,12 @@ export const supportPendingReminder = inngest.createFunction(
       return { ok: true, skipped: 'missing_notify_email' }
     }
 
-    const admin = createAdminClient()
-    const { count, error } = await admin
-      .from('support_threads')
-      .select('id', { count: 'exact', head: true })
-      .in('status', ['aguardando_revisao', 'aguardando_dados'])
-
-    if (error) throw error
-
-    const pending = count ?? 0
+    const sql = getSql()
+    const countRows = await sql<{ n: string | number }[]>`
+      SELECT COUNT(*) AS n FROM support_threads
+      WHERE status = ANY(${sql.array(['aguardando_revisao', 'aguardando_dados'])}::text[])
+    `
+    const pending = asNumber(countRows[0]?.n)
     if (pending < 1) {
       return { ok: true, pending: 0 }
     }

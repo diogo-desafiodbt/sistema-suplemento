@@ -1,5 +1,5 @@
 import { Resend } from 'resend'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getSql } from '@/lib/db'
 import { inngest } from '../client'
 
 const PHARMACY_EMAIL = 'diretorcomercialtk2@gmail.com'
@@ -36,31 +36,21 @@ export const pharmacyReconciliation = inngest.createFunction(
   },
   async ({ step }) => {
     const report = await step.run('reconciliar-ontem', async () => {
-      const admin = createAdminClient()
+      const sql = getSql()
       const yesterday = yesterdayInSaoPaulo(new Date())
       const range = dayRangeUtc(yesterday)
 
-      const { data: orders, error: ordersError } = await admin
-        .from('orders')
-        .select('id')
-        .gte('created_at', range.gte)
-        .lt('created_at', range.lt)
+      const orders = await sql<{ id: string }[]>`
+        SELECT id FROM orders
+        WHERE created_at >= ${range.gte}::timestamptz
+          AND created_at < ${range.lt}::timestamptz
+      `
 
-      if (ordersError) {
-        throw new Error(
-          `Erro ao buscar pedidos de ontem: ${ordersError.message}`,
-        )
-      }
-
-      const { data: logs, error: logsError } = await admin
-        .from('pharmacy_api_logs')
-        .select('order_ids_returned')
-        .gte('called_at', range.gte)
-        .lt('called_at', range.lt)
-
-      if (logsError) {
-        throw new Error(`Erro ao buscar logs da API: ${logsError.message}`)
-      }
+      const logs = await sql<{ order_ids_returned: unknown }[]>`
+        SELECT order_ids_returned FROM pharmacy_api_logs
+        WHERE called_at >= ${range.gte}::timestamptz
+          AND called_at < ${range.lt}::timestamptz
+      `
 
       const pulledIds = new Set<string>()
       for (const log of logs ?? []) {
@@ -85,16 +75,22 @@ export const pharmacyReconciliation = inngest.createFunction(
     })
 
     await step.run('registrar-background-job', async () => {
-      const admin = createAdminClient()
-      const { error } = await admin.from('background_jobs').insert({
-        job_type: 'pharmacy_reconciliation',
-        status: report.ok ? 'completed' : 'failed',
-        payload: report,
-        affected_rows: report.totalOrders,
-        completed_at: new Date().toISOString(),
-        started_at: new Date().toISOString(),
-      })
-      if (error) {
+      const sql = getSql()
+      try {
+        await sql`
+          INSERT INTO background_jobs (
+            job_type, status, payload, affected_rows, completed_at, started_at
+          )
+          VALUES (
+            'pharmacy_reconciliation',
+            ${report.ok ? 'completed' : 'failed'},
+            ${sql.json(report as never)},
+            ${report.totalOrders},
+            ${new Date().toISOString()},
+            ${new Date().toISOString()}
+          )
+        `
+      } catch (error) {
         console.error('Erro ao gravar background_jobs da reconciliação:', error)
       }
     })
