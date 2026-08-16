@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from 'next/server'
+import postgres from 'postgres'
 import { z } from 'zod'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getUserProfile } from '@/lib/auth/profile'
+import { getSql } from '@/lib/db'
 import { createClient } from '@/lib/supabase/server'
 
 const createSchema = z.object({
@@ -20,12 +22,7 @@ export async function POST(request: NextRequest) {
     if (!user)
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
-    const admin = createAdminClient()
-    const { data: profile } = await admin
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .single()
+    const profile = await getUserProfile(user.id)
     if (profile?.role !== 'admin')
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
 
@@ -43,22 +40,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { data: coupon, error } = await admin
-      .from('discount_coupons')
-      .insert({
-        code,
-        type,
-        value,
-        expires_at: expires_at ?? null,
-        max_uses: max_uses ?? null,
-        used_count: 0,
-        is_active: true,
-      })
-      .select()
-      .single()
-
-    if (error) {
-      if (error.code === '23505') {
+    const sql = getSql()
+    try {
+      const couponRows = await sql`
+        INSERT INTO discount_coupons (
+          code, type, value, expires_at, max_uses, used_count, is_active
+        )
+        VALUES (
+          ${code}, ${type}, ${value}, ${expires_at ?? null},
+          ${max_uses ?? null}, 0, true
+        )
+        RETURNING *
+      `
+      const coupon = couponRows[0]
+      return NextResponse.json({ coupon })
+    } catch (error) {
+      if (error instanceof postgres.PostgresError && error.code === '23505') {
         return NextResponse.json(
           { error: 'Já existe um cupom com esse código.' },
           { status: 409 },
@@ -70,8 +67,6 @@ export async function POST(request: NextRequest) {
         { status: 500 },
       )
     }
-
-    return NextResponse.json({ coupon })
   } catch (error) {
     console.error('Admin cupons POST error:', error)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })

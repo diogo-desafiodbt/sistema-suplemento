@@ -7,7 +7,6 @@ import {
   getNewTrackingEvents,
   notifyNewTrackingEvents,
 } from '@/lib/shipping/notify'
-import { createAdminClient } from '@/lib/supabase/admin'
 import type { WebhookRastreamentoPayload } from '@/types/shipping'
 
 export async function POST(request: NextRequest) {
@@ -25,7 +24,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const admin = createAdminClient()
     const sql = getSql()
     let payload: WebhookRastreamentoPayload
 
@@ -100,7 +98,6 @@ export async function POST(request: NextRequest) {
 
     const newEvents = getNewTrackingEvents(order.shipping_json, eventos)
     await notifyNewTrackingEvents(
-      admin,
       order.id,
       newEvents.length > 0 ? newEvents : eventos,
     )

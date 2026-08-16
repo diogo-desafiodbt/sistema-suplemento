@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import imgLogoAzul from '@/../public/logo-azul.png'
 import { DashboardNav } from '@/components/patient/DashboardNav'
 import { ProfileForm } from '@/components/patient/ProfileForm'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getSql } from '@/lib/db'
 import { createClient } from '@/lib/supabase/server'
 
 export default async function PerfilPage() {
@@ -13,20 +13,45 @@ export default async function PerfilPage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/suplementos/login')
 
-  const admin = createAdminClient()
+  const sql = getSql()
+  const profileRows = await sql<
+    {
+      full_name: string | null
+      email: string | null
+      phone: string | null
+      cpf: string | null
+      birth_date: string | Date | null
+    }[]
+  >`
+    SELECT full_name, email, phone, cpf, birth_date
+    FROM users
+    WHERE id = ${user.id}::uuid
+    LIMIT 1
+  `
+  const profile = profileRows[0] ?? null
 
-  const { data: profile } = await admin
-    .from('users')
-    .select('full_name, email, phone, cpf, birth_date')
-    .eq('id', user.id)
-    .single()
+  const addressRows = await sql<
+    {
+      zip_code: string
+      street: string
+      number: string
+      complement: string | null
+      neighborhood: string
+      city: string
+      state: string
+    }[]
+  >`
+    SELECT zip_code, street, number, complement, neighborhood, city, state
+    FROM addresses
+    WHERE user_id = ${user.id}::uuid AND is_default = true
+    LIMIT 1
+  `
+  const address = addressRows[0] ?? null
 
-  const { data: address } = await admin
-    .from('addresses')
-    .select('zip_code, street, number, complement, neighborhood, city, state')
-    .eq('user_id', user.id)
-    .eq('is_default', true)
-    .maybeSingle()
+  const birthDate =
+    profile?.birth_date instanceof Date
+      ? profile.birth_date.toISOString().slice(0, 10)
+      : (profile?.birth_date ?? '')
 
   return (
     <div className="min-h-screen bg-[#f5f0eb]">
@@ -64,7 +89,7 @@ export default async function PerfilPage() {
             email: profile?.email ?? user.email ?? '',
             phone: profile?.phone ?? '',
             cpf: profile?.cpf ?? '',
-            birth_date: profile?.birth_date ?? '',
+            birth_date: birthDate,
             address: {
               zip_code: address?.zip_code ?? '',
               street: address?.street ?? '',

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getSql } from '@/lib/db'
 import { createClient } from '@/lib/supabase/server'
 
 export async function GET() {
@@ -13,26 +13,21 @@ export async function GET() {
       return NextResponse.json({ entitlements: [] }, { status: 401 })
     }
 
-    const { data: entitlements, error } = await supabase
-      .from('user_entitlements')
-      .select('product_key, status, expires_at, is_permanent')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
+    const sql = getSql()
+    const entitlements = await sql<
+      {
+        product_key: string
+        status: string
+        expires_at: string | Date | null
+        is_permanent: boolean
+      }[]
+    >`
+      SELECT product_key, status, expires_at, is_permanent
+      FROM user_entitlements
+      WHERE user_id = ${user.id}::uuid AND status = 'active'
+    `
 
-    if (entitlements) {
-      return NextResponse.json({ entitlements })
-    }
-
-    if (error?.code === '42501') {
-      const { data: adminEntitlements } = await createAdminClient()
-        .from('user_entitlements')
-        .select('product_key, status, expires_at, is_permanent')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-      return NextResponse.json({ entitlements: adminEntitlements ?? [] })
-    }
-
-    return NextResponse.json({ entitlements: [] })
+    return NextResponse.json({ entitlements })
   } catch (error) {
     console.error('Entitlements error:', error)
     return NextResponse.json({ entitlements: [] })

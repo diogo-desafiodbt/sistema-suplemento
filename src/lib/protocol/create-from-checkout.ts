@@ -2,7 +2,6 @@ import { asNumber, getSql, withTransaction } from '@/lib/db'
 import { claimOnce, releaseClaim } from '@/lib/idempotency'
 import { getPharmacyCycleMultiplier } from '@/lib/plans'
 import { productKeyFromName } from '@/lib/protocol/triage'
-import type { createAdminClient } from '@/lib/supabase/admin'
 import type { ShippingSelection } from '@/types/shipping'
 import type postgres from 'postgres'
 
@@ -42,7 +41,6 @@ export type PendingCheckoutPayload = {
   protocol_items: PendingProtocolItem[]
 }
 
-type AdminClient = ReturnType<typeof createAdminClient>
 type DbSql = postgres.Sql | postgres.TransactionSql
 
 async function waitForProtocolId(subscriptionId: string): Promise<string | null> {
@@ -190,7 +188,6 @@ async function finalizeSubscriptionProtocol(
 }
 
 export async function ensureProtocolAfterPayment(
-  admin: AdminClient,
   subscriptionId: string,
   userId: string,
 ): Promise<string | null> {
@@ -245,7 +242,6 @@ export async function ensureProtocolAfterPayment(
   }
 
   const { won, reclaimedStale } = await claimOnce(
-    admin,
     'protocol_creation_locks',
     {
       subscription_id: subscriptionId,
@@ -299,7 +295,6 @@ export async function ensureProtocolAfterPayment(
           )
         })
         await releaseClaim(
-          admin,
           'protocol_creation_locks',
           'subscription_id',
           subscriptionId,
@@ -308,7 +303,6 @@ export async function ensureProtocolAfterPayment(
       } catch (error) {
         console.error('ensureProtocolAfterPayment: resume error', error)
         await releaseClaim(
-          admin,
           'protocol_creation_locks',
           'subscription_id',
           subscriptionId,
@@ -394,7 +388,6 @@ export async function ensureProtocolAfterPayment(
     })
 
     await releaseClaim(
-      admin,
       'protocol_creation_locks',
       'subscription_id',
       subscriptionId,
@@ -403,7 +396,6 @@ export async function ensureProtocolAfterPayment(
   } catch (error) {
     console.error('ensureProtocolAfterPayment: unexpected error', error)
     await releaseClaim(
-      admin,
       'protocol_creation_locks',
       'subscription_id',
       subscriptionId,

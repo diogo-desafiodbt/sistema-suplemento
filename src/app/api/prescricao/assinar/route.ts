@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
+import { getUserProfile } from '@/lib/auth/profile'
 import { getSql, withTransaction } from '@/lib/db'
 import { generatePrescriptionPdf } from '@/lib/pdf/generator'
 import { createPrescriptionPdfSignedUrl } from '@/lib/pdf/signed-url'
@@ -55,11 +56,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
 
-    const { data: profile } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .single()
+    const profile = await getUserProfile(user.id)
 
     if (profile?.role !== 'professional' && profile?.role !== 'admin') {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })

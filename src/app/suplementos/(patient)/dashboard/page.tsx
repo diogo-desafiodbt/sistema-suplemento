@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getUserProfile } from '@/lib/auth/profile'
 import { createClient } from '@/lib/supabase/server'
 
 export default async function DashboardPage() {
@@ -10,13 +10,7 @@ export default async function DashboardPage() {
 
   if (!user) redirect('/suplementos/login')
 
-  const admin = createAdminClient()
-
-  const { data: profile } = await admin
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  const profile = await getUserProfile(user.id)
 
   if (profile?.role === 'professional')
     redirect('/suplementos/profissional/fila')

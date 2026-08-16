@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { ConfigClient } from '@/components/admin/ConfigClient'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getUserProfile } from '@/lib/auth/profile'
+import { getSql } from '@/lib/db'
 import { createClient } from '@/lib/supabase/server'
 
 type ConfigRow = {
@@ -16,19 +17,15 @@ export default async function AdminConfigPage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/suplementos/login')
 
-  const admin = createAdminClient()
-  const { data: profile } = await admin
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  const profile = await getUserProfile(user.id)
 
   if (profile?.role !== 'admin') redirect('/suplementos/dashboard')
 
-  const { data: configs } = await admin
-    .from('system_config')
-    .select('key, value, description')
-    .order('key', { ascending: true })
+  const sql = getSql()
+  const configs = await sql<ConfigRow[]>`
+    SELECT key, value, description FROM system_config
+    ORDER BY key ASC
+  `
 
   return (
     <main className="max-w-3xl mx-auto px-6 py-8">
@@ -42,7 +39,7 @@ export default async function AdminConfigPage() {
         </p>
       </div>
 
-      <ConfigClient configs={(configs ?? []) as ConfigRow[]} />
+      <ConfigClient configs={configs} />
     </main>
   )
 }

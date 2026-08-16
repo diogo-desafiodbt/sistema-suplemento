@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getSql } from '@/lib/db'
 import { normalizeMessageId, wrapMessageId } from '@/lib/support/message-id'
 
 function requireSmtpEnv(): {
@@ -33,13 +33,14 @@ export async function sendSupportEmail(params: {
   useReplySubject?: boolean
 }): Promise<void> {
   const smtp = requireSmtpEnv()
-  const admin = createAdminClient()
+  const sql = getSql()
 
-  const { data: thread } = await admin
-    .from('support_threads')
-    .select('subject')
-    .eq('id', params.threadId)
-    .maybeSingle()
+  const threadRows = await sql<{ subject: string | null }[]>`
+    SELECT subject FROM support_threads
+    WHERE id = ${params.threadId}::uuid
+    LIMIT 1
+  `
+  const thread = threadRows[0] ?? null
 
   const originalSubject =
     thread?.subject?.trim() || params.subject.trim() || 'Suporte'
@@ -85,20 +86,26 @@ export async function sendSupportEmail(params: {
     normalizeMessageId(info.messageId) ??
     `outbound-${params.threadId}-${Date.now()}@desafiodiabetes.com`
 
-  await admin.from('support_messages').insert({
-    thread_id: params.threadId,
-    direction: 'outbound',
-    message_id: outboundId,
-    in_reply_to: normalizeMessageId(params.inReplyToMessageId),
-    from_email: smtp.user,
-    to_email: params.toEmail,
-    body_text: params.bodyText,
-  })
+  await sql`
+    INSERT INTO support_messages (
+      thread_id, direction, message_id, in_reply_to, from_email, to_email, body_text
+    )
+    VALUES (
+      ${params.threadId}::uuid,
+      'outbound',
+      ${outboundId},
+      ${normalizeMessageId(params.inReplyToMessageId)},
+      ${smtp.user},
+      ${params.toEmail},
+      ${params.bodyText}
+    )
+  `
 
-  await admin
-    .from('support_threads')
-    .update({ last_message_at: new Date().toISOString() })
-    .eq('id', params.threadId)
+  await sql`
+    UPDATE support_threads
+    SET last_message_at = ${new Date().toISOString()}
+    WHERE id = ${params.threadId}::uuid
+  `
 }
 
 /** Cabeçalhos de thread a partir da última inbound (+ histórico de message_ids). */
@@ -106,18 +113,21 @@ export async function getThreadReplyHeaders(threadId: string): Promise<{
   inReplyToMessageId?: string
   referencesMessageIds: string[]
 }> {
-  const admin = createAdminClient()
-  const { data: messages } = await admin
-    .from('support_messages')
-    .select('message_id, direction, created_at')
-    .eq('thread_id', threadId)
-    .order('created_at', { ascending: true })
+  const sql = getSql()
+  const messages = await sql<
+    { message_id: string | null; direction: string; created_at: string | Date }[]
+  >`
+    SELECT message_id, direction, created_at
+    FROM support_messages
+    WHERE thread_id = ${threadId}::uuid
+    ORDER BY created_at ASC
+  `
 
-  const allIds = (messages ?? [])
+  const allIds = messages
     .map((m) => normalizeMessageId(m.message_id))
     .filter((id): id is string => Boolean(id))
 
-  const lastInbound = [...(messages ?? [])]
+  const lastInbound = [...messages]
     .reverse()
     .find((m) => m.direction === 'inbound')
 

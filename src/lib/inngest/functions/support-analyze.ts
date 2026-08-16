@@ -1,6 +1,5 @@
 import { claimByFlag, releaseFlag } from '@/lib/idempotency'
 import { getSql } from '@/lib/db'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { classifySupportThread, draftSupportReply } from '@/lib/support/ai'
 import { fetchSupportFacts, hasRelevantFacts } from '@/lib/support/facts'
 import { identifySupportUser } from '@/lib/support/identify'
@@ -23,7 +22,6 @@ export const supportAnalyze = inngest.createFunction(
       throw new Error('Evento suporte/email-recebido sem thread_id')
 
     const sql = getSql()
-    const admin = createAdminClient()
 
     const threadRows = await sql<
       {
@@ -48,7 +46,6 @@ export const supportAnalyze = inngest.createFunction(
 
     // 4.1 — Aviso automático genérico (uma vez por thread, claim permanente)
     const claimed = await claimByFlag(
-      admin,
       'support_threads',
       threadId,
       'auto_ack_sent_at',
@@ -70,7 +67,6 @@ export const supportAnalyze = inngest.createFunction(
       } catch (error) {
         console.error('Falha ao enviar auto-ack de suporte:', error)
         await releaseFlag(
-          admin,
           'support_threads',
           threadId,
           'auto_ack_sent_at',

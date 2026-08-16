@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getSql } from '@/lib/db'
 import { createClient } from '@/lib/supabase/server'
 
 export async function POST(request: Request) {
@@ -13,19 +13,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false }, { status: 401 })
     }
 
-    const admin = createAdminClient()
+    const sql = getSql()
+    await sql`
+      INSERT INTO user_login_history (user_id, ip_address, user_agent, logged_at)
+      VALUES (
+        ${user.id}::uuid,
+        ${request.headers.get('x-forwarded-for') ?? 'unknown'},
+        ${request.headers.get('user-agent') ?? 'unknown'},
+        ${new Date().toISOString()}
+      )
+    `
 
-    await admin.from('user_login_history').insert({
-      user_id: user.id,
-      ip_address: request.headers.get('x-forwarded-for') ?? 'unknown',
-      user_agent: request.headers.get('user-agent') ?? 'unknown',
-      logged_at: new Date().toISOString(),
-    })
-
-    await admin
-      .from('users')
-      .update({ rfm_recalc_queued_at: new Date().toISOString() })
-      .eq('id', user.id)
+    await sql`
+      UPDATE users
+      SET rfm_recalc_queued_at = ${new Date().toISOString()}
+      WHERE id = ${user.id}::uuid
+    `
 
     return NextResponse.json({ ok: true })
   } catch (error) {

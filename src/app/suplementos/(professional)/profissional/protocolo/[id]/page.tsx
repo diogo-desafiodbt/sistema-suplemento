@@ -2,6 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import imgLogoBranca from '@/../public/logo-branca.png'
+import { getUserProfile } from '@/lib/auth/profile'
 import { getSql } from '@/lib/db'
 import {
   calcAge,
@@ -66,11 +67,7 @@ export default async function ProtocoloPage({
 
   if (!user) redirect('/suplementos/login')
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  const profile = await getUserProfile(user.id)
 
   if (profile?.role !== 'professional' && profile?.role !== 'admin') {
     redirect('/suplementos/dashboard')

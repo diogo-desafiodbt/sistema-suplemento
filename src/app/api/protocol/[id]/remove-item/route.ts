@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getSql } from '@/lib/db'
 import { createClient } from '@/lib/supabase/server'
 
 export async function PATCH(
@@ -18,14 +18,14 @@ export async function PATCH(
     }
 
     const { item_id, removed } = await request.json()
-    const admin = createAdminClient()
+    const sql = getSql()
 
-    const { data: protocol } = await admin
-      .from('protocols')
-      .select('id, status')
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .single()
+    const protocolRows = await sql<{ id: string; status: string }[]>`
+      SELECT id, status FROM protocols
+      WHERE id = ${id}::uuid AND user_id = ${user.id}::uuid
+      LIMIT 1
+    `
+    const protocol = protocolRows[0] ?? null
 
     if (!protocol) {
       return NextResponse.json(
@@ -34,24 +34,21 @@ export async function PATCH(
       )
     }
 
-    // Após pagamento a composição fica congelada (farmácia usa protocol_items).
-    const { data: linkedSub } = await admin
-      .from('subscriptions')
-      .select('id')
-      .eq('protocol_id', id)
-      .eq('user_id', user.id)
-      .maybeSingle()
+    const linkedSub = await sql<{ id: string }[]>`
+      SELECT id FROM subscriptions
+      WHERE protocol_id = ${id}::uuid AND user_id = ${user.id}::uuid
+      LIMIT 1
+    `
 
-    if (linkedSub?.id) {
-      const { data: paid } = await admin
-        .from('payments')
-        .select('id')
-        .eq('subscription_id', linkedSub.id)
-        .eq('status', 'paid')
-        .limit(1)
-        .maybeSingle()
+    if (linkedSub[0]?.id) {
+      const paid = await sql<{ id: string }[]>`
+        SELECT id FROM payments
+        WHERE subscription_id = ${linkedSub[0].id}::uuid
+          AND status = 'paid'
+        LIMIT 1
+      `
 
-      if (paid) {
+      if (paid[0]) {
         return NextResponse.json(
           { error: 'Protocolo já pago — itens não podem ser alterados' },
           { status: 400 },
@@ -66,12 +63,14 @@ export async function PATCH(
       )
     }
 
-    const { data: item } = await admin
-      .from('protocol_items')
-      .select('id, is_required, protocol_id')
-      .eq('id', item_id)
-      .eq('protocol_id', id)
-      .single()
+    const itemRows = await sql<
+      { id: string; is_required: boolean; protocol_id: string }[]
+    >`
+      SELECT id, is_required, protocol_id FROM protocol_items
+      WHERE id = ${item_id}::uuid AND protocol_id = ${id}::uuid
+      LIMIT 1
+    `
+    const item = itemRows[0] ?? null
 
     if (!item) {
       return NextResponse.json(
@@ -87,10 +86,16 @@ export async function PATCH(
       )
     }
 
-    await admin
-      .from('protocol_items')
-      .update({ removed_by_patient: removed })
-      .eq('id', item_id)
+    await sql`
+      UPDATE protocol_items
+      SET removed_by_patient = ${removed}
+      WHERE id = ${item_id}::uuid
+        AND protocol_id = ${id}::uuid
+        AND protocol_id IN (
+          SELECT id FROM protocols
+          WHERE id = ${id}::uuid AND user_id = ${user.id}::uuid
+        )
+    `
 
     return NextResponse.json({ ok: true })
   } catch (error) {

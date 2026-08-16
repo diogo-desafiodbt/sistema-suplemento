@@ -10,10 +10,7 @@ import {
   type PackageItem,
 } from '@/lib/shipping/package'
 import { escolherTiers } from '@/lib/shipping/tiers'
-import type { createAdminClient } from '@/lib/supabase/admin'
 import type { ShippingSelection, ShippingTier } from '@/types/shipping'
-
-type AdminClient = ReturnType<typeof createAdminClient>
 
 type ProtocolItemInput = {
   product_id?: string
@@ -38,9 +35,7 @@ export type PricedCheckout = {
  *
  * `includeShipping: false` → shipping.valor = 0 (subtotal só de produtos).
  */
-export async function computeServerCheckoutTotal(
-  admin: AdminClient,
-  params: {
+export async function computeServerCheckoutTotal(params: {
     planType: string
     protocolItems: ProtocolItemInput[]
     shipping: { tier: ShippingTier }

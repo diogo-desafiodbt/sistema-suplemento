@@ -1,10 +1,8 @@
 import { Resend } from 'resend'
+import { getSql } from '@/lib/db'
 import { claimOnce, markClaimCompleted, releaseClaim } from '@/lib/idempotency'
 import { trackingEventKey } from '@/lib/shipping/create-label'
-import type { createAdminClient } from '@/lib/supabase/admin'
 import type { RastreamentoEvento } from '@/types/shipping'
-
-type AdminClient = ReturnType<typeof createAdminClient>
 
 export type ShippingNotificationKind = 'dispatched' | 'tracking' | 'delivered'
 
@@ -56,17 +54,16 @@ export function getNewTrackingEvents(
 }
 
 async function logNotification(
-  admin: AdminClient,
   userId: string,
   status: 'sent' | 'failed',
 ): Promise<void> {
-  const { error } = await admin.from('notification_logs').insert({
-    user_id: userId,
-    type: 'tracking_update',
-    channel: 'email',
-    status,
-  })
-  if (error) {
+  const sql = getSql()
+  try {
+    await sql`
+      INSERT INTO notification_logs (user_id, type, channel, status)
+      VALUES (${userId}::uuid, 'tracking_update', 'email', ${status})
+    `
+  } catch (error) {
     console.error(
       'Erro ao registrar notification_logs (tracking_update):',
       error,
@@ -75,39 +72,37 @@ async function logNotification(
 }
 
 async function markShippingEmailSent(
-  admin: AdminClient,
   claimKeys: { order_id: string; event_id: string },
 ): Promise<void> {
-  const { error } = await admin
-    .from('shipping_notification_logs')
-    .update({ email_sent_at: new Date().toISOString() })
-    .eq('order_id', claimKeys.order_id)
-    .eq('event_id', claimKeys.event_id)
-  if (error) {
-    throw new Error(
-      `notifyShippingUpdate: falha ao gravar email_sent_at: ${error.message}`,
-    )
-  }
+  const sql = getSql()
+  await sql`
+    UPDATE shipping_notification_logs
+    SET email_sent_at = ${new Date().toISOString()}
+    WHERE order_id = ${claimKeys.order_id}::uuid
+      AND event_id = ${claimKeys.event_id}
+  `
 }
 
 /** Se o e-mail já saiu (email_sent_at na claim) ou completed_at, completa e retorna true. */
 async function healShippingClaimIfSent(
-  admin: AdminClient,
   claimKeys: { order_id: string; event_id: string },
 ): Promise<boolean> {
-  const { data: existingClaim } = await admin
-    .from('shipping_notification_logs')
-    .select('completed_at, email_sent_at')
-    .eq('order_id', claimKeys.order_id)
-    .eq('event_id', claimKeys.event_id)
-    .maybeSingle()
+  const sql = getSql()
+  const rows = await sql<
+    { completed_at: string | Date | null; email_sent_at: string | Date | null }[]
+  >`
+    SELECT completed_at, email_sent_at FROM shipping_notification_logs
+    WHERE order_id = ${claimKeys.order_id}::uuid
+      AND event_id = ${claimKeys.event_id}
+    LIMIT 1
+  `
+  const existingClaim = rows[0] ?? null
 
   if (existingClaim?.completed_at) return true
 
   if (!existingClaim?.email_sent_at) return false
 
   await markClaimCompleted(
-    admin,
     'shipping_notification_logs',
     claimKeys,
     undefined,
@@ -221,9 +216,7 @@ function buildShippingEmailHtml(params: {
   return { subject, html }
 }
 
-export async function notifyShippingUpdate(
-  admin: AdminClient,
-  params: {
+export async function notifyShippingUpdate(params: {
     orderId: string
     eventId: string
     kind: ShippingNotificationKind
@@ -234,22 +227,25 @@ export async function notifyShippingUpdate(
   },
 ): Promise<void> {
   try {
-    const { data: order } = await admin
-      .from('orders')
-      .select('id, user_id')
-      .eq('id', params.orderId)
-      .maybeSingle()
+    const sql = getSql()
+    const orderRows = await sql<{ id: string; user_id: string | null }[]>`
+      SELECT id, user_id FROM orders
+      WHERE id = ${params.orderId}::uuid
+      LIMIT 1
+    `
+    const order = orderRows[0] ?? null
 
     if (!order?.user_id) {
       console.error('notifyShippingUpdate: pedido sem user_id', params.orderId)
       return
     }
 
-    const { data: user } = await admin
-      .from('users')
-      .select('full_name, email')
-      .eq('id', order.user_id)
-      .maybeSingle()
+    const userRows = await sql<{ full_name: string | null; email: string | null }[]>`
+      SELECT full_name, email FROM users
+      WHERE id = ${order.user_id}::uuid
+      LIMIT 1
+    `
+    const user = userRows[0] ?? null
 
     if (!user?.email) {
       console.error('notifyShippingUpdate: usuário sem e-mail', order.user_id)
@@ -271,7 +267,6 @@ export async function notifyShippingUpdate(
     }
 
     const { won } = await claimOnce(
-      admin,
       'shipping_notification_logs',
       claimKeys,
       shippingClaimOpts,
@@ -279,22 +274,21 @@ export async function notifyShippingUpdate(
 
     let claimed = won
     if (!won) {
-      if (await healShippingClaimIfSent(admin, claimKeys)) return
+      if (await healShippingClaimIfSent(claimKeys)) return
 
       // Espera breve o outro worker (~15s), sem releaseClaim manual.
       for (let i = 0; i < 30; i++) {
         await new Promise((resolve) => setTimeout(resolve, 500))
-        if (await healShippingClaimIfSent(admin, claimKeys)) return
+        if (await healShippingClaimIfSent(claimKeys)) return
       }
 
       const retry = await claimOnce(
-        admin,
         'shipping_notification_logs',
         claimKeys,
         shippingClaimOpts,
       )
       if (!retry.won) {
-        if (await healShippingClaimIfSent(admin, claimKeys)) return
+        if (await healShippingClaimIfSent(claimKeys)) return
         throw new Error(
           `notifyShippingUpdate: claim incompleta após espera para order ${params.orderId} event ${params.eventId}`,
         )
@@ -308,8 +302,8 @@ export async function notifyShippingUpdate(
     const resendApiKey = process.env.RESEND_API_KEY
     if (!resendApiKey) {
       console.warn('RESEND_API_KEY ausente — e-mail de frete não enviado')
-      await releaseClaim(admin, 'shipping_notification_logs', claimKeys)
-      await logNotification(admin, order.user_id, 'failed')
+      await releaseClaim('shipping_notification_logs', claimKeys)
+      await logNotification(order.user_id, 'failed')
       throw new Error('RESEND_API_KEY ausente — e-mail de frete não enviado')
     }
 
@@ -334,19 +328,18 @@ export async function notifyShippingUpdate(
         html,
       })
     } catch (error) {
-      await releaseClaim(admin, 'shipping_notification_logs', claimKeys)
+      await releaseClaim('shipping_notification_logs', claimKeys)
       console.error('Erro ao enviar e-mail de frete:', error)
-      await logNotification(admin, order.user_id, 'failed')
+      await logNotification(order.user_id, 'failed')
       throw error
     }
 
     // Evidência na própria claim (order_id+event_id) — nunca releaseClaim pós-send.
     try {
-      await markShippingEmailSent(admin, claimKeys)
+      await markShippingEmailSent(claimKeys)
     } catch (emailSentError) {
       try {
         await markClaimCompleted(
-          admin,
           'shipping_notification_logs',
           claimKeys,
           undefined,
@@ -361,13 +354,12 @@ export async function notifyShippingUpdate(
       throw emailSentError
     }
     await markClaimCompleted(
-      admin,
       'shipping_notification_logs',
       claimKeys,
       undefined,
       'completed_at',
     )
-    await logNotification(admin, order.user_id, 'sent')
+    await logNotification(order.user_id, 'sent')
   } catch (error) {
     console.error('notifyShippingUpdate error:', error)
     throw error
@@ -376,19 +368,18 @@ export async function notifyShippingUpdate(
 
 /** Notifica o comprador por cada evento de rastreio novo (após salvar o pedido). */
 export async function notifyNewTrackingEvents(
-  admin: AdminClient,
   orderId: string,
   newEvents: RastreamentoEvento[],
 ): Promise<void> {
   for (const evento of newEvents) {
     if (evento.finalizado === 1) {
-      await notifyShippingUpdate(admin, {
+      await notifyShippingUpdate({
         orderId,
         eventId: 'entregue',
         kind: 'delivered',
       })
     } else {
-      await notifyShippingUpdate(admin, {
+      await notifyShippingUpdate({
         orderId,
         eventId: trackingEventKey(evento as unknown as Record<string, unknown>),
         kind: 'tracking',

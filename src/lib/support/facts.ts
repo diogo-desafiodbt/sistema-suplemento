@@ -1,8 +1,8 @@
+import { asNumber, getSql } from '@/lib/db'
 import {
   addBusinessDays,
   estimateCustomerDeliveryDays,
 } from '@/lib/shipping/estimate'
-import { createAdminClient } from '@/lib/supabase/admin'
 
 export type SupportCategory = 'frete' | 'pagamento' | 'fora_de_escopo'
 
@@ -48,18 +48,26 @@ export async function fetchSupportFacts(
     return { category }
   }
 
-  const admin = createAdminClient()
+  const sql = getSql()
 
   if (category === 'frete') {
-    const { data: order } = await admin
-      .from('orders')
-      .select(
-        'id, status, tracking_code, created_at, shipping_json, shipping_quote_json',
-      )
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    const orderRows = await sql<
+      {
+        id: string
+        status: string
+        tracking_code: string | null
+        created_at: string | Date
+        shipping_json: unknown
+        shipping_quote_json: unknown
+      }[]
+    >`
+      SELECT id, status, tracking_code, created_at, shipping_json, shipping_quote_json
+      FROM orders
+      WHERE user_id = ${userId}::uuid
+      ORDER BY created_at DESC
+      LIMIT 1
+    `
+    const order = orderRows[0] ?? null
 
     if (!order) {
       return {
@@ -118,13 +126,22 @@ export async function fetchSupportFacts(
   }
 
   // pagamento
-  const { data: subscription } = await admin
-    .from('subscriptions')
-    .select('id, plan_type, status, next_billing_at, expires_at')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  const subscriptionRows = await sql<
+    {
+      id: string
+      plan_type: string | null
+      status: string | null
+      next_billing_at: string | Date | null
+      expires_at: string | Date | null
+    }[]
+  >`
+    SELECT id, plan_type, status, next_billing_at, expires_at
+    FROM subscriptions
+    WHERE user_id = ${userId}::uuid
+    ORDER BY created_at DESC
+    LIMIT 1
+  `
+  const subscription = subscriptionRows[0] ?? null
 
   if (!subscription) {
     return {
@@ -141,22 +158,26 @@ export async function fetchSupportFacts(
     }
   }
 
-  const { data: payment } = await admin
-    .from('payments')
-    .select('status, amount')
-    .eq('subscription_id', subscription.id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  const paymentRows = await sql<{ status: string | null; amount: string | number | null }[]>`
+    SELECT status, amount FROM payments
+    WHERE subscription_id = ${subscription.id}::uuid
+    ORDER BY created_at DESC
+    LIMIT 1
+  `
+  const payment = paymentRows[0] ?? null
 
   return {
     category,
     pagamento: {
       payment_status: payment?.status ?? null,
-      amount: payment?.amount ?? null,
+      amount: payment?.amount == null ? null : asNumber(payment.amount),
       plan_type: subscription.plan_type,
-      next_billing_at: subscription.next_billing_at,
-      expires_at: subscription.expires_at,
+      next_billing_at: subscription.next_billing_at
+        ? new Date(subscription.next_billing_at).toISOString()
+        : null,
+      expires_at: subscription.expires_at
+        ? new Date(subscription.expires_at).toISOString()
+        : null,
       subscription_status: subscription.status,
       found: true,
     },

@@ -3,17 +3,9 @@ import {
   SupportThreadPanel,
   type SupportThreadView,
 } from '@/components/admin/SupportThreadPanel'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getUserProfile } from '@/lib/auth/profile'
+import { getSql } from '@/lib/db'
 import { createClient } from '@/lib/supabase/server'
-
-const THREAD_SELECT = `
-  id, from_email, subject, status, user_id, db_facts, suggested_reply,
-  last_message_at, created_at,
-  users ( full_name, email ),
-  support_messages (
-    id, direction, from_email, body_text, created_at
-  )
-`
 
 export default async function AdminSuportePage() {
   const supabase = await createClient()
@@ -22,32 +14,51 @@ export default async function AdminSuportePage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/suplementos/login')
 
-  const admin = createAdminClient()
-  const { data: profile } = await admin
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  const profile = await getUserProfile(user.id)
 
   if (profile?.role !== 'admin') redirect('/suplementos/dashboard')
 
-  const [{ data: pendingRows }, { data: historyRows }] = await Promise.all([
-    admin
-      .from('support_threads')
-      .select(THREAD_SELECT)
-      .in('status', ['aguardando_revisao', 'aguardando_dados', 'novo'])
-      .order('last_message_at', { ascending: false })
-      .limit(500),
-    admin
-      .from('support_threads')
-      .select(THREAD_SELECT)
-      .eq('status', 'respondido')
-      .order('last_message_at', { ascending: false })
-      .limit(100),
+  const sql = getSql()
+  const [pendingRows, historyRows] = await Promise.all([
+    sql<SupportThreadView[]>`
+      SELECT t.id, t.from_email, t.subject, t.status, t.user_id, t.db_facts,
+             t.suggested_reply, t.last_message_at, t.created_at,
+        CASE WHEN u.id IS NULL THEN NULL ELSE jsonb_build_object(
+          'full_name', u.full_name, 'email', u.email) END AS users,
+        COALESCE(msgs.list, '[]'::jsonb) AS support_messages
+      FROM support_threads t
+      LEFT JOIN users u ON u.id = t.user_id
+      LEFT JOIN LATERAL (
+        SELECT jsonb_agg(jsonb_build_object(
+          'id', m.id, 'direction', m.direction, 'from_email', m.from_email,
+          'body_text', m.body_text, 'created_at', m.created_at
+        ) ORDER BY m.created_at) AS list
+        FROM support_messages m WHERE m.thread_id = t.id
+      ) msgs ON true
+      WHERE t.status = ANY(${sql.array(['aguardando_revisao', 'aguardando_dados', 'novo'])}::text[])
+      ORDER BY t.last_message_at DESC
+      LIMIT 500
+    `,
+    sql<SupportThreadView[]>`
+      SELECT t.id, t.from_email, t.subject, t.status, t.user_id, t.db_facts,
+             t.suggested_reply, t.last_message_at, t.created_at,
+        CASE WHEN u.id IS NULL THEN NULL ELSE jsonb_build_object(
+          'full_name', u.full_name, 'email', u.email) END AS users,
+        COALESCE(msgs.list, '[]'::jsonb) AS support_messages
+      FROM support_threads t
+      LEFT JOIN users u ON u.id = t.user_id
+      LEFT JOIN LATERAL (
+        SELECT jsonb_agg(jsonb_build_object(
+          'id', m.id, 'direction', m.direction, 'from_email', m.from_email,
+          'body_text', m.body_text, 'created_at', m.created_at
+        ) ORDER BY m.created_at) AS list
+        FROM support_messages m WHERE m.thread_id = t.id
+      ) msgs ON true
+      WHERE t.status = 'respondido'
+      ORDER BY t.last_message_at DESC
+      LIMIT 100
+    `,
   ])
-
-  const pending = (pendingRows ?? []) as unknown as SupportThreadView[]
-  const history = (historyRows ?? []) as unknown as SupportThreadView[]
 
   return (
     <main className="max-w-4xl mx-auto px-6 py-8">
@@ -61,7 +72,7 @@ export default async function AdminSuportePage() {
         </p>
       </div>
 
-      <SupportThreadPanel pending={pending} history={history} />
+      <SupportThreadPanel pending={pendingRows} history={historyRows} />
     </main>
   )
 }

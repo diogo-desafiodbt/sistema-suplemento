@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { getSql } from '@/lib/db'
 import { createClient } from '@/lib/supabase/server'
 
 const bodySchema = z.object({
@@ -36,17 +37,18 @@ export async function PATCH(request: NextRequest) {
     }
 
     const { full_name, phone, birth_date, address } = parsed.data
+    const sql = getSql()
 
-    const { error: userError } = await supabase
-      .from('users')
-      .update({
-        full_name,
-        phone: phone ?? null,
-        birth_date: birth_date ?? null,
-      })
-      .eq('id', user.id)
-
-    if (userError) {
+    try {
+      await sql`
+        UPDATE users
+        SET
+          full_name = ${full_name},
+          phone = ${phone ?? null},
+          birth_date = ${birth_date ?? null}
+        WHERE id = ${user.id}::uuid
+      `
+    } catch (userError) {
       console.error('Erro ao atualizar usuário:', userError)
       return NextResponse.json(
         { error: 'Erro ao salvar dados pessoais' },
@@ -54,54 +56,52 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    const { data: existingAddress } = await supabase
-      .from('addresses')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('is_default', true)
-      .maybeSingle()
+    const existingAddress = await sql<{ id: string }[]>`
+      SELECT id FROM addresses
+      WHERE user_id = ${user.id}::uuid AND is_default = true
+      LIMIT 1
+    `
 
-    if (existingAddress) {
-      const { error: addrError } = await supabase
-        .from('addresses')
-        .update({
-          zip_code: address.zip_code,
-          street: address.street,
-          number: address.number,
-          complement: address.complement ?? null,
-          neighborhood: address.neighborhood,
-          city: address.city,
-          state: address.state,
-        })
-        .eq('id', existingAddress.id)
-
-      if (addrError) {
-        console.error('Erro ao atualizar endereço:', addrError)
-        return NextResponse.json(
-          { error: 'Erro ao salvar endereço' },
-          { status: 500 },
-        )
+    try {
+      if (existingAddress[0]) {
+        await sql`
+          UPDATE addresses
+          SET
+            zip_code = ${address.zip_code},
+            street = ${address.street},
+            number = ${address.number},
+            complement = ${address.complement ?? null},
+            neighborhood = ${address.neighborhood},
+            city = ${address.city},
+            state = ${address.state}
+          WHERE id = ${existingAddress[0].id}::uuid
+            AND user_id = ${user.id}::uuid
+        `
+      } else {
+        await sql`
+          INSERT INTO addresses (
+            user_id, zip_code, street, number, complement,
+            neighborhood, city, state, is_default
+          )
+          VALUES (
+            ${user.id}::uuid,
+            ${address.zip_code},
+            ${address.street},
+            ${address.number},
+            ${address.complement ?? null},
+            ${address.neighborhood},
+            ${address.city},
+            ${address.state},
+            true
+          )
+        `
       }
-    } else {
-      const { error: addrError } = await supabase.from('addresses').insert({
-        user_id: user.id,
-        zip_code: address.zip_code,
-        street: address.street,
-        number: address.number,
-        complement: address.complement ?? null,
-        neighborhood: address.neighborhood,
-        city: address.city,
-        state: address.state,
-        is_default: true,
-      })
-
-      if (addrError) {
-        console.error('Erro ao inserir endereço:', addrError)
-        return NextResponse.json(
-          { error: 'Erro ao salvar endereço' },
-          { status: 500 },
-        )
-      }
+    } catch (addrError) {
+      console.error('Erro ao salvar endereço:', addrError)
+      return NextResponse.json(
+        { error: 'Erro ao salvar endereço' },
+        { status: 500 },
+      )
     }
 
     return NextResponse.json({ ok: true })

@@ -1,7 +1,6 @@
 import { Resend } from 'resend'
 import { asNumber, getSql } from '@/lib/db'
 import { claimOnce, markClaimCompleted, releaseClaim } from '@/lib/idempotency'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { inngest } from '../client'
 
 function escapeHtml(text: string): string {
@@ -143,7 +142,6 @@ export const purchaseConfirmed = inngest.createFunction(
     }
 
     const sql = getSql()
-    const admin = createAdminClient()
 
     let payment: { id: string; amount: number | null } | null = null
 
@@ -232,7 +230,6 @@ export const purchaseConfirmed = inngest.createFunction(
     })
 
     const { won } = await claimOnce(
-      admin,
       'purchase_confirmation_logs',
       { payment_id: payment.id },
       {
@@ -268,7 +265,6 @@ export const purchaseConfirmed = inngest.createFunction(
       // E-mail pode ter saído e markClaimCompleted falhado — confere email_sent_at.
       if (existingClaim?.email_sent_at) {
         await markClaimCompleted(
-          admin,
           'purchase_confirmation_logs',
           'payment_id',
           payment.id,
@@ -298,7 +294,6 @@ export const purchaseConfirmed = inngest.createFunction(
     } catch (error) {
       console.error('Erro ao enviar e-mail de compra confirmada:', error)
       await releaseClaim(
-        admin,
         'purchase_confirmation_logs',
         'payment_id',
         payment.id,
@@ -317,7 +312,6 @@ export const purchaseConfirmed = inngest.createFunction(
     } catch (emailSentError) {
       try {
         await markClaimCompleted(
-          admin,
           'purchase_confirmation_logs',
           'payment_id',
           payment.id,
@@ -338,7 +332,6 @@ export const purchaseConfirmed = inngest.createFunction(
       )
     }
     await markClaimCompleted(
-      admin,
       'purchase_confirmation_logs',
       'payment_id',
       payment.id,

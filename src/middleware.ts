@@ -1,5 +1,8 @@
 import { createServerClient } from '@supabase/ssr'
 import { type NextRequest, NextResponse } from 'next/server'
+import { getUserProfile } from '@/lib/auth/profile'
+
+export const runtime = 'nodejs'
 
 /**
  * Portão de pré-lançamento.
@@ -84,11 +87,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (user && (isAdmin || isProfessional)) {
-    const { data: profile } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle()
+    const profile = await getUserProfile(user.id)
 
     if (isAdmin && profile?.role !== 'admin') {
       const url = request.nextUrl.clone()

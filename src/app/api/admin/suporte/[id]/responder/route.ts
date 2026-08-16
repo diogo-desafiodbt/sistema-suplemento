@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getUserProfile } from '@/lib/auth/profile'
+import { getSql } from '@/lib/db'
 import { createClient } from '@/lib/supabase/server'
 import { getThreadReplyHeaders, sendSupportEmail } from '@/lib/support/mailer'
 
@@ -10,15 +11,9 @@ async function requireAdmin() {
   } = await supabase.auth.getUser()
   if (!user) return null
 
-  const admin = createAdminClient()
-  const { data: profile } = await admin
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
+  const profile = await getUserProfile(user.id)
   if (profile?.role !== 'admin') return null
-  return { admin, userId: user.id }
+  return { userId: user.id }
 }
 
 export async function POST(
@@ -41,11 +36,21 @@ export async function POST(
       )
     }
 
-    const { data: thread } = await auth.admin
-      .from('support_threads')
-      .select('id, from_email, subject, status')
-      .eq('id', id)
-      .maybeSingle()
+    const sql = getSql()
+    const threadRows = await sql<
+      {
+        id: string
+        from_email: string
+        subject: string | null
+        status: string
+      }[]
+    >`
+      SELECT id, from_email, subject, status
+      FROM support_threads
+      WHERE id = ${id}::uuid
+      LIMIT 1
+    `
+    const thread = threadRows[0] ?? null
 
     if (!thread) {
       return NextResponse.json(
@@ -72,14 +77,14 @@ export async function POST(
       useReplySubject: true,
     })
 
-    await auth.admin
-      .from('support_threads')
-      .update({
-        status: 'respondido',
-        reviewed_by: auth.userId,
-        suggested_reply: bodyText,
-      })
-      .eq('id', id)
+    await sql`
+      UPDATE support_threads
+      SET
+        status = 'respondido',
+        reviewed_by = ${auth.userId}::uuid,
+        suggested_reply = ${bodyText}
+      WHERE id = ${id}::uuid
+    `
 
     return NextResponse.json({ ok: true })
   } catch (error) {

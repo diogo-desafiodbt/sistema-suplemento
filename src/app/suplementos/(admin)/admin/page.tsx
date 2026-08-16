@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { getUserProfile } from '@/lib/auth/profile'
 import { asNumber, getSql } from '@/lib/db'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 type PeriodKey = '7' | '30' | '90' | 'all'
@@ -41,27 +41,6 @@ type FailedPayment = {
   created_at: string
   clientHref: string | null
   patientName: string
-}
-
-// O client admin não usa os tipos gerados do Database (createAdminClient não
-// passa o generic), então o builder do Supabase acaba com generics profundos
-// demais pra compor via callback sem estourar "type instantiation is
-// excessively deep" do TS. `any` aqui é a via de escape deliberada — mantém
-// runtime seguro (filtros são só .eq/.gte/.not encadeados) sem tentar
-// recriar os tipos do postgrest-js.
-async function countRows(
-  admin: ReturnType<typeof createAdminClient>,
-  table: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- query builder genérico sem Database tipado
-  filters: (q: any) => any,
-): Promise<number> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- idem
-  let query: any = admin
-    .from(table)
-    .select('id', { count: 'exact', head: true })
-  query = filters(query)
-  const { count } = await query
-  return count ?? 0
 }
 
 function daysAgoIso(days: number): string {
@@ -129,12 +108,7 @@ export default async function AdminVisaoGeralPage({
   } = await supabase.auth.getUser()
   if (!user) redirect('/suplementos/login')
 
-  const admin = createAdminClient()
-  const { data: profile } = await admin
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  const profile = await getUserProfile(user.id)
 
   if (profile?.role !== 'admin') redirect('/suplementos/dashboard')
 
@@ -148,6 +122,15 @@ export default async function AdminVisaoGeralPage({
 
   const since = periodo === 'all' ? null : daysAgoIso(parseInt(periodo, 10))
 
+  const sqlCounts = getSql()
+  const sinceFilter = (col: string) =>
+    since
+      ? sqlCounts`${sqlCounts(col)} >= ${since}::timestamptz`
+      : sqlCounts`true`
+
+  const countN = async (query: Promise<{ n: number }[]>) =>
+    (await query)[0]?.n ?? 0
+
   const [
     quizStarted,
     quizCompleted,
@@ -158,46 +141,38 @@ export default async function AdminVisaoGeralPage({
     dispatched,
     delivered,
   ] = await Promise.all([
-    countRows(admin, 'funnel_events', (q) => {
-      let next = q.eq('event_type', 'quiz_started')
-      if (since) next = next.gte('created_at', since)
-      return next
-    }),
-    countRows(admin, 'funnel_events', (q) => {
-      let next = q.eq('event_type', 'quiz_eligible')
-      if (since) next = next.gte('created_at', since)
-      return next
-    }),
-    countRows(admin, 'funnel_events', (q) => {
-      let next = q.eq('event_type', 'checkout_started')
-      if (since) next = next.gte('created_at', since)
-      return next
-    }),
-    countRows(admin, 'payments', (q) => {
-      let next = q.eq('status', 'paid')
-      if (since) next = next.gte('paid_at', since)
-      return next
-    }),
-    countRows(admin, 'protocols', (q) => {
-      let next = q.eq('status', 'signed')
-      if (since) next = next.gte('signed_at', since)
-      return next
-    }),
-    countRows(admin, 'orders', (q) => {
-      let next = q.not('pharmacy_sent_at', 'is', null)
-      if (since) next = next.gte('pharmacy_sent_at', since)
-      return next
-    }),
-    countRows(admin, 'orders', (q) => {
-      let next = q.eq('status', 'dispatched')
-      if (since) next = next.gte('created_at', since)
-      return next
-    }),
-    countRows(admin, 'orders', (q) => {
-      let next = q.eq('status', 'delivered')
-      if (since) next = next.gte('created_at', since)
-      return next
-    }),
+    countN(sqlCounts<{ n: number }[]>`
+      SELECT COUNT(*)::int AS n FROM funnel_events
+      WHERE event_type = 'quiz_started' AND ${sinceFilter('created_at')}
+    `),
+    countN(sqlCounts<{ n: number }[]>`
+      SELECT COUNT(*)::int AS n FROM funnel_events
+      WHERE event_type = 'quiz_eligible' AND ${sinceFilter('created_at')}
+    `),
+    countN(sqlCounts<{ n: number }[]>`
+      SELECT COUNT(*)::int AS n FROM funnel_events
+      WHERE event_type = 'checkout_started' AND ${sinceFilter('created_at')}
+    `),
+    countN(sqlCounts<{ n: number }[]>`
+      SELECT COUNT(*)::int AS n FROM payments
+      WHERE status = 'paid' AND ${sinceFilter('paid_at')}
+    `),
+    countN(sqlCounts<{ n: number }[]>`
+      SELECT COUNT(*)::int AS n FROM protocols
+      WHERE status = 'signed' AND ${sinceFilter('signed_at')}
+    `),
+    countN(sqlCounts<{ n: number }[]>`
+      SELECT COUNT(*)::int AS n FROM orders
+      WHERE pharmacy_sent_at IS NOT NULL AND ${sinceFilter('pharmacy_sent_at')}
+    `),
+    countN(sqlCounts<{ n: number }[]>`
+      SELECT COUNT(*)::int AS n FROM orders
+      WHERE status = 'dispatched' AND ${sinceFilter('created_at')}
+    `),
+    countN(sqlCounts<{ n: number }[]>`
+      SELECT COUNT(*)::int AS n FROM orders
+      WHERE status = 'delivered' AND ${sinceFilter('created_at')}
+    `),
   ])
 
   const rawSteps = [
@@ -351,13 +326,11 @@ export default async function AdminVisaoGeralPage({
     }
   })
 
-  const { count: unprocessedWebhooks } = await admin
-    .from('webhook_logs')
-    .select('id', { count: 'exact', head: true })
-    .eq('processed', false)
-    .gte('created_at', sevenDaysAgo)
-
-  const webhookCount = unprocessedWebhooks ?? 0
+  const webhookCountRows = await sql<{ n: number }[]>`
+    SELECT COUNT(*)::int AS n FROM webhook_logs
+    WHERE processed = false AND created_at >= ${sevenDaysAgo}::timestamptz
+  `
+  const webhookCount = webhookCountRows[0]?.n ?? 0
 
   return (
     <main className="max-w-6xl mx-auto px-6 py-8 space-y-8">

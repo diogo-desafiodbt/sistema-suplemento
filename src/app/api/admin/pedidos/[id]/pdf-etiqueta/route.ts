@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
+import { getUserProfile } from '@/lib/auth/profile'
+import { getSql } from '@/lib/db'
 import { getPdfEtiqueta } from '@/lib/shipping/envie-agora/etiqueta'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 async function requireAdmin() {
@@ -9,14 +10,9 @@ async function requireAdmin() {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return null
-  const admin = createAdminClient()
-  const { data: profile } = await admin
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  const profile = await getUserProfile(user.id)
   if (profile?.role !== 'admin') return null
-  return admin
+  return true
 }
 
 export async function POST(
@@ -24,17 +20,21 @@ export async function POST(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
-    const admin = await requireAdmin()
-    if (!admin) {
+    const ok = await requireAdmin()
+    if (!ok) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
 
     const { id } = await context.params
-    const { data: order } = await admin
-      .from('orders')
-      .select('id, shipping_request_id')
-      .eq('id', id)
-      .single()
+    const sql = getSql()
+    const orderRows = await sql<
+      { id: string; shipping_request_id: string | null }[]
+    >`
+      SELECT id, shipping_request_id FROM orders
+      WHERE id = ${id}::uuid
+      LIMIT 1
+    `
+    const order = orderRows[0] ?? null
 
     if (!order?.shipping_request_id) {
       return NextResponse.json(

@@ -3,7 +3,6 @@ import { getSql } from '@/lib/db'
 import { isBearerTokenAuthorizedComTransicao } from '@/lib/security/token'
 import { summarizeShippingWebhookPayload } from '@/lib/security/webhook-payload'
 import { notifyShippingUpdate } from '@/lib/shipping/notify'
-import { createAdminClient } from '@/lib/supabase/admin'
 import type { WebhookEtiquetaPayload } from '@/types/shipping'
 
 export async function POST(request: NextRequest) {
@@ -21,7 +20,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const admin = createAdminClient()
     const sql = getSql()
     let payload: WebhookEtiquetaPayload
 
@@ -77,7 +75,7 @@ export async function POST(request: NextRequest) {
       WHERE id = ${order.id}::uuid
     `
 
-    await notifyShippingUpdate(admin, {
+    await notifyShippingUpdate({
       orderId: order.id,
       eventId: 'etiqueta',
       kind: 'dispatched',

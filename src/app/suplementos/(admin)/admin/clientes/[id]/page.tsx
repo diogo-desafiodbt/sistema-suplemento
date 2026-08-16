@@ -7,6 +7,7 @@ import { createPrescriptionPdfSignedUrl } from '@/lib/pdf/signed-url'
 import { PLAN_LABELS } from '@/lib/plans'
 import { getProductDisplayName } from '@/lib/product-display-names'
 import { isNorteNordeste } from '@/lib/shipping/sender-region'
+import { getUserProfile } from '@/lib/auth/profile'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -230,15 +231,11 @@ export default async function AdminClienteDetalhePage({
   } = await supabase.auth.getUser()
   if (!user) redirect('/suplementos/login')
 
-  const admin = createAdminClient()
-  const { data: profile } = await admin
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  const profile = await getUserProfile(user.id)
 
   if (profile?.role !== 'admin') redirect('/suplementos/dashboard')
 
+  const admin = createAdminClient()
   const { id } = await params
   const sql = getSql()
 

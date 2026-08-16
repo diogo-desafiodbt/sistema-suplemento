@@ -13,7 +13,6 @@ import {
   computePackageDimensions,
   type PackageItem,
 } from '@/lib/shipping/package'
-import { createAdminClient } from '@/lib/supabase/admin'
 import type { ShippingSelection } from '@/types/shipping'
 import { inngest } from '../client'
 
@@ -129,7 +128,6 @@ export const pharmacyOrder = inngest.createFunction(
     }
 
     const sql = getSql()
-    const admin = createAdminClient()
 
     let payment: { id: string } | null = null
 
@@ -334,7 +332,6 @@ export const pharmacyOrder = inngest.createFunction(
 
     // Claim só depois das leituras — se falhar depois, apaga pra o retry do Inngest funcionar.
     const { won, reclaimedStale } = await claimOnce(
-      admin,
       'pharmacy_order_dispatch_logs',
       { payment_id: payment.id },
       { completedColumn: 'completed_at' },
@@ -367,7 +364,6 @@ export const pharmacyOrder = inngest.createFunction(
         (await isOrderFullyBuilt(linkedOrderId))
       ) {
         await markClaimCompleted(
-          admin,
           'pharmacy_order_dispatch_logs',
           'payment_id',
           payment.id,
@@ -398,7 +394,6 @@ export const pharmacyOrder = inngest.createFunction(
           WHERE payment_id = ${payment.id}::uuid
         `
         await markClaimCompleted(
-          admin,
           'pharmacy_order_dispatch_logs',
           'payment_id',
           payment.id,
@@ -484,7 +479,6 @@ export const pharmacyOrder = inngest.createFunction(
       })
     } catch (err) {
       await releaseClaim(
-        admin,
         'pharmacy_order_dispatch_logs',
         'payment_id',
         payment.id,
@@ -493,7 +487,6 @@ export const pharmacyOrder = inngest.createFunction(
     }
 
     await markClaimCompleted(
-      admin,
       'pharmacy_order_dispatch_logs',
       'payment_id',
       payment.id,

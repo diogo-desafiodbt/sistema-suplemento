@@ -6,7 +6,6 @@ import { addPlanPeriod } from '@/lib/plans'
 import { ensureProtocolAfterPayment } from '@/lib/protocol/create-from-checkout'
 import { summarizePagarmePayload } from '@/lib/security/pagarme'
 import { isBearerOrQueryTokenAuthorized } from '@/lib/security/token'
-import { createAdminClient } from '@/lib/supabase/admin'
 
 type PagarmePayload = {
   type?: string
@@ -184,7 +183,6 @@ async function handlePaymentSucceeded(
   payload: PagarmePayload,
 ): Promise<void> {
   const sql = getSql()
-  const admin = createAdminClient()
   const subscriptionId = metadata.subscription_id
   const userId = metadata.user_id
   const planType = metadata.plan_type ?? '1mes'
@@ -395,7 +393,7 @@ async function handlePaymentSucceeded(
   `
 
   if (!skipFulfillment) {
-    await ensureProtocolAfterPayment(admin, subscriptionId, userId)
+    await ensureProtocolAfterPayment(subscriptionId, userId)
   }
 
   if (webhookLogId) {

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { getSql } from '@/lib/db'
 import type { createAdminClient } from '@/lib/supabase/admin'
 
 type AdminClient = ReturnType<typeof createAdminClient>
@@ -26,24 +27,22 @@ export async function verificarIntegridadePdf(
   admin: AdminClient,
   protocolId: string,
 ): Promise<IntegridadePdf> {
-  const { data: log } = await admin
-    .from('prescription_audit_logs')
-    .select('pdf_hash')
-    .eq('protocol_id', protocolId)
-    .order('signed_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  const storedHash = log?.pdf_hash?.trim()
+  const sql = getSql()
+  const logRows = await sql<{ pdf_hash: string | null }[]>`
+    SELECT pdf_hash FROM prescription_audit_logs
+    WHERE protocol_id = ${protocolId}::uuid
+    ORDER BY signed_at DESC
+    LIMIT 1
+  `
+  const storedHash = logRows[0]?.pdf_hash?.trim()
   if (!storedHash) return 'sem_registro'
 
-  const { data: protocol } = await admin
-    .from('protocols')
-    .select('prescription_pdf_path')
-    .eq('id', protocolId)
-    .maybeSingle()
-
-  const path = protocol?.prescription_pdf_path?.trim()
+  const protocolRows = await sql<{ prescription_pdf_path: string | null }[]>`
+    SELECT prescription_pdf_path FROM protocols
+    WHERE id = ${protocolId}::uuid
+    LIMIT 1
+  `
+  const path = protocolRows[0]?.prescription_pdf_path?.trim()
   if (!path) return 'alterado'
 
   const { data: file, error } = await admin.storage

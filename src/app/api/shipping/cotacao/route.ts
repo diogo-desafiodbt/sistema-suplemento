@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { getSql } from '@/lib/db'
 import { getCotacao } from '@/lib/shipping/envie-agora/cotacao'
 import {
   computePackageDimensions,
   type PackageItem,
 } from '@/lib/shipping/package'
 import { escolherTiers } from '@/lib/shipping/tiers'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import type { ShippingOptionPublic } from '@/types/shipping'
 
@@ -43,16 +43,16 @@ export async function POST(request: NextRequest) {
     }
 
     const { cepdestino, uf, valordeclarado, protocol_items } = parsed.data
-    const admin = createAdminClient()
+    const sql = getSql()
     const productIds = protocol_items.map((i) => i.product_id)
 
-    const { data: products } = await admin
-      .from('products')
-      .select('id, box_type')
-      .in('id', productIds)
+    const products = await sql<{ id: string; box_type: string | null }[]>`
+      SELECT id, box_type FROM products
+      WHERE id = ANY(${sql.array(productIds)}::uuid[])
+    `
 
     const byId = new Map(
-      (products ?? []).map((p) => [p.id, p.box_type as string | null]),
+      products.map((p) => [p.id, p.box_type as string | null]),
     )
 
     const packageItems: PackageItem[] = []

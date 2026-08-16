@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
+import { getSql } from '@/lib/db'
 import { canCancelRecurringBilling } from '@/lib/plans'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 async function cancelPagarmeSubscription(pagarmeSubId: string): Promise<void> {
@@ -40,16 +40,24 @@ export async function POST(_request: NextRequest) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
 
-    const admin = createAdminClient()
-
-    const { data: subscription } = await admin
-      .from('subscriptions')
-      .select('id, status, expires_at, pagarme_sub_id, plan_type')
-      .eq('user_id', user.id)
-      .in('status', ['active', 'past_due', 'grace_period'])
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    const sql = getSql()
+    const subscriptionRows = await sql<
+      {
+        id: string
+        status: string
+        expires_at: string | Date | null
+        pagarme_sub_id: string | null
+        plan_type: string | null
+      }[]
+    >`
+      SELECT id, status, expires_at, pagarme_sub_id, plan_type
+      FROM subscriptions
+      WHERE user_id = ${user.id}::uuid
+        AND status = ANY(${sql.array(['active', 'past_due', 'grace_period'])}::text[])
+      ORDER BY created_at DESC
+      LIMIT 1
+    `
+    const subscription = subscriptionRows[0] ?? null
 
     if (!subscription) {
       return NextResponse.json(
@@ -60,7 +68,7 @@ export async function POST(_request: NextRequest) {
 
     if (
       !canCancelRecurringBilling(
-        subscription.plan_type,
+        subscription.plan_type ?? '',
         subscription.pagarme_sub_id,
       )
     ) {
@@ -76,10 +84,12 @@ export async function POST(_request: NextRequest) {
       await cancelPagarmeSubscription(subscription.pagarme_sub_id)
     }
 
-    await admin
-      .from('subscriptions')
-      .update({ status: 'canceled' })
-      .eq('id', subscription.id)
+    await sql`
+      UPDATE subscriptions
+      SET status = 'canceled'
+      WHERE id = ${subscription.id}::uuid
+        AND user_id = ${user.id}::uuid
+    `
 
     return NextResponse.json({ ok: true, expires_at: subscription.expires_at })
   } catch (error) {

@@ -1,11 +1,12 @@
 import { type NextRequest, NextResponse } from 'next/server'
+import { getUserProfile } from '@/lib/auth/profile'
+import { getSql } from '@/lib/db'
 import { mergeTrackingEvents } from '@/lib/shipping/create-label'
 import { getRastreamento } from '@/lib/shipping/envie-agora/rastreamento'
 import {
   getNewTrackingEvents,
   notifyNewTrackingEvents,
 } from '@/lib/shipping/notify'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 async function requireAdmin() {
@@ -14,14 +15,9 @@ async function requireAdmin() {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return null
-  const admin = createAdminClient()
-  const { data: profile } = await admin
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  const profile = await getUserProfile(user.id)
   if (profile?.role !== 'admin') return null
-  return admin
+  return true
 }
 
 export async function POST(
@@ -29,17 +25,25 @@ export async function POST(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
-    const admin = await requireAdmin()
-    if (!admin) {
+    const ok = await requireAdmin()
+    if (!ok) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
 
     const { id } = await context.params
-    const { data: order } = await admin
-      .from('orders')
-      .select('id, shipping_request_id, shipping_json')
-      .eq('id', id)
-      .single()
+    const sql = getSql()
+    const orderRows = await sql<
+      {
+        id: string
+        shipping_request_id: string | null
+        shipping_json: unknown
+      }[]
+    >`
+      SELECT id, shipping_request_id, shipping_json FROM orders
+      WHERE id = ${id}::uuid
+      LIMIT 1
+    `
+    const order = orderRows[0] ?? null
 
     if (!order?.shipping_request_id) {
       return NextResponse.json(
@@ -51,31 +55,30 @@ export async function POST(
     const tracking = await getRastreamento(order.shipping_request_id)
     const eventos = tracking.eventos ?? []
 
-    // Persiste antes de notificar (mesmo padrão do webhook de rastreamento).
     const merged = mergeTrackingEvents(
       order.shipping_json,
       eventos as unknown as Array<Record<string, unknown>>,
     )
 
-    const updates: Record<string, unknown> = { shipping_json: merged }
-    if (eventos.some((e) => e.finalizado === 1)) {
-      updates.status = 'delivered'
-    }
-
-    const { error: updateError } = await admin
-      .from('orders')
-      .update(updates)
-      .eq('id', id)
-
-    if (updateError) {
-      throw new Error(
-        `atualizar-rastreio: falha ao persistir shipping_json: ${updateError.message}`,
-      )
+    const delivered = eventos.some((e) => e.finalizado === 1)
+    if (delivered) {
+      await sql`
+        UPDATE orders
+        SET
+          shipping_json = ${sql.json(merged as never)},
+          status = 'delivered'
+        WHERE id = ${id}::uuid
+      `
+    } else {
+      await sql`
+        UPDATE orders
+        SET shipping_json = ${sql.json(merged as never)}
+        WHERE id = ${id}::uuid
+      `
     }
 
     const newEvents = getNewTrackingEvents(order.shipping_json, eventos)
     await notifyNewTrackingEvents(
-      admin,
       order.id,
       newEvents.length > 0 ? newEvents : eventos,
     )

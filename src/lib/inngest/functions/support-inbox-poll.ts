@@ -3,7 +3,6 @@ import { simpleParser } from 'mailparser'
 import postgres from 'postgres'
 import { getSql } from '@/lib/db'
 import { claimOnce, markClaimCompleted, releaseClaim } from '@/lib/idempotency'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { normalizeMessageId } from '@/lib/support/message-id'
 import { inngest } from '../client'
 
@@ -76,7 +75,6 @@ export const supportInboxPoll = inngest.createFunction(
     }
 
     const sql = getSql()
-    const admin = createAdminClient()
     const client = new ImapFlow({
       host: imapHost,
       port: Number(process.env.SUPPORT_IMAP_PORT ?? 993),
@@ -179,7 +177,6 @@ export const supportInboxPoll = inngest.createFunction(
         let won = false
         try {
           const result = await claimOnce(
-            admin,
             'support_messages',
             messageRow,
             {
@@ -224,7 +221,6 @@ export const supportInboxPoll = inngest.createFunction(
               processError,
             )
             await releaseClaim(
-              admin,
               'support_messages',
               'message_id',
               messageId,
@@ -237,7 +233,6 @@ export const supportInboxPoll = inngest.createFunction(
             for (let attempt = 0; attempt < 3 && !stamped; attempt++) {
               try {
                 await markClaimCompleted(
-                  admin,
                   'support_messages',
                   'message_id',
                   messageId,
@@ -303,7 +298,6 @@ export const supportInboxPoll = inngest.createFunction(
               `
 
               await markClaimCompleted(
-                admin,
                 'support_messages',
                 'message_id',
                 messageId,

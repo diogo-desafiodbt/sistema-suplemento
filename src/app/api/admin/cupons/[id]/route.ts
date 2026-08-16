@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getUserProfile } from '@/lib/auth/profile'
+import { getSql } from '@/lib/db'
 import { createClient } from '@/lib/supabase/server'
 
 const patchSchema = z.object({
@@ -21,12 +22,7 @@ export async function PATCH(
     if (!user)
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
-    const admin = createAdminClient()
-    const { data: profile } = await admin
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .single()
+    const profile = await getUserProfile(user.id)
     if (profile?.role !== 'admin')
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
 
@@ -35,12 +31,14 @@ export async function PATCH(
     if (!parsed.success)
       return NextResponse.json({ error: 'Dados inválidos' }, { status: 400 })
 
-    const { error } = await admin
-      .from('discount_coupons')
-      .update({ is_active: parsed.data.is_active })
-      .eq('id', id)
-
-    if (error) {
+    const sql = getSql()
+    try {
+      await sql`
+        UPDATE discount_coupons
+        SET is_active = ${parsed.data.is_active}
+        WHERE id = ${id}::uuid
+      `
+    } catch (error) {
       console.error('Erro ao atualizar cupom:', error)
       return NextResponse.json(
         { error: 'Erro ao atualizar cupom' },

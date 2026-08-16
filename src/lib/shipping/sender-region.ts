@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getSql } from '@/lib/db'
 
 const NORTE_NORDESTE_UFS = [
   'AC',
@@ -67,11 +67,10 @@ export async function getSenderAddress(
   const prefix = fortaleza ? 'shipping_sender_fortaleza' : 'shipping_sender'
   const defaults = fortaleza ? FORTALEZA_DEFAULTS : CURITIBA_DEFAULTS
 
-  const admin = createAdminClient()
-  const { data: configs } = await admin
-    .from('system_config')
-    .select('key, value')
-    .in('key', [
+  const sql = getSql()
+  const configs = await sql<{ key: string; value: string }[]>`
+    SELECT key, value FROM system_config
+    WHERE key = ANY(${sql.array([
       `${prefix}_nome`,
       `${prefix}_cep`,
       `${prefix}_logradouro`,
@@ -80,9 +79,10 @@ export async function getSenderAddress(
       `${prefix}_bairro`,
       `${prefix}_cidade`,
       `${prefix}_uf`,
-    ])
+    ])}::text[])
+  `
 
-  const map = Object.fromEntries((configs ?? []).map((c) => [c.key, c.value]))
+  const map = Object.fromEntries(configs.map((c) => [c.key, c.value]))
 
   return {
     nome: map[`${prefix}_nome`] ?? defaults.nome,

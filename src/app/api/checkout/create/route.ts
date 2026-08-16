@@ -19,7 +19,6 @@ import {
   verifyTriageSessionToken,
 } from '@/lib/quiz/triage-session'
 import { summarizePagarmePayload } from '@/lib/security/pagarme'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { TERMS_CONTENT, TERMS_VERSION } from '@/lib/terms/content'
 
@@ -84,7 +83,6 @@ const checkoutSchema = z.object({
   cpf: z.string(),
 })
 
-type AdminClient = ReturnType<typeof createAdminClient>
 type PlanType = PurchasePlanType
 
 function planItemName(planType: PlanType): string {
@@ -175,16 +173,13 @@ async function activateSubscriptionRow(opts: {
   `
 }
 
-async function finalizePaidSubscription(
-  admin: AdminClient,
-  opts: {
-    subscriptionId: string
-    userId: string
-    expiresAt: Date
-  },
-) {
+async function finalizePaidSubscription(opts: {
+  subscriptionId: string
+  userId: string
+  expiresAt: Date
+}) {
   await activateSubscriptionRow(opts)
-  return ensureProtocolAfterPayment(admin, opts.subscriptionId, opts.userId)
+  return ensureProtocolAfterPayment(opts.subscriptionId, opts.userId)
 }
 
 async function recordTermsAcceptance(opts: {
@@ -265,7 +260,6 @@ type ChargeAttemptResult = {
 }
 
 async function chargeOneTimeOrder(opts: {
-  admin: AdminClient
   subscriptionId: string
   planType: PlanType
   serverTotal: number
@@ -372,7 +366,6 @@ async function chargeOneTimeOrder(opts: {
 }
 
 async function chargeSubscription(opts: {
-  admin: AdminClient
   subscriptionId: string
   planType: PlanType
   serverTotal: number
@@ -751,7 +744,6 @@ export async function POST(request: NextRequest) {
     }
 
     const sql = getSql()
-    const admin = createAdminClient()
 
     const profileRows = await sql<
       { full_name: string; email: string; client_code: string }[]
@@ -843,7 +835,7 @@ export async function POST(request: NextRequest) {
 
     const cardToken = data.card_token ?? null
 
-    const priced = await computeServerCheckoutTotal(admin, {
+    const priced = await computeServerCheckoutTotal({
       planType,
       protocolItems: activeItems,
       shipping: data.shipping,
@@ -905,7 +897,6 @@ export async function POST(request: NextRequest) {
 
     const result = isRecurringPlan(planType)
       ? await chargeSubscription({
-          admin,
           subscriptionId: subscription.id,
           planType,
           serverTotal,
@@ -916,7 +907,6 @@ export async function POST(request: NextRequest) {
           pagarmeHeaders,
         })
       : await chargeOneTimeOrder({
-          admin,
           subscriptionId: subscription.id,
           planType,
           serverTotal,
@@ -956,7 +946,7 @@ export async function POST(request: NextRequest) {
 
     let protocolId: string | null = null
     if (result.paid) {
-      protocolId = await finalizePaidSubscription(admin, {
+      protocolId = await finalizePaidSubscription({
         subscriptionId: subscription.id,
         userId: user.id,
         expiresAt,

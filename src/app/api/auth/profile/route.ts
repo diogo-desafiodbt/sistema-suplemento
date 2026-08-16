@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getUserProfile } from '@/lib/supabase/profile'
+import { getUserProfile } from '@/lib/auth/profile'
 import { createClient } from '@/lib/supabase/server'
 
 export async function GET() {

@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { CuponsClient } from '@/components/admin/CuponsClient'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getUserProfile } from '@/lib/auth/profile'
+import { asNumber, getSql } from '@/lib/db'
 import { createClient } from '@/lib/supabase/server'
 
 type Coupon = {
@@ -21,21 +22,36 @@ export default async function AdminCuponsPage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/suplementos/login')
 
-  const admin = createAdminClient()
-  const { data: profile } = await admin
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  const profile = await getUserProfile(user.id)
 
   if (profile?.role !== 'admin') redirect('/suplementos/dashboard')
 
-  const { data: coupons } = await admin
-    .from('discount_coupons')
-    .select(
-      'id, code, type, value, expires_at, max_uses, used_count, is_active',
-    )
-    .order('created_at', { ascending: false })
+  const sql = getSql()
+  const couponRows = await sql<
+    {
+      id: string
+      code: string
+      type: 'percentage' | 'fixed'
+      value: string | number
+      expires_at: string | Date | null
+      max_uses: number | null
+      used_count: number
+      is_active: boolean
+    }[]
+  >`
+    SELECT id, code, type, value, expires_at, max_uses, used_count, is_active
+    FROM discount_coupons
+    ORDER BY created_at DESC
+  `
+
+  const coupons: Coupon[] = couponRows.map((c) => ({
+    ...c,
+    value: asNumber(c.value),
+    expires_at:
+      c.expires_at instanceof Date
+        ? c.expires_at.toISOString()
+        : c.expires_at,
+  }))
 
   return (
     <main className="max-w-6xl mx-auto px-6 py-8">
@@ -49,11 +65,11 @@ export default async function AdminCuponsPage() {
           </h1>
         </div>
         <span className="text-sm text-gray-400">
-          {(coupons ?? []).length} cupons
+          {coupons.length} cupons
         </span>
       </div>
 
-      <CuponsClient coupons={(coupons ?? []) as Coupon[]} />
+      <CuponsClient coupons={coupons} />
     </main>
   )
 }

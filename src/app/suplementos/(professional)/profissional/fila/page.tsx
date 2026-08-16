@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import imgLogoBranca from '@/../public/logo-branca.png'
 import { ProfessionalNav } from '@/components/professional/ProfessionalNav'
+import { getUserProfile } from '@/lib/auth/profile'
 import { getSql } from '@/lib/db'
 import { createClient } from '@/lib/supabase/server'
 
@@ -41,11 +42,7 @@ export default async function FilaPage() {
 
   if (!user) redirect('/suplementos/login')
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role, full_name')
-    .eq('id', user.id)
-    .single()
+  const profile = await getUserProfile(user.id)
 
   if (profile?.role !== 'professional' && profile?.role !== 'admin') {
     redirect('/suplementos/dashboard')

@@ -1,7 +1,4 @@
 import { getSql, type Sql } from '@/lib/db'
-import type { createAdminClient } from '@/lib/supabase/admin'
-
-type AdminClient = ReturnType<typeof createAdminClient>
 
 const DEFAULT_STALE_CLAIM_MS = 10 * 60 * 1000
 
@@ -50,10 +47,8 @@ function insertableRow(row: Record<string, unknown>): Record<string, unknown> {
  * payment_id). Retorna `{ won: true }` se essa chamada "ganhou" a claim;
  * `{ won: false }` se já foi reivindicada por outra invocação.
  *
- * `admin` permanece na assinatura para os chamadores atuais; o SQL usa `getSql()`.
  */
 export async function claimOnce(
-  _admin: AdminClient,
   table: string,
   claimRow: Record<string, unknown>,
   options?: ClaimOnceOptions,
@@ -131,7 +126,6 @@ export async function claimOnce(
 
 /** Desfaz a claim (chamar sempre que a ação real falhar depois de reivindicada). */
 export async function releaseClaim(
-  _admin: AdminClient,
   table: string,
   keyColumnOrFilters: string | Record<string, unknown>,
   keyValue?: string,
@@ -163,7 +157,6 @@ export async function releaseClaim(
  * (mesmo padrão de releaseClaim).
  */
 export async function markClaimCompleted(
-  _admin: AdminClient,
   table: string,
   keyColumnOrFilters: string | Record<string, unknown>,
   keyValue?: string,
@@ -202,7 +195,6 @@ export async function markClaimCompleted(
  * "uma vez por thread", nunca reclaim).
  */
 export async function claimByFlag(
-  _admin: AdminClient,
   table: string,
   id: string,
   flagColumn: string,
@@ -245,7 +237,6 @@ export async function claimByFlag(
 
 /** Desfaz a claim por flag (chamar se a ação real falhar depois de reivindicada). */
 export async function releaseFlag(
-  _admin: AdminClient,
   table: string,
   id: string,
   flagColumn: string,

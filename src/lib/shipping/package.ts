@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getSql } from '@/lib/db'
 import type { PackageDimensions } from '@/types/shipping'
 
 export type PackageItem = { box_type: 'R80' | 'R110'; quantity: number }
@@ -11,11 +11,10 @@ type BoxDims = {
 }
 
 async function loadBoxConfig(): Promise<Record<'R80' | 'R110', BoxDims>> {
-  const admin = createAdminClient()
-  const { data: configs } = await admin
-    .from('system_config')
-    .select('key, value')
-    .in('key', [
+  const sql = getSql()
+  const configs = await sql<{ key: string; value: string }[]>`
+    SELECT key, value FROM system_config
+    WHERE key = ANY(${sql.array([
       'shipping_box_r80_altura',
       'shipping_box_r80_largura',
       'shipping_box_r80_comprimento',
@@ -24,9 +23,10 @@ async function loadBoxConfig(): Promise<Record<'R80' | 'R110', BoxDims>> {
       'shipping_box_r110_largura',
       'shipping_box_r110_comprimento',
       'shipping_box_r110_peso',
-    ])
+    ])}::text[])
+  `
 
-  const map = Object.fromEntries((configs ?? []).map((c) => [c.key, c.value]))
+  const map = Object.fromEntries(configs.map((c) => [c.key, c.value]))
 
   return {
     R80: {
