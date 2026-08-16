@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import imgLogoBranca from '@/../public/logo-branca.png'
 import { ProfessionalNav } from '@/components/professional/ProfessionalNav'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getSql } from '@/lib/db'
 import { createClient } from '@/lib/supabase/server'
 
 type ProtocolItem = {
@@ -51,40 +51,31 @@ export default async function FilaPage() {
     redirect('/suplementos/dashboard')
   }
 
-  const admin = createAdminClient()
-
-  const { data: protocols } = await admin
-    .from('protocols')
-    .select(`
-      id,
-      status,
-      generated_at,
-      source,
-      users (
-        full_name,
-        email,
-        client_code
-      ),
-      quiz_responses (
-        diagnosis_type,
-        years_diagnosed,
-        medications,
-        symptoms,
-        conditions_serious,
-        allergies
-      ),
-      protocol_items (
-        is_required,
-        removed_by_patient,
-        products (
-          name
-        )
-      )
-    `)
-    .eq('status', 'pending_signature')
-    .order('generated_at', { ascending: true })
-
-  const pendingProtocols = (protocols ?? []) as unknown as PendingProtocol[]
+  const sql = getSql()
+  const pendingProtocols = await sql<PendingProtocol[]>`
+    SELECT p.id, p.status, p.generated_at, p.source,
+      CASE WHEN u.id IS NULL THEN NULL ELSE jsonb_build_object(
+        'full_name', u.full_name, 'email', u.email, 'client_code', u.client_code) END AS users,
+      CASE WHEN q.id IS NULL THEN NULL ELSE jsonb_build_object(
+        'diagnosis_type', q.diagnosis_type, 'years_diagnosed', q.years_diagnosed,
+        'medications', q.medications, 'symptoms', q.symptoms,
+        'conditions_serious', q.conditions_serious, 'allergies', q.allergies) END AS quiz_responses,
+      COALESCE(items.list, '[]'::jsonb) AS protocol_items
+    FROM protocols p
+    LEFT JOIN users u ON u.id = p.user_id
+    LEFT JOIN quiz_responses q ON q.id = p.quiz_response_id
+    LEFT JOIN LATERAL (
+      SELECT jsonb_agg(jsonb_build_object(
+        'is_required', pi.is_required,
+        'removed_by_patient', pi.removed_by_patient,
+        'products', CASE WHEN pr.id IS NULL THEN NULL
+          ELSE jsonb_build_object('name', pr.name) END
+      ) ORDER BY pi.id) AS list
+      FROM protocol_items pi LEFT JOIN products pr ON pr.id = pi.product_id
+      WHERE pi.protocol_id = p.id) items ON true
+    WHERE p.status = 'pending_signature'
+    ORDER BY p.generated_at ASC
+  `
 
   return (
     <div className="min-h-screen bg-[#f5f0eb]">

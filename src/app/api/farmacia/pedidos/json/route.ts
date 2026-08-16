@@ -9,14 +9,10 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 type OrderRow = {
   id: string
-  created_at: Date | string
+  created_at: string
   status: string
   pharmacy_json: unknown
   prescription_pdf_path: string | null
-}
-
-function toIso(value: Date | string): string {
-  return value instanceof Date ? value.toISOString() : value
 }
 
 export async function GET(request: NextRequest) {
@@ -36,7 +32,7 @@ export async function GET(request: NextRequest) {
     const lt = range.lt ?? null
 
     const orders = await sql<OrderRow[]>`
-      SELECT o.id, o.created_at, o.status, o.pharmacy_json,
+      SELECT o.id, to_jsonb(o.created_at) #>> '{}' AS created_at, o.status, o.pharmacy_json,
              p.prescription_pdf_path
       FROM orders o
       JOIN subscriptions s ON s.id = o.subscription_id
@@ -56,7 +52,7 @@ export async function GET(request: NextRequest) {
         )
         return {
           numero_pedido: o.id,
-          data_compra: toIso(o.created_at),
+          data_compra: o.created_at,
           status: o.status,
           pedido: injectPrescriptionPdfUrl(o.pharmacy_json, signedUrl),
         }

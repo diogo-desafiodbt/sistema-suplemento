@@ -149,7 +149,9 @@ export default async function ProtocoloPage({
       AND (
         ${isAdmin}::boolean
         OR p.status = 'pending_signature'
-        OR p.signed_by = ${user.id}::uuid
+        OR p.signed_by = (
+          SELECT pf.id FROM professionals pf WHERE pf.user_id = ${user.id}::uuid
+        )
       )
     LIMIT 1
   `

@@ -1,10 +1,48 @@
 import { type NextRequest, NextResponse } from 'next/server'
+import { getSql, withTransaction } from '@/lib/db'
 import { generatePrescriptionPdf } from '@/lib/pdf/generator'
 import { createPrescriptionPdfSignedUrl } from '@/lib/pdf/signed-url'
 import { sendToPharmacyWithPdf } from '@/lib/pharmacy/sender'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import type { PharmacyOrder } from '@/types/pharmacy'
+
+type ProtocolRow = {
+  id: string
+  protocol_items: Array<{
+    removed_by_patient: boolean
+    is_required: boolean
+    activation_reason: string | null
+    products: { name: string } | null
+  }> | null
+  users: {
+    full_name: string
+    email: string
+    client_code: string
+  } | null
+  quiz_responses: {
+    diagnosis_type: string
+    age: number | null
+    birth_date: string | null
+    sex: string | null
+    is_pregnant_or_breastfeeding: boolean | null
+    renal_conditions: string[] | null
+    hepatic_conditions: string[] | null
+    medications: string[]
+    years_diagnosed: string | null
+    hba1c_range: string | null
+    allergies: string | null
+  } | null
+  [key: string]: unknown
+}
+
+type ProfessionalRow = {
+  id: string
+  crm: string | null
+  crm_state: string | null
+  specialty: string | null
+  users: { full_name: string } | null
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,43 +73,56 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const sql = getSql()
     const admin = createAdminClient()
 
-    const { data: protocol, error } = await admin
-      .from('protocols')
-      .select(`
-        *,
-        users ( full_name, email, client_code ),
-        quiz_responses (
-          diagnosis_type, age, birth_date, sex, is_pregnant_or_breastfeeding,
-          renal_conditions, hepatic_conditions, medications,
-          years_diagnosed, hba1c_range, allergies
-        ),
-        protocol_items (
-          id, is_required, removed_by_patient, activation_reason,
-          products ( name )
-        )
-      `)
-      .eq('id', protocol_id)
-      .eq('status', 'pending_signature')
-      .single()
+    const protocolRows = await sql<ProtocolRow[]>`
+      SELECT p.*,
+        CASE WHEN u.id IS NULL THEN NULL ELSE jsonb_build_object(
+          'full_name', u.full_name, 'email', u.email, 'client_code', u.client_code) END AS users,
+        CASE WHEN q.id IS NULL THEN NULL ELSE jsonb_build_object(
+          'diagnosis_type', q.diagnosis_type, 'age', q.age, 'birth_date', q.birth_date,
+          'sex', q.sex, 'is_pregnant_or_breastfeeding', q.is_pregnant_or_breastfeeding,
+          'renal_conditions', q.renal_conditions, 'hepatic_conditions', q.hepatic_conditions,
+          'medications', q.medications, 'years_diagnosed', q.years_diagnosed,
+          'hba1c_range', q.hba1c_range, 'allergies', q.allergies) END AS quiz_responses,
+        COALESCE(items.list, '[]'::jsonb) AS protocol_items
+      FROM protocols p
+      LEFT JOIN users u ON u.id = p.user_id
+      LEFT JOIN quiz_responses q ON q.id = p.quiz_response_id
+      LEFT JOIN LATERAL (
+        SELECT jsonb_agg(jsonb_build_object(
+          'id', pi.id, 'is_required', pi.is_required,
+          'removed_by_patient', pi.removed_by_patient,
+          'activation_reason', pi.activation_reason,
+          'products', CASE WHEN pr.id IS NULL THEN NULL
+            ELSE jsonb_build_object('name', pr.name) END
+        ) ORDER BY pi.id) AS list
+        FROM protocol_items pi LEFT JOIN products pr ON pr.id = pi.product_id
+        WHERE pi.protocol_id = p.id) items ON true
+      WHERE p.id = ${protocol_id}::uuid AND p.status = 'pending_signature'
+      LIMIT 1
+    `
 
-    if (error || !protocol) {
+    const protocol = protocolRows[0]
+    if (!protocol) {
       return NextResponse.json(
         { error: 'Protocolo não encontrado ou já assinado' },
         { status: 404 },
       )
     }
 
-    const { data: professional } = await admin
-      .from('professionals')
-      .select(`
-        id, crm, crm_state, specialty,
-        users ( full_name )
-      `)
-      .eq('user_id', user.id)
-      .maybeSingle()
+    const professionalRows = await sql<ProfessionalRow[]>`
+      SELECT pf.id, pf.crm, pf.crm_state, pf.specialty,
+        CASE WHEN u.id IS NULL THEN NULL
+          ELSE jsonb_build_object('full_name', u.full_name) END AS users
+      FROM professionals pf
+      LEFT JOIN users u ON u.id = pf.user_id
+      WHERE pf.user_id = ${user.id}::uuid
+      LIMIT 1
+    `
 
+    const professional = professionalRows[0] ?? null
     if (!professional) {
       return NextResponse.json(
         { error: 'Registro de profissional não encontrado' },
@@ -79,24 +130,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const activeItems = (
-      protocol.protocol_items as Array<{
-        removed_by_patient: boolean
-        is_required: boolean
-        activation_reason: string | null
-        products: { name: string } | null
-      }>
-    ).filter((item) => !item.removed_by_patient)
+    const activeItems = (protocol.protocol_items ?? []).filter(
+      (item) => !item.removed_by_patient,
+    )
 
-    const patient = protocol.users as unknown as {
+    const patient = protocol.users as {
       full_name: string
       email: string
       client_code: string
     }
-    const professionalUser = professional.users as unknown as {
-      full_name: string
-    } | null
-    const quiz = protocol.quiz_responses as unknown as {
+    const professionalUser = professional.users
+    const quiz = protocol.quiz_responses as {
       diagnosis_type: string
       age: number | null
       birth_date: string | null
@@ -116,9 +160,9 @@ export async function POST(request: NextRequest) {
       patient,
       professional: {
         full_name: professionalUser?.full_name ?? 'Médico',
-        crm: professional.crm,
-        crm_state: professional.crm_state,
-        specialty: professional.specialty,
+        crm: professional.crm ?? '',
+        crm_state: professional.crm_state ?? '',
+        specialty: professional.specialty ?? '',
       },
       protocol: {
         id: protocol.id,
@@ -145,64 +189,66 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Erro ao salvar PDF' }, { status: 500 })
     }
 
-    const { error: updateError } = await admin
-      .from('protocols')
-      .update({
-        status: 'signed',
-        signed_at: signedAt,
-        signed_by: professional.id,
-        prescription_pdf_path: fileName,
-      })
-      .eq('id', protocol_id)
-
-    if (updateError) {
-      console.error('Update error:', updateError)
-      return NextResponse.json(
-        { error: 'Erro ao atualizar protocolo' },
-        { status: 500 },
-      )
-    }
-
     const pdfUrl =
       (await createPrescriptionPdfSignedUrl(admin, fileName)) ?? ''
 
-    const { error: auditError } = await admin
-      .from('prescription_audit_logs')
-      .insert({
-        protocol_id,
-        professional_id: professional.id,
-        action: 'signed',
-        signed_at: signedAt,
-        ip_address: request.headers.get('x-forwarded-for') ?? 'unknown',
-        user_agent: request.headers.get('user-agent') ?? 'unknown',
-        pdf_url: pdfUrl,
-        pdf_hash: hash,
-        payload_snapshot: protocol,
-      })
+    const ipAddress = request.headers.get('x-forwarded-for') ?? 'unknown'
+    const userAgent = request.headers.get('user-agent') ?? 'unknown'
 
-    if (auditError) {
-      console.error('Audit error:', auditError)
+    try {
+      await withTransaction(async (tx) => {
+        await tx`
+          UPDATE protocols
+          SET
+            status = 'signed',
+            signed_at = ${signedAt},
+            signed_by = ${professional.id}::uuid,
+            prescription_pdf_path = ${fileName}
+          WHERE id = ${protocol_id}::uuid
+        `
+        await tx`
+          INSERT INTO prescription_audit_logs (
+            protocol_id, professional_id, action, signed_at,
+            ip_address, user_agent, pdf_url, pdf_hash, payload_snapshot
+          ) VALUES (
+            ${protocol_id}::uuid,
+            ${professional.id}::uuid,
+            'signed',
+            ${signedAt},
+            ${ipAddress},
+            ${userAgent},
+            ${pdfUrl},
+            ${hash},
+            ${tx.json(protocol as never)}
+          )
+        `
+      })
+    } catch (writeError) {
+      console.error('Assinar write error:', writeError)
       return NextResponse.json(
-        { error: 'Erro ao registrar auditoria' },
+        { error: 'Erro ao gravar assinatura e auditoria' },
         { status: 500 },
       )
     }
 
-    const { data: linkedSubscription } = await admin
-      .from('subscriptions')
-      .select('id')
-      .eq('protocol_id', protocol_id)
-      .maybeSingle()
+    const linkedRows = await sql<{ id: string }[]>`
+      SELECT id FROM subscriptions
+      WHERE protocol_id = ${protocol_id}::uuid
+      LIMIT 1
+    `
+    const linkedSubscription = linkedRows[0] ?? null
 
     if (linkedSubscription) {
-      const { data: pendingOrder } = await admin
-        .from('orders')
-        .select('id, pharmacy_json')
-        .eq('subscription_id', linkedSubscription.id)
-        .is('pharmacy_sent_at', null)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
+      const pendingRows = await sql<
+        { id: string; pharmacy_json: unknown }[]
+      >`
+        SELECT id, pharmacy_json FROM orders
+        WHERE subscription_id = ${linkedSubscription.id}::uuid
+          AND pharmacy_sent_at IS NULL
+        ORDER BY created_at DESC
+        LIMIT 1
+      `
+      const pendingOrder = pendingRows[0] ?? null
 
       if (pendingOrder?.pharmacy_json) {
         try {
@@ -210,13 +256,13 @@ export async function POST(request: NextRequest) {
             pendingOrder.pharmacy_json as PharmacyOrder,
             buffer,
           )
-          await admin
-            .from('orders')
-            .update({
-              status: 'sent_to_pharmacy',
-              pharmacy_sent_at: new Date().toISOString(),
-            })
-            .eq('id', pendingOrder.id)
+          await sql`
+            UPDATE orders
+            SET
+              status = 'sent_to_pharmacy',
+              pharmacy_sent_at = ${new Date().toISOString()}
+            WHERE id = ${pendingOrder.id}::uuid
+          `
         } catch (pharmError) {
           console.error('Erro ao enviar prescrição para farmácia:', pharmError)
         }

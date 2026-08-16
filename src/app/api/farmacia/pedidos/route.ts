@@ -4,12 +4,8 @@ import { isFarmaciaAuthorized, parseDateRange } from '@/lib/pharmacy/pull-api'
 
 type OrderRow = {
   id: string
-  created_at: Date | string
+  created_at: string
   status: string
-}
-
-function toIso(value: Date | string): string {
-  return value instanceof Date ? value.toISOString() : value
 }
 
 export async function GET(request: NextRequest) {
@@ -28,7 +24,7 @@ export async function GET(request: NextRequest) {
     const lt = range.lt ?? null
 
     const orders = await sql<OrderRow[]>`
-      SELECT o.id, o.created_at, o.status
+      SELECT o.id, to_jsonb(o.created_at) #>> '{}' AS created_at, o.status
       FROM orders o
       JOIN subscriptions s ON s.id = o.subscription_id
       JOIN protocols p ON p.id = s.protocol_id
@@ -40,7 +36,7 @@ export async function GET(request: NextRequest) {
 
     const result = orders.map((o) => ({
       numero_pedido: o.id,
-      data_compra: toIso(o.created_at),
+      data_compra: o.created_at,
       status: o.status,
     }))
 

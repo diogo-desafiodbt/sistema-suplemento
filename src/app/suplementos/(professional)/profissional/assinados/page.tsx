@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import imgLogoBranca from '@/../public/logo-branca.png'
 import { ProfessionalNav } from '@/components/professional/ProfessionalNav'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getSql } from '@/lib/db'
 import { createClient } from '@/lib/supabase/server'
 
 type ProtocolItem = {
@@ -42,38 +42,32 @@ export default async function AssinadosPage() {
     redirect('/suplementos/dashboard')
   }
 
-  const admin = createAdminClient()
+  const isAdmin = profile?.role === 'admin'
+  const sql = getSql()
 
-  // Histórico do profissional: só o que ele assinou. Admin vê todos.
-  let signedQuery = admin
-    .from('protocols')
-    .select(`
-      id,
-      status,
-      signed_at,
-      users (
-        full_name,
-        email,
-        client_code
-      ),
-      protocol_items (
-        is_required,
-        removed_by_patient,
-        products (
-          name
-        )
-      )
-    `)
-    .eq('status', 'signed')
-    .order('signed_at', { ascending: false })
-
-  if (profile?.role !== 'admin') {
-    signedQuery = signedQuery.eq('signed_by', user.id)
-  }
-
-  const { data: protocols } = await signedQuery
-
-  const signedProtocols = (protocols ?? []) as unknown as SignedProtocol[]
+  // Histórico do profissional: só o que ele assinou (professionals.id).
+  // Admin vê todos. Filtro fica no SQL.
+  const signedProtocols = await sql<SignedProtocol[]>`
+    SELECT p.id, p.status, p.signed_at,
+      CASE WHEN u.id IS NULL THEN NULL ELSE jsonb_build_object(
+        'full_name', u.full_name, 'email', u.email, 'client_code', u.client_code) END AS users,
+      COALESCE(items.list, '[]'::jsonb) AS protocol_items
+    FROM protocols p
+    LEFT JOIN users u ON u.id = p.user_id
+    LEFT JOIN LATERAL (
+      SELECT jsonb_agg(jsonb_build_object(
+        'is_required', pi.is_required,
+        'removed_by_patient', pi.removed_by_patient,
+        'products', CASE WHEN pr.id IS NULL THEN NULL
+          ELSE jsonb_build_object('name', pr.name) END
+      ) ORDER BY pi.id) AS list
+      FROM protocol_items pi LEFT JOIN products pr ON pr.id = pi.product_id
+      WHERE pi.protocol_id = p.id) items ON true
+    WHERE p.status = 'signed'
+      AND (${isAdmin}::boolean OR p.signed_by = (
+            SELECT pf.id FROM professionals pf WHERE pf.user_id = ${user.id}::uuid))
+    ORDER BY p.signed_at DESC
+  `
 
   return (
     <div className="min-h-screen bg-[#f5f0eb]">

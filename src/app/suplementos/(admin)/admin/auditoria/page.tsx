@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { getSql } from '@/lib/db'
 import {
   type IntegridadePdf,
   verificarIntegridadePdf,
@@ -50,21 +51,23 @@ export default async function AdminAuditoriaPage() {
 
   if (profile?.role !== 'admin') redirect('/suplementos/dashboard')
 
-  const { data: logs } = await admin
-    .from('prescription_audit_logs')
-    .select(`
-      id, protocol_id, signed_at, pdf_hash,
-      professionals (
-        users ( full_name )
-      ),
-      protocols (
-        users ( full_name )
-      )
-    `)
-    .order('signed_at', { ascending: false })
-    .limit(100)
-
-  const auditLogs = (logs ?? []) as unknown as AuditLogRow[]
+  const sql = getSql()
+  const auditLogs = await sql<AuditLogRow[]>`
+    SELECT l.id, l.protocol_id, l.signed_at, l.pdf_hash,
+      CASE WHEN pf.id IS NULL THEN NULL ELSE jsonb_build_object(
+        'users', CASE WHEN pu.id IS NULL THEN NULL
+          ELSE jsonb_build_object('full_name', pu.full_name) END) END AS professionals,
+      CASE WHEN p.id IS NULL THEN NULL ELSE jsonb_build_object(
+        'users', CASE WHEN ou.id IS NULL THEN NULL
+          ELSE jsonb_build_object('full_name', ou.full_name) END) END AS protocols
+    FROM prescription_audit_logs l
+    LEFT JOIN professionals pf ON pf.id = l.professional_id
+    LEFT JOIN users pu ON pu.id = pf.user_id
+    LEFT JOIN protocols p ON p.id = l.protocol_id
+    LEFT JOIN users ou ON ou.id = p.user_id
+    ORDER BY l.signed_at DESC
+    LIMIT 100
+  `
   const protocolIds = [
     ...new Set(auditLogs.map((log) => log.protocol_id).filter(Boolean)),
   ]
