@@ -42,13 +42,22 @@ while read -r t; do
   [ -n "$t" ] && EXCL="$EXCL --exclude-table=public.$t"
 done < "$LISTA"
 
-AWK_B64=$(base64 < "$FILTRO" | tr -d '\n')
-GRANTS_B64=$(base64 < "$GRANTS" | tr -d '\n')
+# O override da tarefa tem teto de 8192 bytes contando tudo. O filtro mais os
+# grants não cabem embutidos, então vão pelo S3 com URL assinada de 15 minutos
+# e os objetos são apagados no fim.
+BALDE="desafiodiabetes-builds"
+PREFIXO="db/migrar-$$-$(date +%s)"
+aws s3 cp "$FILTRO" "s3://$BALDE/$PREFIXO-filtro.awk" --region "$REGIAO" >/dev/null
+aws s3 cp "$GRANTS" "s3://$BALDE/$PREFIXO-grants.sql" --region "$REGIAO" >/dev/null
+trap 'aws s3 rm "s3://$BALDE/$PREFIXO-filtro.awk" --region "$REGIAO" >/dev/null 2>&1 || true;
+      aws s3 rm "s3://$BALDE/$PREFIXO-grants.sql" --region "$REGIAO" >/dev/null 2>&1 || true' EXIT
+URL_FILTRO=$(aws s3 presign "s3://$BALDE/$PREFIXO-filtro.awk" --region "$REGIAO" --expires-in 900)
+URL_GRANTS=$(aws s3 presign "s3://$BALDE/$PREFIXO-grants.sql" --region "$REGIAO" --expires-in 900)
 
 if [ "$APLICAR" -eq 1 ]; then
   PASSO_CARGA="psql -v ON_ERROR_STOP=1 -X -q -d clinico -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
 psql -v ON_ERROR_STOP=1 -X -q --single-transaction -d clinico -f /tmp/full.sql
-echo \$GRANTS_B64_PLACEHOLDER | base64 -d > /tmp/grants.sql
+wget -qO- '$URL_GRANTS' > /tmp/grants.sql
 psql -v ON_ERROR_STOP=1 -X -q -d clinico -f /tmp/grants.sql
 echo '--- conferência ---'
 psql -X -q -A -t -d clinico -c \"select 'tabelas=' || count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE'\"
@@ -59,14 +68,12 @@ else
 fi
 
 SCRIPT="set -e
-echo $AWK_B64 | base64 -d > /tmp/f.awk
+wget -qO- '$URL_FILTRO' > /tmp/f.awk
 pg_dump \"\$ORIGEM_URL\" --no-owner --no-privileges --schema=public $EXCL 2>/tmp/e.txt | awk -f /tmp/f.awk > /tmp/full.sql
 [ -s /tmp/e.txt ] && { echo 'pg_dump reclamou:'; head -3 /tmp/e.txt; }
 echo \"dump: \$(wc -l < /tmp/full.sql) linhas, \$(grep -c '^COPY ' /tmp/full.sql) tabelas com dados\"
 echo \"sobrou RLS? \$(grep -c 'ROW LEVEL SECURITY' /tmp/full.sql) | sobrou auth.? \$(grep -c 'auth\\.' /tmp/full.sql)\"
 $PASSO_CARGA"
-
-SCRIPT="${SCRIPT//\$GRANTS_B64_PLACEHOLDER/$GRANTS_B64}"
 
 B64=$(printf '%s' "$SCRIPT" | base64 | tr -d '\n')
 OV=$(printf '{"containerOverrides":[{"name":"psql","command":["sh","-c","echo %s | base64 -d | sh"]}]}' "$B64")
