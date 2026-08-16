@@ -1,8 +1,10 @@
+import { asNumber, getSql, withTransaction } from '@/lib/db'
 import { claimOnce, releaseClaim } from '@/lib/idempotency'
 import { getPharmacyCycleMultiplier } from '@/lib/plans'
 import { productKeyFromName } from '@/lib/protocol/triage'
 import type { createAdminClient } from '@/lib/supabase/admin'
 import type { ShippingSelection } from '@/types/shipping'
+import type postgres from 'postgres'
 
 type CheckoutSource = 'full_quiz' | 'mini_quiz'
 
@@ -19,8 +21,6 @@ type PendingProtocolItem = {
 export type PendingCheckoutPayload = {
   source: CheckoutSource
   plan_type: '1mes' | 'assinatura_mensal' | '3meses' | '6meses' | '1ano'
-  // O envio já resolvido pelo servidor, com transportadora e serviço — é daqui
-  // que a etiqueta e a farmácia tiram o que precisam. Nunca vem do cliente.
   shipping?: ShippingSelection
   quiz: {
     full_name: string
@@ -43,24 +43,21 @@ export type PendingCheckoutPayload = {
 }
 
 type AdminClient = ReturnType<typeof createAdminClient>
+type DbSql = postgres.Sql | postgres.TransactionSql
 
-async function waitForProtocolId(
-  admin: AdminClient,
-  subscriptionId: string,
-): Promise<string | null> {
-  // ~15s no request path (checkout/webhook); se esgotar, o webhook responde 500 e retenta.
+async function waitForProtocolId(subscriptionId: string): Promise<string | null> {
+  const sql = getSql()
   for (let i = 0; i < 30; i++) {
     if (i > 0) {
       await new Promise((resolve) => setTimeout(resolve, 500))
     }
-    const { data } = await admin
-      .from('subscriptions')
-      .select('protocol_id')
-      .eq('id', subscriptionId)
-      .maybeSingle()
-    // Só preenchido quando a criação terminou (items + link final).
-    if (data?.protocol_id) {
-      return data.protocol_id as string
+    const rows = await sql<{ protocol_id: string | null }[]>`
+      SELECT protocol_id FROM subscriptions
+      WHERE id = ${subscriptionId}::uuid
+      LIMIT 1
+    `
+    if (rows[0]?.protocol_id) {
+      return rows[0].protocol_id
     }
   }
   console.error(
@@ -71,15 +68,17 @@ async function waitForProtocolId(
 }
 
 async function stampLockProtocolId(
-  admin: AdminClient,
+  sql: DbSql,
   subscriptionId: string,
   protocolId: string,
 ): Promise<void> {
-  const { error } = await admin
-    .from('protocol_creation_locks')
-    .update({ protocol_id: protocolId })
-    .eq('subscription_id', subscriptionId)
-  if (error) {
+  try {
+    await sql`
+      UPDATE protocol_creation_locks
+      SET protocol_id = ${protocolId}::uuid
+      WHERE subscription_id = ${subscriptionId}::uuid
+    `
+  } catch (error) {
     console.error(
       'ensureProtocolAfterPayment: falha ao gravar protocol_id no lock',
       error,
@@ -88,7 +87,7 @@ async function stampLockProtocolId(
 }
 
 async function insertProtocolItemsFromPending(
-  admin: AdminClient,
+  sql: DbSql,
   protocolId: string,
   pending: PendingCheckoutPayload,
 ): Promise<boolean> {
@@ -97,16 +96,14 @@ async function insertProtocolItemsFromPending(
   )
   if (activeItems.length === 0) return true
 
-  const { count } = await admin
-    .from('protocol_items')
-    .select('id', { count: 'exact', head: true })
-    .eq('protocol_id', protocolId)
-  if ((count ?? 0) > 0) return true
+  const countRows = await sql<{ n: string | number }[]>`
+    SELECT COUNT(*) AS n FROM protocol_items
+    WHERE protocol_id = ${protocolId}::uuid
+  `
+  if (asNumber(countRows[0]?.n) > 0) return true
 
   const withIds = activeItems.filter((item) => item.product_id)
   const withoutIds = activeItems.filter((item) => !item.product_id)
-
-  // TODO(Miligrama): quantity física = qty × ciclo (3/6). Pode mudar após validação.
   const cycleMult = getPharmacyCycleMultiplier(pending.plan_type)
 
   const itemsToInsert: Array<{
@@ -127,15 +124,14 @@ async function insertProtocolItemsFromPending(
   }))
 
   if (withoutIds.length > 0) {
-    const { data: products } = await admin
-      .from('products')
-      .select('id, name')
-      .eq('is_active', true)
+    const products = await sql<{ id: string; name: string }[]>`
+      SELECT id, name FROM products WHERE is_active = true
+    `
 
     for (const item of withoutIds) {
       const itemKey = productKeyFromName(item.product_name)
       const product = itemKey
-        ? products?.find((p) => productKeyFromName(p.name) === itemKey)
+        ? products.find((p) => productKeyFromName(p.name) === itemKey)
         : undefined
       if (!product) continue
       itemsToInsert.push({
@@ -164,23 +160,16 @@ async function insertProtocolItemsFromPending(
     return true
   }
 
-  const { error: itemsError } = await admin
-    .from('protocol_items')
-    .insert(itemsToInsert)
-  if (itemsError) {
-    console.error('ensureProtocolAfterPayment: items insert error', itemsError)
-    return false
-  }
+  await sql`INSERT INTO protocol_items ${sql(itemsToInsert)}`
   return true
 }
 
 async function finalizeSubscriptionProtocol(
-  admin: AdminClient,
+  sql: DbSql,
   subscriptionId: string,
   protocolId: string,
   pending: PendingCheckoutPayload,
-): Promise<boolean> {
-  // Mantém snapshot de frete + itens pagos pra farmácia (não confiar em edits pós-pagamento).
+): Promise<void> {
   const fulfillmentCheckout = {
     source: pending.source,
     plan_type: pending.plan_type,
@@ -191,71 +180,59 @@ async function finalizeSubscriptionProtocol(
     fulfillment_locked_at: new Date().toISOString(),
   }
 
-  const { error } = await admin
-    .from('subscriptions')
-    .update({
-      protocol_id: protocolId,
-      pending_checkout: fulfillmentCheckout,
-    })
-    .eq('id', subscriptionId)
-  if (error) {
-    console.error('ensureProtocolAfterPayment: subscription link error', error)
-    return false
-  }
-  return true
+  await sql`
+    UPDATE subscriptions
+    SET
+      protocol_id = ${protocolId}::uuid,
+      pending_checkout = ${sql.json(fulfillmentCheckout as never)}
+    WHERE id = ${subscriptionId}::uuid
+  `
 }
 
-/**
- * Creates quiz_response + protocol + items from a pending checkout payload.
- * Idempotent: if subscription already has protocol_id, returns it.
- * Uses protocol_creation_locks to avoid checkout+webhook races.
- *
- * `subscriptions.protocol_id` só é gravado no final (protocolo + items prontos),
- * pra waitForProtocolId nunca devolver um id incompleto/inválido. O lock guarda
- * `protocol_id` como breadcrumb da própria subscription pra crash recovery.
- */
 export async function ensureProtocolAfterPayment(
   admin: AdminClient,
   subscriptionId: string,
   userId: string,
 ): Promise<string | null> {
-  const { data: subscription, error: subError } = await admin
-    .from('subscriptions')
-    .select('id, protocol_id, pending_checkout')
-    .eq('id', subscriptionId)
-    .eq('user_id', userId)
-    .single()
-
-  if (subError || !subscription) {
-    console.error(
-      'ensureProtocolAfterPayment: subscription not found',
-      subError,
-    )
+  const sql = getSql()
+  const subRows = await sql<
+    {
+      id: string
+      protocol_id: string | null
+      pending_checkout: PendingCheckoutPayload | null
+    }[]
+  >`
+    SELECT id, protocol_id, pending_checkout
+    FROM subscriptions
+    WHERE id = ${subscriptionId}::uuid AND user_id = ${userId}::uuid
+    LIMIT 1
+  `
+  const subscription = subRows[0]
+  if (!subscription) {
+    console.error('ensureProtocolAfterPayment: subscription not found')
     return null
   }
 
   if (subscription.protocol_id) {
-    const { data: existingProtocol } = await admin
-      .from('protocols')
-      .select('id')
-      .eq('id', subscription.protocol_id)
-      .maybeSingle()
-    if (existingProtocol) {
-      return subscription.protocol_id as string
+    const existingProtocol = await sql<{ id: string }[]>`
+      SELECT id FROM protocols WHERE id = ${subscription.protocol_id}::uuid LIMIT 1
+    `
+    if (existingProtocol[0]) {
+      return subscription.protocol_id
     }
-    // Link órfão (rollback antigo sem limpar protocol_id) — limpa e recria.
     console.warn(
       'ensureProtocolAfterPayment: protocol_id órfão na subscription, limpando',
       { subscriptionId, protocol_id: subscription.protocol_id },
     )
-    await admin
-      .from('subscriptions')
-      .update({ protocol_id: null })
-      .eq('id', subscriptionId)
-      .eq('protocol_id', subscription.protocol_id)
+    await sql`
+      UPDATE subscriptions
+      SET protocol_id = NULL
+      WHERE id = ${subscriptionId}::uuid
+        AND protocol_id = ${subscription.protocol_id}::uuid
+    `
   }
 
-  const pending = subscription.pending_checkout as PendingCheckoutPayload | null
+  const pending = subscription.pending_checkout
   if (
     !pending?.quiz?.diagnosis_type ||
     !Array.isArray(pending.protocol_items)
@@ -275,11 +252,9 @@ export async function ensureProtocolAfterPayment(
     },
   )
   if (!won) {
-    return waitForProtocolId(admin, subscriptionId)
+    return waitForProtocolId(subscriptionId)
   }
 
-  // Crash anterior nesta mesma subscription — retoma o protocolo do lock ou
-  // o criado com creation_subscription_id (breadcrumb se o stamp no lock falhou).
   const staleProtocolId =
     (typeof reclaimedStale?.protocol_id === 'string' &&
       reclaimedStale.protocol_id) ||
@@ -287,97 +262,59 @@ export async function ensureProtocolAfterPayment(
 
   let resumeProtocolId = staleProtocolId
   if (!resumeProtocolId) {
-    const { data: bySubscription } = await admin
-      .from('protocols')
-      .select('id')
-      .eq('creation_subscription_id', subscriptionId)
-      .eq('user_id', userId)
-      .order('generated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    resumeProtocolId = bySubscription?.id ?? null
+    const bySubscription = await sql<{ id: string }[]>`
+      SELECT id FROM protocols
+      WHERE creation_subscription_id = ${subscriptionId}::uuid
+        AND user_id = ${userId}::uuid
+      ORDER BY generated_at DESC
+      LIMIT 1
+    `
+    resumeProtocolId = bySubscription[0]?.id ?? null
   }
 
   if (resumeProtocolId) {
-    const { data: existingProtocol } = await admin
-      .from('protocols')
-      .select('id')
-      .eq('id', resumeProtocolId)
-      .eq('user_id', userId)
-      .maybeSingle()
+    const existingProtocol = await sql<{ id: string }[]>`
+      SELECT id FROM protocols
+      WHERE id = ${resumeProtocolId}::uuid AND user_id = ${userId}::uuid
+      LIMIT 1
+    `
 
-    if (existingProtocol) {
-      await stampLockProtocolId(admin, subscriptionId, resumeProtocolId)
-      const itemsOk = await insertProtocolItemsFromPending(
-        admin,
-        resumeProtocolId,
-        pending,
-      )
-      if (!itemsOk) {
-        // Libera o lock pra o webhook poder retentar; protocolo fica com
-        // creation_subscription_id pra retomar na próxima claim.
-        await releaseClaim(
-          admin,
-          'protocol_creation_locks',
-          'subscription_id',
-          subscriptionId,
-        )
-        return null
-      }
-      const linked = await finalizeSubscriptionProtocol(
-        admin,
-        subscriptionId,
-        resumeProtocolId,
-        pending,
-      )
-      if (!linked) {
-        await releaseClaim(
-          admin,
-          'protocol_creation_locks',
-          'subscription_id',
-          subscriptionId,
-        )
-        return null
-      }
-      await releaseClaim(
-        admin,
-        'protocol_creation_locks',
-        'subscription_id',
-        subscriptionId,
-      )
-      return resumeProtocolId
-    }
-  }
-
-  let quizResponseId: string | null = null
-  let protocolIdCreated: string | null = null
-
-  const rollbackPartialAndRelease = async () => {
-    // Libera o lock antes de apagar o protocolo (FK protocol_id no lock).
-    await releaseClaim(
-      admin,
-      'protocol_creation_locks',
-      'subscription_id',
-      subscriptionId,
-    )
-    if (protocolIdCreated) {
-      // Se finalize já tinha linkado, limpa o id órfão e restaura pending
-      // pra o retry (webhook/checkout) conseguir recriar o protocolo.
-      await admin
-        .from('subscriptions')
-        .update({
-          protocol_id: null,
-          pending_checkout: pending,
+    if (existingProtocol[0]) {
+      try {
+        await withTransaction(async (tx) => {
+          await stampLockProtocolId(tx, subscriptionId, resumeProtocolId)
+          const itemsOk = await insertProtocolItemsFromPending(
+            tx,
+            resumeProtocolId,
+            pending,
+          )
+          if (!itemsOk) {
+            throw new Error('ensureProtocolAfterPayment: items resume falhou')
+          }
+          await finalizeSubscriptionProtocol(
+            tx,
+            subscriptionId,
+            resumeProtocolId,
+            pending,
+          )
         })
-        .eq('id', subscriptionId)
-      await admin
-        .from('protocol_items')
-        .delete()
-        .eq('protocol_id', protocolIdCreated)
-      await admin.from('protocols').delete().eq('id', protocolIdCreated)
-    }
-    if (quizResponseId) {
-      await admin.from('quiz_responses').delete().eq('id', quizResponseId)
+        await releaseClaim(
+          admin,
+          'protocol_creation_locks',
+          'subscription_id',
+          subscriptionId,
+        )
+        return resumeProtocolId
+      } catch (error) {
+        console.error('ensureProtocolAfterPayment: resume error', error)
+        await releaseClaim(
+          admin,
+          'protocol_creation_locks',
+          'subscription_id',
+          subscriptionId,
+        )
+        return null
+      }
     }
   }
 
@@ -386,89 +323,75 @@ export async function ensureProtocolAfterPayment(
       pending.source === 'mini_quiz' ? 'mini_quiz' : 'full_quiz'
     const quiz = pending.quiz
 
-    // Atualiza nome do perfil; NÃO fabricar/propagar birth_date a partir da idade.
-    const updates: Record<string, string | null> = {}
-    if (quiz.full_name?.trim()) updates.full_name = quiz.full_name.trim()
-    if (quiz.birth_date) updates.birth_date = quiz.birth_date
-    if (Object.keys(updates).length > 0) {
-      await admin.from('users').update(updates).eq('id', userId)
-    }
+    const protocolId = await withTransaction(async (tx) => {
+      const updates: Record<string, string | null> = {}
+      if (quiz.full_name?.trim()) updates.full_name = quiz.full_name.trim()
+      if (quiz.birth_date) updates.birth_date = quiz.birth_date
+      if (Object.keys(updates).length > 0) {
+        await tx`
+          UPDATE users SET ${tx(updates)} WHERE id = ${userId}::uuid
+        `
+      }
 
-    const { data: quizResponse, error: quizError } = await admin
-      .from('quiz_responses')
-      .insert({
-        user_id: userId,
-        diagnosis_type: quiz.diagnosis_type,
-        age: quiz.age,
-        ...(quiz.birth_date ? { birth_date: quiz.birth_date } : {}),
-        sex: quiz.sex,
-        is_pregnant_or_breastfeeding: quiz.is_pregnant_or_breastfeeding,
-        renal_conditions: quiz.renal_conditions ?? [],
-        hepatic_conditions: quiz.hepatic_conditions ?? [],
-        medications: quiz.medications ?? [],
-        allergies:
-          typeof quiz.allergies === 'string' && quiz.allergies.trim()
-            ? quiz.allergies.trim()
-            : null,
-        completed_at: new Date().toISOString(),
-      })
-      .select('id')
-      .single()
+      const quizRows = await tx<{ id: string }[]>`
+        INSERT INTO quiz_responses ${tx({
+          user_id: userId,
+          diagnosis_type: quiz.diagnosis_type,
+          age: quiz.age,
+          ...(quiz.birth_date ? { birth_date: quiz.birth_date } : {}),
+          sex: quiz.sex,
+          is_pregnant_or_breastfeeding: quiz.is_pregnant_or_breastfeeding,
+          renal_conditions: quiz.renal_conditions ?? [],
+          hepatic_conditions: quiz.hepatic_conditions ?? [],
+          medications: quiz.medications ?? [],
+          allergies:
+            typeof quiz.allergies === 'string' && quiz.allergies.trim()
+              ? quiz.allergies.trim()
+              : null,
+          completed_at: new Date().toISOString(),
+        })}
+        RETURNING id
+      `
+      const quizResponse = quizRows[0]
+      if (!quizResponse) {
+        throw new Error('ensureProtocolAfterPayment: quiz insert sem id')
+      }
 
-    if (quizError || !quizResponse) {
-      console.error('ensureProtocolAfterPayment: quiz insert error', quizError)
-      await rollbackPartialAndRelease()
-      return null
-    }
-    quizResponseId = quizResponse.id as string
+      const protocolRows = await tx<{ id: string }[]>`
+        INSERT INTO protocols ${tx({
+          user_id: userId,
+          quiz_response_id: quizResponse.id,
+          status: 'pending_signature',
+          source,
+          generated_at: new Date().toISOString(),
+          creation_subscription_id: subscriptionId,
+        })}
+        RETURNING id
+      `
+      const protocol = protocolRows[0]
+      if (!protocol) {
+        throw new Error('ensureProtocolAfterPayment: protocol insert sem id')
+      }
 
-    const { data: protocol, error: protocolError } = await admin
-      .from('protocols')
-      .insert({
-        user_id: userId,
-        quiz_response_id: quizResponse.id,
-        status: 'pending_signature',
-        source,
-        generated_at: new Date().toISOString(),
-        creation_subscription_id: subscriptionId,
-      })
-      .select('id')
-      .single()
+      await stampLockProtocolId(tx, subscriptionId, protocol.id)
 
-    if (protocolError || !protocol) {
-      console.error(
-        'ensureProtocolAfterPayment: protocol insert error',
-        protocolError,
+      const itemsOk = await insertProtocolItemsFromPending(
+        tx,
+        protocol.id,
+        pending,
       )
-      await rollbackPartialAndRelease()
-      return null
-    }
-    protocolIdCreated = protocol.id as string
+      if (!itemsOk) {
+        throw new Error('ensureProtocolAfterPayment: items insert falhou')
+      }
 
-    // Breadcrumb no lock desta subscription — ainda NÃO expõe na subscription.
-    await stampLockProtocolId(admin, subscriptionId, protocol.id)
-
-    const itemsOk = await insertProtocolItemsFromPending(
-      admin,
-      protocol.id,
-      pending,
-    )
-    if (!itemsOk) {
-      await rollbackPartialAndRelease()
-      return null
-    }
-
-    // Só agora o perdedor da corrida pode ver o protocol_id (estado completo).
-    const linked = await finalizeSubscriptionProtocol(
-      admin,
-      subscriptionId,
-      protocol.id,
-      pending,
-    )
-    if (!linked) {
-      await rollbackPartialAndRelease()
-      return null
-    }
+      await finalizeSubscriptionProtocol(
+        tx,
+        subscriptionId,
+        protocol.id,
+        pending,
+      )
+      return protocol.id
+    })
 
     await releaseClaim(
       admin,
@@ -476,11 +399,15 @@ export async function ensureProtocolAfterPayment(
       'subscription_id',
       subscriptionId,
     )
-
-    return protocol.id as string
+    return protocolId
   } catch (error) {
     console.error('ensureProtocolAfterPayment: unexpected error', error)
-    await rollbackPartialAndRelease()
+    await releaseClaim(
+      admin,
+      'protocol_creation_locks',
+      'subscription_id',
+      subscriptionId,
+    )
     return null
   }
 }

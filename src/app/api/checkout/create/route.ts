@@ -1,7 +1,9 @@
 import { createHash } from 'node:crypto'
 import { type NextRequest, NextResponse } from 'next/server'
+import postgres from 'postgres'
 import { z } from 'zod'
 import { computeServerCheckoutTotal } from '@/lib/checkout/price'
+import { getSql, withTransaction } from '@/lib/db'
 import { inngest } from '@/lib/inngest/client'
 import {
   addPlanPeriod,
@@ -90,96 +92,103 @@ function planItemName(planType: PlanType): string {
   return `Desafio Diabetes — ${label}`
 }
 
-async function insertPaymentWithRetry(
-  admin: AdminClient,
-  row: Record<string, unknown>,
-) {
-  let { data, error } = await admin
-    .from('payments')
-    .insert(row)
-    .select('id')
-    .single()
-  if (error) {
-    console.error('Checkout payments.insert error (tentativa 1):', error)
-    ;({ data, error } = await admin
-      .from('payments')
-      .insert(row)
-      .select('id')
-      .single())
+async function insertPaymentWithRetry(row: Record<string, unknown>) {
+  const sql = getSql()
+  const tryInsert = async () => {
+    const rows = await sql<{ id: string }[]>`
+      INSERT INTO payments ${sql(row)}
+      RETURNING id
+    `
+    return rows[0]
   }
-  if (error?.code === '23505') {
-    const chargeId = row.pagarme_charge_id
-    if (typeof chargeId === 'string' && chargeId) {
-      const { data: existing } = await admin
-        .from('payments')
-        .select('id')
-        .eq('pagarme_charge_id', chargeId)
-        .maybeSingle()
-      if (existing) return existing
+
+  try {
+    const data = await tryInsert()
+    if (!data?.id) {
+      throw new Error('Checkout: payments.insert não retornou id')
+    }
+    return data
+  } catch (error) {
+    console.error('Checkout payments.insert error (tentativa 1):', error)
+    try {
+      const data = await tryInsert()
+      if (!data?.id) {
+        throw new Error('Checkout: payments.insert não retornou id')
+      }
+      return data
+    } catch (error2) {
+      if (
+        error2 instanceof postgres.PostgresError &&
+        error2.code === '23505'
+      ) {
+        const chargeId = row.pagarme_charge_id
+        if (typeof chargeId === 'string' && chargeId) {
+          const existing = await sql<{ id: string }[]>`
+            SELECT id FROM payments
+            WHERE pagarme_charge_id = ${chargeId}
+            LIMIT 1
+          `
+          if (existing[0]) return existing[0]
+        }
+      }
+      console.error(
+        'CRÍTICO — payments.insert falhou 2x; cobrança pode ter sido aprovada sem registro interno:',
+        error2,
+        {
+          subscription_id: row.subscription_id,
+          pagarme_charge_id: row.pagarme_charge_id,
+          amount: row.amount,
+          status: row.status,
+        },
+      )
+      const message =
+        error2 instanceof Error ? error2.message : String(error2)
+      throw new Error(
+        `Checkout: falha ao registrar payment após cobrança (${message})`,
+      )
     }
   }
-  if (error) {
-    console.error(
-      'CRÍTICO — payments.insert falhou 2x; cobrança pode ter sido aprovada sem registro interno:',
-      error,
-      {
-        subscription_id: row.subscription_id,
-        pagarme_charge_id: row.pagarme_charge_id,
-        amount: row.amount,
-        status: row.status,
-      },
-    )
-    throw new Error(
-      `Checkout: falha ao registrar payment após cobrança (${error.message})`,
-    )
-  }
-  if (!data?.id) {
-    throw new Error('Checkout: payments.insert não retornou id')
-  }
-  return data
 }
 
 /** Ativa subscription + entitlements sem criar protocolo. */
-async function activateSubscriptionRow(
-  admin: AdminClient,
-  opts: {
-    subscriptionId: string
-    userId: string
-    expiresAt: Date
-  },
-) {
-  await admin
-    .from('subscriptions')
-    .update({
-      status: 'active',
-      expires_at: opts.expiresAt.toISOString(),
-      next_billing_at: opts.expiresAt.toISOString(),
-    })
-    .eq('id', opts.subscriptionId)
+async function activateSubscriptionRow(opts: {
+  subscriptionId: string
+  userId: string
+  expiresAt: Date
+}) {
+  const sql = getSql()
+  const expiresAt = opts.expiresAt.toISOString()
+  await sql`
+    UPDATE subscriptions
+    SET
+      status = 'active',
+      expires_at = ${expiresAt},
+      next_billing_at = ${expiresAt}
+    WHERE id = ${opts.subscriptionId}::uuid
+  `
 
-  const { data: existing } = await admin
-    .from('user_entitlements')
-    .select('id')
-    .eq('user_id', opts.userId)
-    .eq('product_key', 'treatment')
-    .maybeSingle()
+  const existing = await sql<{ id: string }[]>`
+    SELECT id FROM user_entitlements
+    WHERE user_id = ${opts.userId}::uuid AND product_key = 'treatment'
+    LIMIT 1
+  `
 
-  if (existing) {
-    await admin
-      .from('user_entitlements')
-      .update({
-        status: 'active',
-        expires_at: opts.expiresAt.toISOString(),
-      })
-      .eq('id', existing.id)
+  if (existing[0]) {
+    await sql`
+      UPDATE user_entitlements
+      SET status = 'active', expires_at = ${expiresAt}
+      WHERE id = ${existing[0].id}::uuid
+    `
   } else {
-    await admin.from('user_entitlements').insert({
-      user_id: opts.userId,
-      product_key: 'treatment',
-      status: 'active',
-      expires_at: opts.expiresAt.toISOString(),
-      is_permanent: false,
-    })
+    await sql`
+      INSERT INTO user_entitlements ${sql({
+        user_id: opts.userId,
+        product_key: 'treatment',
+        status: 'active',
+        expires_at: expiresAt,
+        is_permanent: false,
+      })}
+    `
   }
 }
 
@@ -191,66 +200,63 @@ async function finalizePaidSubscription(
     expiresAt: Date
   },
 ) {
-  await activateSubscriptionRow(admin, opts)
+  await activateSubscriptionRow(opts)
   return ensureProtocolAfterPayment(admin, opts.subscriptionId, opts.userId)
 }
 
-async function recordTermsAcceptance(
-  admin: AdminClient,
-  opts: {
-    userId: string
-    subscriptionId: string
-    ipAddress: string | null
-  },
-) {
+async function recordTermsAcceptance(opts: {
+  userId: string
+  subscriptionId: string
+  ipAddress: string | null
+}) {
+  const sql = getSql()
   const termsHash = createHash('sha256')
     .update(TERMS_CONTENT + TERMS_VERSION)
     .digest('hex')
 
-  const { error: termsError } = await admin.from('terms_acceptances').insert({
-    user_id: opts.userId,
-    subscription_id: opts.subscriptionId,
-    terms_version: TERMS_VERSION,
-    terms_hash: termsHash,
-    ip_address: opts.ipAddress,
-    accepted_at: new Date().toISOString(),
-  })
-
-  if (termsError) {
+  try {
+    await sql`
+      INSERT INTO terms_acceptances ${sql({
+        user_id: opts.userId,
+        subscription_id: opts.subscriptionId,
+        terms_version: TERMS_VERSION,
+        terms_hash: termsHash,
+        ip_address: opts.ipAddress,
+        accepted_at: new Date().toISOString(),
+      })}
+    `
+  } catch (termsError) {
     console.error('terms_acceptances insert error:', termsError)
   }
 }
 
-async function createSubscriptionRow(
-  admin: AdminClient,
-  opts: {
-    userId: string
-    planType: PlanType
-    pendingCheckout: PendingCheckoutPayload
-    expiresAt: Date
-  },
-) {
-  const { data: subscription, error: subError } = await admin
-    .from('subscriptions')
-    .insert({
-      user_id: opts.userId,
-      protocol_id: null,
-      pending_checkout: opts.pendingCheckout,
-      plan_type: opts.planType,
-      status: 'pending',
-      started_at: new Date().toISOString(),
-      expires_at: opts.expiresAt.toISOString(),
-      next_billing_at: opts.expiresAt.toISOString(),
-      retry_count: 0,
-    })
-    .select()
-    .single()
-
-  if (subError || !subscription) {
+async function createSubscriptionRow(opts: {
+  userId: string
+  planType: PlanType
+  pendingCheckout: PendingCheckoutPayload
+  expiresAt: Date
+}) {
+  const sql = getSql()
+  try {
+    const rows = await sql<{ id: string }[]>`
+      INSERT INTO subscriptions ${sql({
+        user_id: opts.userId,
+        protocol_id: null,
+        pending_checkout: opts.pendingCheckout,
+        plan_type: opts.planType,
+        status: 'pending',
+        started_at: new Date().toISOString(),
+        expires_at: opts.expiresAt.toISOString(),
+        next_billing_at: opts.expiresAt.toISOString(),
+        retry_count: 0,
+      })}
+      RETURNING id
+    `
+    return rows[0] ?? null
+  } catch (subError) {
     console.error('Subscription error:', subError)
     return null
   }
-  return subscription
 }
 
 type PagarmeBillingAddress = {
@@ -345,7 +351,7 @@ async function chargeOneTimeOrder(opts: {
   }
 
   const charge = pagarmeData.charges?.[0]
-  const payment = await insertPaymentWithRetry(opts.admin, {
+  const payment = await insertPaymentWithRetry({
     subscription_id: opts.subscriptionId,
     amount: opts.serverTotal,
     status: charge?.status === 'paid' ? 'paid' : 'pending',
@@ -354,12 +360,16 @@ async function chargeOneTimeOrder(opts: {
     webhook_payload: summarizePagarmePayload(pagarmeData),
   })
 
-  await opts.admin.from('webhook_logs').insert({
-    source: 'pagarme',
-    event_type: 'order.created',
-    payload: summarizePagarmePayload(pagarmeData),
-    processed: true,
-  })
+  const sql = getSql()
+  await sql`
+    INSERT INTO webhook_logs (source, event_type, payload, processed)
+    VALUES (
+      'pagarme',
+      'order.created',
+      ${sql.json(summarizePagarmePayload(pagarmeData) as never)},
+      true
+    )
+  `
 
   return {
     ok: true,
@@ -436,10 +446,12 @@ async function chargeSubscription(opts: {
     }
   }
 
-  await opts.admin
-    .from('subscriptions')
-    .update({ pagarme_sub_id: pagarmeData.id })
-    .eq('id', opts.subscriptionId)
+  const sql = getSql()
+  await sql`
+    UPDATE subscriptions
+    SET pagarme_sub_id = ${pagarmeData.id}
+    WHERE id = ${opts.subscriptionId}::uuid
+  `
 
   const charge = pagarmeData.charges?.[0]
   const cycleStatus = pagarmeData.current_cycle?.status as string | undefined
@@ -452,7 +464,7 @@ async function chargeSubscription(opts: {
     (pagarmeData.current_cycle?.id as string | undefined) ??
     pagarmeData.id
 
-  const payment = await insertPaymentWithRetry(opts.admin, {
+  const payment = await insertPaymentWithRetry({
     subscription_id: opts.subscriptionId,
     amount: opts.serverTotal,
     status: paid ? 'paid' : 'pending',
@@ -461,12 +473,15 @@ async function chargeSubscription(opts: {
     webhook_payload: summarizePagarmePayload(pagarmeData),
   })
 
-  await opts.admin.from('webhook_logs').insert({
-    source: 'pagarme',
-    event_type: 'subscription.created',
-    payload: summarizePagarmePayload(pagarmeData),
-    processed: true,
-  })
+  await sql`
+    INSERT INTO webhook_logs (source, event_type, payload, processed)
+    VALUES (
+      'pagarme',
+      'subscription.created',
+      ${sql.json(summarizePagarmePayload(pagarmeData) as never)},
+      true
+    )
+  `
 
   return {
     ok: true,
@@ -523,32 +538,42 @@ async function cancelPagarmeSubscriptionBestEffort(
   }
 }
 
+async function deleteSubscriptionLocal(subscriptionId: string) {
+  await withTransaction(async (tx) => {
+    await tx`
+      UPDATE terms_acceptances
+      SET subscription_id = NULL
+      WHERE subscription_id = ${subscriptionId}::uuid
+    `
+    await tx`
+      DELETE FROM payments WHERE subscription_id = ${subscriptionId}::uuid
+    `
+    await tx`
+      DELETE FROM subscriptions WHERE id = ${subscriptionId}::uuid
+    `
+  })
+}
+
 async function deleteFailedSubscription(
-  admin: AdminClient,
   subscriptionId: string,
   pagarmeHeaders?: Record<string, string>,
 ) {
-  // Cancela assinatura remota antes de apagar o registro local (evita órfão na Pagar.me).
   if (pagarmeHeaders) {
-    const { data: row } = await admin
-      .from('subscriptions')
-      .select('pagarme_sub_id')
-      .eq('id', subscriptionId)
-      .maybeSingle()
-    if (row?.pagarme_sub_id) {
+    const sql = getSql()
+    const rows = await sql<{ pagarme_sub_id: string | null }[]>`
+      SELECT pagarme_sub_id FROM subscriptions
+      WHERE id = ${subscriptionId}::uuid
+      LIMIT 1
+    `
+    if (rows[0]?.pagarme_sub_id) {
       await cancelPagarmeSubscriptionBestEffort(
-        row.pagarme_sub_id as string,
+        rows[0].pagarme_sub_id,
         pagarmeHeaders,
       )
     }
   }
 
-  await admin
-    .from('terms_acceptances')
-    .update({ subscription_id: null })
-    .eq('subscription_id', subscriptionId)
-  await admin.from('payments').delete().eq('subscription_id', subscriptionId)
-  await admin.from('subscriptions').delete().eq('id', subscriptionId)
+  await deleteSubscriptionLocal(subscriptionId)
 }
 
 /** Cancela cobrança/pedido Pix pendente no Pagar.me (best effort). */
@@ -588,19 +613,20 @@ async function cancelPagarmePendingOrder(
   }
 }
 
-async function replacePendingPixSubscription(
-  admin: AdminClient,
-  opts: {
-    userId: string
-    replaceSubscriptionId: string
-    pagarmeHeaders: Record<string, string>
-  },
-): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
-  const { data: prev } = await admin
-    .from('subscriptions')
-    .select('id, user_id, status')
-    .eq('id', opts.replaceSubscriptionId)
-    .maybeSingle()
+async function replacePendingPixSubscription(opts: {
+  userId: string
+  replaceSubscriptionId: string
+  pagarmeHeaders: Record<string, string>
+}): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
+  const sql = getSql()
+  const prevRows = await sql<
+    { id: string; user_id: string; status: string }[]
+  >`
+    SELECT id, user_id, status FROM subscriptions
+    WHERE id = ${opts.replaceSubscriptionId}::uuid
+    LIMIT 1
+  `
+  const prev = prevRows[0] ?? null
 
   if (!prev || prev.user_id !== opts.userId) {
     return {
@@ -617,13 +643,16 @@ async function replacePendingPixSubscription(
     }
   }
 
-  const { data: payments } = await admin
-    .from('payments')
-    .select('id, pagarme_charge_id')
-    .eq('subscription_id', opts.replaceSubscriptionId)
+  const payments = await sql<{ id: string; pagarme_charge_id: string | null }[]>`
+    SELECT id, pagarme_charge_id FROM payments
+    WHERE subscription_id = ${opts.replaceSubscriptionId}::uuid
+  `
 
-  for (const payment of payments ?? []) {
-    if (typeof payment.pagarme_charge_id === 'string' && payment.pagarme_charge_id) {
+  for (const payment of payments) {
+    if (
+      typeof payment.pagarme_charge_id === 'string' &&
+      payment.pagarme_charge_id
+    ) {
       await cancelPagarmePendingOrder(
         payment.pagarme_charge_id,
         opts.pagarmeHeaders,
@@ -631,15 +660,7 @@ async function replacePendingPixSubscription(
     }
   }
 
-  await admin
-    .from('terms_acceptances')
-    .update({ subscription_id: null })
-    .eq('subscription_id', opts.replaceSubscriptionId)
-  await admin
-    .from('payments')
-    .delete()
-    .eq('subscription_id', opts.replaceSubscriptionId)
-  await admin.from('subscriptions').delete().eq('id', opts.replaceSubscriptionId)
+  await deleteSubscriptionLocal(opts.replaceSubscriptionId)
 
   return { ok: true }
 }
@@ -746,13 +767,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const sql = getSql()
     const admin = createAdminClient()
 
-    const { data: profile } = await admin
-      .from('users')
-      .select('full_name, email, client_code')
-      .eq('id', user.id)
-      .single()
+    const profileRows = await sql<
+      { full_name: string; email: string; client_code: string }[]
+    >`
+      SELECT full_name, email, client_code FROM users
+      WHERE id = ${user.id}::uuid
+      LIMIT 1
+    `
+    const profile = profileRows[0]
 
     if (!profile) {
       return NextResponse.json(
@@ -761,8 +786,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    await admin.from('addresses').upsert(
-      {
+    await sql`
+      INSERT INTO addresses ${sql({
         user_id: user.id,
         zip_code: data.address.zip_code,
         street: data.address.street,
@@ -772,9 +797,17 @@ export async function POST(request: NextRequest) {
         city: data.address.city,
         state: data.address.state,
         is_default: true,
-      },
-      { onConflict: 'user_id' },
-    )
+      })}
+      ON CONFLICT (user_id) DO UPDATE SET
+        zip_code = EXCLUDED.zip_code,
+        street = EXCLUDED.street,
+        number = EXCLUDED.number,
+        complement = EXCLUDED.complement,
+        neighborhood = EXCLUDED.neighborhood,
+        city = EXCLUDED.city,
+        state = EXCLUDED.state,
+        is_default = EXCLUDED.is_default
+    `
 
     const forwardedFor = request.headers.get('x-forwarded-for')
     const ipAddress = forwardedFor?.split(',')[0]?.trim() || null
@@ -786,7 +819,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (data.replace_subscription_id) {
-      const replaced = await replacePendingPixSubscription(admin, {
+      const replaced = await replacePendingPixSubscription({
         userId: user.id,
         replaceSubscriptionId: data.replace_subscription_id,
         pagarmeHeaders,
@@ -860,7 +893,7 @@ export async function POST(request: NextRequest) {
       protocol_items: activeItems,
     }
 
-    const subscription = await createSubscriptionRow(admin, {
+    const subscription = await createSubscriptionRow({
       userId: user.id,
       planType,
       pendingCheckout,
@@ -874,7 +907,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    await recordTermsAcceptance(admin, {
+    await recordTermsAcceptance({
       userId: user.id,
       subscriptionId: subscription.id,
       ipAddress,
@@ -914,7 +947,7 @@ export async function POST(request: NextRequest) {
         })
 
     if (!result.ok) {
-      await deleteFailedSubscription(admin, subscription.id, pagarmeHeaders)
+      await deleteFailedSubscription(subscription.id, pagarmeHeaders)
       return NextResponse.json(
         { error: result.error ?? 'Erro no pagamento' },
         { status: 400 },
@@ -930,7 +963,7 @@ export async function POST(request: NextRequest) {
         !isCardDeclinedStatus(result.chargeStatus)
 
       if (!waitForWebhook) {
-        await deleteFailedSubscription(admin, subscription.id, pagarmeHeaders)
+        await deleteFailedSubscription(subscription.id, pagarmeHeaders)
         return NextResponse.json(
           { error: 'Pagamento não autorizado. Tente outro cartão.' },
           { status: 400 },

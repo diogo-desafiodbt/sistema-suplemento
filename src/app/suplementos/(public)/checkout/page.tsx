@@ -17,6 +17,7 @@ import {
 import { getProductDisplayName } from '@/lib/product-display-names'
 import { estimateCustomerDeliveryDays } from '@/lib/shipping/estimate'
 import { createClient } from '@/lib/supabase/client'
+import { fetchCheckoutProfile } from './actions'
 import {
   type ShippingOptionPublic,
   type ShippingSelection,
@@ -82,17 +83,9 @@ function clearCheckoutSession() {
   sessionStorage.removeItem('triage_session_token')
 }
 
-async function waitForProfile(
-  supabase: ReturnType<typeof createClient>,
-  userId: string,
-  retries = 3,
-) {
+async function waitForProfile(retries = 3) {
   for (let i = 0; i < retries; i++) {
-    const { data: profile } = await supabase
-      .from('users')
-      .select('full_name, email')
-      .eq('id', userId)
-      .maybeSingle()
+    const profile = await fetchCheckoutProfile()
     if (profile) return profile
     if (i < retries - 1) {
       await new Promise((resolve) => setTimeout(resolve, 500))
@@ -269,7 +262,7 @@ export default function CheckoutPage() {
       } = await supabase.auth.getUser()
       if (!user || cancelled) return
 
-      const profile = await waitForProfile(supabase, user.id)
+      const profile = await waitForProfile()
       if (cancelled) return
 
       if (profile) {
@@ -351,7 +344,7 @@ export default function CheckoutPage() {
         return
       }
 
-      const profile = await waitForProfile(supabase, data.user.id)
+      const profile = await waitForProfile()
       if (!profile) {
         toast.warning(
           'Conta criada, mas o perfil ainda está sincronizando. Você pode continuar.',

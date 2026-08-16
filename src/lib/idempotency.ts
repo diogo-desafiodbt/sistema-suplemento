@@ -1,3 +1,4 @@
+import { getSql, type Sql } from '@/lib/db'
 import type { createAdminClient } from '@/lib/supabase/admin'
 
 type AdminClient = ReturnType<typeof createAdminClient>
@@ -26,41 +27,57 @@ export type ClaimOnceOptions = {
   protectColumns?: string[]
 }
 
+function eqFilters(sql: Sql, filters: Record<string, unknown>) {
+  const entries = Object.entries(filters).filter(
+    ([, v]) => v !== undefined && v !== null,
+  )
+  return entries.flatMap(([key, value], i) => {
+    const v = value as string | number | boolean | Date
+    return i === 0
+      ? sql`${sql(key)} = ${v}`
+      : sql`AND ${sql(key)} = ${v}`
+  })
+}
+
+function insertableRow(row: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(row).filter(([, v]) => v !== undefined),
+  )
+}
+
 /**
  * Claim via insert numa tabela de log dedicada (chave primária única, ex.:
  * payment_id). Retorna `{ won: true }` se essa chamada "ganhou" a claim;
- * `{ won: false }` se já foi reivindicada por outra invocação. Lança erro
- * em qualquer falha que NÃO seja violação de unicidade (23505).
+ * `{ won: false }` se já foi reivindicada por outra invocação.
  *
- * Se a claim existente for mais velha que `staleAfterMs` (default 10 min) e
- * ainda não estiver marcada como concluída (`completedColumn`), trata como
- * abandonada: apaga, tenta de novo, e devolve a linha antiga em
- * `reclaimedStale` pra o caller limpar efeitos colaterais (ex.: pedido órfão).
+ * `admin` permanece na assinatura para os chamadores atuais; o SQL usa `getSql()`.
  */
 export async function claimOnce(
-  admin: AdminClient,
+  _admin: AdminClient,
   table: string,
   claimRow: Record<string, unknown>,
   options?: ClaimOnceOptions,
 ): Promise<ClaimOnceResult> {
+  const sql = getSql()
   const staleAfterMs = options?.staleAfterMs ?? DEFAULT_STALE_CLAIM_MS
   const timestampColumn = options?.timestampColumn ?? 'created_at'
   const completedColumn = options?.completedColumn
   const protectColumns = options?.protectColumns ?? []
-
-  const from = admin.from.bind(admin)
+  const row = insertableRow(claimRow)
 
   const tryInsert = async (): Promise<'won' | 'conflict'> => {
-    const { error } = await from(table).insert(claimRow)
-    if (!error) return 'won'
-    if (error.code === '23505') return 'conflict'
-    throw new Error(`claimOnce(${table}) falhou: ${error.message}`)
+    const inserted = await sql`
+      INSERT INTO ${sql(table)} ${sql(row)}
+      ON CONFLICT DO NOTHING
+      RETURNING *
+    `
+    return inserted.length > 0 ? 'won' : 'conflict'
   }
 
   const first = await tryInsert()
   if (first === 'won') return { won: true }
 
-  const entries = Object.entries(claimRow).filter(
+  const entries = Object.entries(row).filter(
     ([key, v]) =>
       v !== undefined &&
       v !== null &&
@@ -69,81 +86,75 @@ export async function claimOnce(
   )
   if (entries.length === 0) return { won: false }
 
-  let existingQuery = from(table).select('*')
-  for (const [key, value] of entries) {
-    existingQuery = existingQuery.eq(key, value)
-  }
-  const { data: existing } = await existingQuery.maybeSingle()
+  const filters = Object.fromEntries(entries)
+  const existingRows = await sql`
+    SELECT * FROM ${sql(table)}
+    WHERE ${eqFilters(sql, filters)}
+    LIMIT 1
+  `
+  const existing = (existingRows[0] ?? null) as Record<string, unknown> | null
 
-  if (!existing || typeof existing !== 'object') return { won: false }
+  if (!existing) return { won: false }
 
   if (completedColumn) {
-    const completedAt = (existing as Record<string, unknown>)[completedColumn]
-    if (completedAt != null) return { won: false }
+    if (existing[completedColumn] != null) return { won: false }
   }
 
   for (const col of protectColumns) {
-    if ((existing as Record<string, unknown>)[col] != null) {
-      return { won: false }
-    }
+    if (existing[col] != null) return { won: false }
   }
 
-  const stampedAt = (existing as Record<string, unknown>)[timestampColumn] as
-    | string
-    | undefined
-  if (!stampedAt) return { won: false }
+  const protectNulls = protectColumns.flatMap((col) => [
+    sql`AND ${sql(col)} IS NULL`,
+  ])
+  const completedNull = completedColumn
+    ? sql`AND ${sql(completedColumn)} IS NULL`
+    : sql``
 
-  const ageMs = Date.now() - new Date(stampedAt).getTime()
-  if (Number.isNaN(ageMs) || ageMs < staleAfterMs) return { won: false }
-
-  let deleteQuery = from(table).delete()
-  for (const [key, value] of entries) {
-    deleteQuery = deleteQuery.eq(key, value)
-  }
-  const { error: deleteError } = await deleteQuery
-  if (deleteError) {
-    console.error(
-      `claimOnce(${table}): falha ao apagar claim stale:`,
-      deleteError,
-    )
-  }
+  const deleted = await sql`
+    DELETE FROM ${sql(table)}
+    WHERE ${eqFilters(sql, filters)}
+      AND ${sql(timestampColumn)} < now() - (${staleAfterMs} || ' milliseconds')::interval
+      ${completedNull}
+      ${protectNulls}
+    RETURNING *
+  `
+  const reclaimed = deleted[0] as Record<string, unknown> | undefined
+  if (!reclaimed) return { won: false }
 
   const second = await tryInsert()
   if (second === 'won') {
-    return { won: true, reclaimedStale: existing as Record<string, unknown> }
+    return { won: true, reclaimedStale: reclaimed }
   }
   return { won: false }
 }
 
 /** Desfaz a claim (chamar sempre que a ação real falhar depois de reivindicada). */
 export async function releaseClaim(
-  admin: AdminClient,
+  _admin: AdminClient,
   table: string,
   keyColumnOrFilters: string | Record<string, unknown>,
   keyValue?: string,
 ): Promise<void> {
-  const from = admin.from.bind(admin)
+  const sql = getSql()
 
   if (typeof keyColumnOrFilters === 'string') {
-    const { error } = await from(table)
-      .delete()
-      .eq(keyColumnOrFilters, keyValue)
-    if (error) {
-      throw new Error(`releaseClaim(${table}) falhou: ${error.message}`)
-    }
+    await sql`
+      DELETE FROM ${sql(table)}
+      WHERE ${sql(keyColumnOrFilters)} = ${keyValue ?? ''}
+    `
     return
   }
 
-  let deleteQuery = from(table).delete()
-  for (const [key, value] of Object.entries(keyColumnOrFilters)) {
-    if (value !== undefined && value !== null) {
-      deleteQuery = deleteQuery.eq(key, value)
-    }
-  }
-  const { error } = await deleteQuery
-  if (error) {
-    throw new Error(`releaseClaim(${table}) falhou: ${error.message}`)
-  }
+  const filters = Object.fromEntries(
+    Object.entries(keyColumnOrFilters).filter(
+      ([, v]) => v !== undefined && v !== null,
+    ),
+  )
+  await sql`
+    DELETE FROM ${sql(table)}
+    WHERE ${eqFilters(sql, filters)}
+  `
 }
 
 /**
@@ -152,35 +163,34 @@ export async function releaseClaim(
  * (mesmo padrão de releaseClaim).
  */
 export async function markClaimCompleted(
-  admin: AdminClient,
+  _admin: AdminClient,
   table: string,
   keyColumnOrFilters: string | Record<string, unknown>,
   keyValue?: string,
   completedColumn = 'completed_at',
 ): Promise<void> {
-  const from = admin.from.bind(admin)
+  const sql = getSql()
   const stamp = { [completedColumn]: new Date().toISOString() }
 
   if (typeof keyColumnOrFilters === 'string') {
-    const { error } = await from(table)
-      .update(stamp)
-      .eq(keyColumnOrFilters, keyValue)
-    if (error) {
-      throw new Error(`markClaimCompleted(${table}) falhou: ${error.message}`)
-    }
+    await sql`
+      UPDATE ${sql(table)}
+      SET ${sql(stamp)}
+      WHERE ${sql(keyColumnOrFilters)} = ${keyValue ?? ''}
+    `
     return
   }
 
-  let updateQuery = from(table).update(stamp)
-  for (const [key, value] of Object.entries(keyColumnOrFilters)) {
-    if (value !== undefined && value !== null) {
-      updateQuery = updateQuery.eq(key, value)
-    }
-  }
-  const { error } = await updateQuery
-  if (error) {
-    throw new Error(`markClaimCompleted(${table}) falhou: ${error.message}`)
-  }
+  const filters = Object.fromEntries(
+    Object.entries(keyColumnOrFilters).filter(
+      ([, v]) => v !== undefined && v !== null,
+    ),
+  )
+  await sql`
+    UPDATE ${sql(table)}
+    SET ${sql(stamp)}
+    WHERE ${eqFilters(sql, filters)}
+  `
 }
 
 /**
@@ -192,61 +202,58 @@ export async function markClaimCompleted(
  * "uma vez por thread", nunca reclaim).
  */
 export async function claimByFlag(
-  admin: AdminClient,
+  _admin: AdminClient,
   table: string,
   id: string,
   flagColumn: string,
   staleAfterMs: number | false = DEFAULT_STALE_CLAIM_MS,
 ): Promise<boolean> {
-  const from = admin.from.bind(admin)
+  const sql = getSql()
 
   const tryClaim = async (): Promise<boolean> => {
-    const { data } = await from(table)
-      .update({ [flagColumn]: new Date().toISOString() })
-      .eq('id', id)
-      .is(flagColumn, null)
-      .select('id')
-      .maybeSingle()
-    return !!data
+    const rows = await sql`
+      UPDATE ${sql(table)}
+      SET ${sql(flagColumn)} = now()
+      WHERE id = ${id} AND ${sql(flagColumn)} IS NULL
+      RETURNING id
+    `
+    return rows.length > 0
   }
 
   if (await tryClaim()) return true
 
-  const { data: row } = await from(table)
-    .select(flagColumn)
-    .eq('id', id)
-    .maybeSingle()
-
-  const flaggedAt = (row as Record<string, unknown> | null)?.[flagColumn] as
-    | string
-    | null
-    | undefined
+  const rows = await sql`
+    SELECT ${sql(flagColumn)} FROM ${sql(table)}
+    WHERE id = ${id}
+    LIMIT 1
+  `
+  const flaggedAt = (rows[0] as Record<string, unknown> | undefined)?.[
+    flagColumn
+  ] as string | Date | null | undefined
   if (!flaggedAt) return false
 
-  // Flag permanente: se já tem valor, nunca reivindica de novo.
   if (staleAfterMs === false) return false
 
-  const ageMs = Date.now() - new Date(flaggedAt).getTime()
-  if (Number.isNaN(ageMs) || ageMs < staleAfterMs) return false
-
-  await from(table)
-    .update({ [flagColumn]: null })
-    .eq('id', id)
+  await sql`
+    UPDATE ${sql(table)}
+    SET ${sql(flagColumn)} = NULL
+    WHERE id = ${id}
+      AND ${sql(flagColumn)} < now() - (${staleAfterMs} || ' milliseconds')::interval
+  `
   return tryClaim()
 }
 
 /** Desfaz a claim por flag (chamar se a ação real falhar depois de reivindicada). */
 export async function releaseFlag(
-  admin: AdminClient,
+  _admin: AdminClient,
   table: string,
   id: string,
   flagColumn: string,
 ): Promise<void> {
-  const { error } = await admin
-    .from(table)
-    .update({ [flagColumn]: null })
-    .eq('id', id)
-  if (error) {
-    throw new Error(`releaseFlag(${table}) falhou: ${error.message}`)
-  }
+  const sql = getSql()
+  await sql`
+    UPDATE ${sql(table)}
+    SET ${sql(flagColumn)} = NULL
+    WHERE id = ${id}
+  `
 }

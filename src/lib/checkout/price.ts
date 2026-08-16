@@ -1,3 +1,4 @@
+import { asNumber, getSql } from '@/lib/db'
 import {
   getPharmacyCycleMultiplier,
   getUnitPriceFromProduct,
@@ -63,18 +64,38 @@ export async function computeServerCheckoutTotal(
   }
 
   const productIds = activeItems.map((i) => i.product_id as string)
-  const { data: products, error } = await admin
-    .from('products')
-    .select(
-      'id, price_monthly, price_quarterly, price_yearly, box_type, is_active',
-    )
-    .in('id', productIds)
-
-  if (error) {
+  const sql = getSql()
+  let products: Array<{
+    id: string
+    price_monthly: string | number | null
+    price_quarterly: string | number | null
+    price_yearly: string | number | null
+    box_type: string | null
+    is_active: boolean
+  }>
+  try {
+    products = await sql`
+      SELECT id, price_monthly, price_quarterly, price_yearly, box_type, is_active
+      FROM products
+      WHERE id = ANY(${sql.array(productIds)}::uuid[])
+    `
+  } catch {
     return { ok: false, error: 'Erro ao carregar produtos' }
   }
 
-  const byId = new Map((products ?? []).map((p) => [p.id, p]))
+  const byId = new Map(
+    products.map((p) => [
+      p.id,
+      {
+        ...p,
+        price_monthly:
+          p.price_monthly == null ? null : asNumber(p.price_monthly),
+        price_quarterly:
+          p.price_quarterly == null ? null : asNumber(p.price_quarterly),
+        price_yearly: p.price_yearly == null ? null : asNumber(p.price_yearly),
+      },
+    ]),
+  )
   let productsSubtotal = 0
   const packageItems: PackageItem[] = []
   // Peso/volume físico: 3meses/6meses despacham N× o pacote mensal.
