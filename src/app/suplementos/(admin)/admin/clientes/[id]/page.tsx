@@ -8,7 +8,6 @@ import { PLAN_LABELS } from '@/lib/plans'
 import { getProductDisplayName } from '@/lib/product-display-names'
 import { isNorteNordeste } from '@/lib/shipping/sender-region'
 import { getUserProfile } from '@/lib/auth/profile'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 type AddressRow = {
@@ -235,7 +234,6 @@ export default async function AdminClienteDetalhePage({
 
   if (profile?.role !== 'admin') redirect('/suplementos/dashboard')
 
-  const admin = createAdminClient()
   const { id } = await params
   const sql = getSql()
 
@@ -345,7 +343,6 @@ export default async function AdminClienteDetalhePage({
     protocols.map(async (p) => ({
       ...p,
       prescription_pdf_signed_url: await createPrescriptionPdfSignedUrl(
-        admin,
         p.prescription_pdf_path,
       ),
     })),

@@ -4,7 +4,7 @@ import { getSql, withTransaction } from '@/lib/db'
 import { generatePrescriptionPdf } from '@/lib/pdf/generator'
 import { createPrescriptionPdfSignedUrl } from '@/lib/pdf/signed-url'
 import { sendToPharmacyWithPdf } from '@/lib/pharmacy/sender'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { enviarPdf } from '@/lib/s3/prescricoes'
 import { createClient } from '@/lib/supabase/server'
 import type { PharmacyOrder } from '@/types/pharmacy'
 
@@ -71,7 +71,6 @@ export async function POST(request: NextRequest) {
     }
 
     const sql = getSql()
-    const admin = createAdminClient()
 
     const protocolRows = await sql<ProtocolRow[]>`
       SELECT p.*,
@@ -174,20 +173,14 @@ export async function POST(request: NextRequest) {
     })
 
     const fileName = `${protocol_id}.pdf`
-    const { error: uploadError } = await admin.storage
-      .from('prescricoes')
-      .upload(fileName, buffer, {
-        contentType: 'application/pdf',
-        upsert: true,
-      })
-
-    if (uploadError) {
+    try {
+      await enviarPdf(fileName, buffer)
+    } catch (uploadError) {
       console.error('Upload error:', uploadError)
       return NextResponse.json({ error: 'Erro ao salvar PDF' }, { status: 500 })
     }
 
-    const pdfUrl =
-      (await createPrescriptionPdfSignedUrl(admin, fileName)) ?? ''
+    const pdfUrl = (await createPrescriptionPdfSignedUrl(fileName)) ?? ''
 
     const ipAddress = request.headers.get('x-forwarded-for') ?? 'unknown'
     const userAgent = request.headers.get('user-agent') ?? 'unknown'
@@ -214,7 +207,7 @@ export async function POST(request: NextRequest) {
             ${signedAt},
             ${ipAddress},
             ${userAgent},
-            ${pdfUrl},
+            ${null},
             ${hash},
             ${tx.json(protocol as never)}
           )

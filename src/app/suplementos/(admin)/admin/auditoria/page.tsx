@@ -5,7 +5,6 @@ import {
   type IntegridadePdf,
   verificarIntegridadePdf,
 } from '@/lib/pdf/verificar-integridade'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 type AuditLogRow = {
@@ -64,13 +63,12 @@ export default async function AdminAuditoriaPage() {
     ORDER BY l.signed_at DESC
     LIMIT 100
   `
-  const admin = createAdminClient()
   const protocolIds = [
     ...new Set(auditLogs.map((log) => log.protocol_id).filter(Boolean)),
   ]
   const integridadeEntries = await Promise.all(
     protocolIds.map(async (protocolId) => {
-      const estado = await verificarIntegridadePdf(admin, protocolId)
+      const estado = await verificarIntegridadePdf(protocolId)
       return [protocolId, estado] as const
     }),
   )

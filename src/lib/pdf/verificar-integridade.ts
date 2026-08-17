@@ -1,8 +1,6 @@
 import { createHash } from 'node:crypto'
 import { getSql } from '@/lib/db'
-import type { createAdminClient } from '@/lib/supabase/admin'
-
-type AdminClient = ReturnType<typeof createAdminClient>
+import { baixarPdf } from '@/lib/s3/prescricoes'
 
 /**
  * `alterado` é acusação: significa que o documento foi baixado e não confere
@@ -24,7 +22,6 @@ function hashPdfBuffer(buffer: Buffer): string {
 }
 
 export async function verificarIntegridadePdf(
-  admin: AdminClient,
   protocolId: string,
 ): Promise<IntegridadePdf> {
   const sql = getSql()
@@ -43,14 +40,11 @@ export async function verificarIntegridadePdf(
     LIMIT 1
   `
   const path = protocolRows[0]?.prescription_pdf_path?.trim()
-  if (!path) return 'alterado'
+  if (!path) return 'indisponivel'
 
-  const { data: file, error } = await admin.storage
-    .from('prescricoes')
-    .download(path)
+  const file = await baixarPdf(path)
+  if (!file) return 'indisponivel'
 
-  if (error || !file) return 'alterado'
-
-  const atual = hashPdfBuffer(Buffer.from(await file.arrayBuffer()))
+  const atual = hashPdfBuffer(file)
   return atual === storedHash ? 'integro' : 'alterado'
 }

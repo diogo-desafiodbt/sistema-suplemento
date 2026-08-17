@@ -5,7 +5,6 @@ import {
   injectPrescriptionPdfUrl,
 } from '@/lib/pdf/signed-url'
 import { isFarmaciaAuthorized, parseDateRange } from '@/lib/pharmacy/pull-api'
-import { createAdminClient } from '@/lib/supabase/admin'
 
 type OrderRow = {
   id: string
@@ -27,7 +26,6 @@ export async function GET(request: NextRequest) {
     }
 
     const sql = getSql()
-    const admin = createAdminClient()
     const gte = range.gte ?? null
     const lt = range.lt ?? null
 
@@ -47,7 +45,6 @@ export async function GET(request: NextRequest) {
     const result = await Promise.all(
       orders.map(async (o) => {
         const signedUrl = await createPrescriptionPdfSignedUrl(
-          admin,
           o.prescription_pdf_path,
         )
         return {
