@@ -53,7 +53,7 @@ export async function POST(_request: NextRequest) {
       SELECT id, status, expires_at, pagarme_sub_id, plan_type
       FROM subscriptions
       WHERE user_id = ${user.id}::uuid
-        AND status = ANY(${sql.array(['active', 'past_due', 'grace_period'])}::text[])
+        AND status = ANY(${sql.array(['active', 'past_due', 'grace_period'])}::subscription_status[])
       ORDER BY created_at DESC
       LIMIT 1
     `

@@ -28,7 +28,7 @@ export const supportPendingReminder = inngest.createFunction(
     const sql = getSql()
     const countRows = await sql<{ n: string | number }[]>`
       SELECT COUNT(*) AS n FROM support_threads
-      WHERE status = ANY(${sql.array(['aguardando_revisao', 'aguardando_dados'])}::text[])
+      WHERE status = ANY(${sql.array(['aguardando_revisao', 'aguardando_dados'])}::support_thread_status[])
     `
     const pending = asNumber(countRows[0]?.n)
     if (pending < 1) {

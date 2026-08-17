@@ -35,7 +35,7 @@ export default async function AdminSuportePage() {
         ) ORDER BY m.created_at) AS list
         FROM support_messages m WHERE m.thread_id = t.id
       ) msgs ON true
-      WHERE t.status = ANY(${sql.array(['aguardando_revisao', 'aguardando_dados', 'novo'])}::text[])
+      WHERE t.status = ANY(${sql.array(['aguardando_revisao', 'aguardando_dados', 'novo'])}::support_thread_status[])
       ORDER BY t.last_message_at DESC
       LIMIT 500
     `,

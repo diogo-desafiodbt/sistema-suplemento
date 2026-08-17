@@ -317,7 +317,13 @@ export const supportInboxPoll = inngest.createFunction(
       }
     } finally {
       lock.release()
-      await client.logout()
+      try {
+        await client.logout()
+      } catch (logoutError) {
+        // A conexão já pode ter morrido (socket timeout do IMAP). O trabalho
+        // desta run já terminou; encerrar mal não deve reprovar a run.
+        console.warn('support-inbox-poll: logout do IMAP falhou:', logoutError)
+      }
     }
 
     return { ok: true, processed }
