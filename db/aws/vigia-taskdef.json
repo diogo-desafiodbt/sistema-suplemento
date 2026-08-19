@@ -1,0 +1,33 @@
+{
+  "family": "vigia",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::768102455037:role/ecsTaskExecutionRole",
+  "containerDefinitions": [
+    {
+      "name": "psql",
+      "image": "public.ecr.aws/docker/library/postgres:17-alpine",
+      "essential": true,
+      "environment": [
+        { "name": "PGSSLMODE", "value": "require" },
+        { "name": "PGHOST", "value": "desafiodiabetes.c0fsqek8ykxr.us-east-1.rds.amazonaws.com" },
+        { "name": "PGUSER", "value": "vigia" },
+        { "name": "PGDATABASE", "value": "clinico" }
+      ],
+      "secrets": [
+        { "name": "PGPASSWORD", "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:rds/VIGIA_PASSWORD" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/vigia",
+          "awslogs-create-group": "true",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "psql"
+        }
+      }
+    }
+  ]
+}
