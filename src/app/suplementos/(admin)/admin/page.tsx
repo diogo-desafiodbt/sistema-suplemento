@@ -328,7 +328,7 @@ export default async function AdminVisaoGeralPage({
 
   const webhookCountRows = await sql<{ n: number }[]>`
     SELECT COUNT(*)::int AS n FROM webhook_logs
-    WHERE processed = false AND created_at >= ${sevenDaysAgo}::timestamptz
+    WHERE processed = false AND received_at >= ${sevenDaysAgo}::timestamptz
   `
   const webhookCount = webhookCountRows[0]?.n ?? 0
 

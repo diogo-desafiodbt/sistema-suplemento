@@ -115,6 +115,7 @@ export async function POST(request: NextRequest) {
       FROM professionals pf
       LEFT JOIN users u ON u.id = pf.user_id
       WHERE pf.user_id = ${user.id}::uuid
+        AND pf.is_active = true
       LIMIT 1
     `
 
