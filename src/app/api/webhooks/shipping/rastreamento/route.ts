@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { getSql } from '@/lib/db'
 import { isBearerTokenAuthorizedComTransicao } from '@/lib/security/token'
 import { summarizeShippingWebhookPayload } from '@/lib/security/webhook-payload'
-import { mergeTrackingEvents } from '@/lib/shipping/create-label'
+import { mergeTrackingEvents } from '@/lib/shipping/tracking-events'
 import {
   getNewTrackingEvents,
   notifyNewTrackingEvents,

@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { getUserProfile } from '@/lib/auth/profile'
 import { getSql } from '@/lib/db'
-import { mergeTrackingEvents } from '@/lib/shipping/create-label'
+import { mergeTrackingEvents } from '@/lib/shipping/tracking-events'
 import { getRastreamento } from '@/lib/shipping/envie-agora/rastreamento'
 import {
   getNewTrackingEvents,

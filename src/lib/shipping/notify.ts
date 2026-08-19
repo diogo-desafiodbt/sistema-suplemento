@@ -1,7 +1,7 @@
 import { Resend } from 'resend'
 import { getSql } from '@/lib/db'
 import { claimOnce, markClaimCompleted, releaseClaim } from '@/lib/idempotency'
-import { trackingEventKey } from '@/lib/shipping/create-label'
+import { trackingEventKey } from '@/lib/shipping/tracking-events'
 import { getAppBaseUrl } from '@/lib/url-base'
 import type { RastreamentoEvento } from '@/types/shipping'
 
