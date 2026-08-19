@@ -66,6 +66,16 @@ BEGIN
 
   EXECUTE format('REVOKE UPDATE ON public.users FROM app_web');
   EXECUTE format('GRANT UPDATE (%s) ON public.users TO app_web', colunas);
+
+  -- O mesmo vale para o INSERT, e isso passou batido até 19/08/2026: a
+  -- aplicação podia criar um usuário JÁ administrador. `garantirPerfil`
+  -- omite a coluna e o DEFAULT 'patient' resolve o caso legítimo.
+  --
+  -- Revogar só a coluna não adianta: a concessão de INSERT era de tabela
+  -- inteira, e concessão ampla continua cobrindo a coluna revogada. Tem que
+  -- revogar amplo e conceder estreito — como acima.
+  EXECUTE format('REVOKE INSERT ON public.users FROM app_web');
+  EXECUTE format('GRANT INSERT (%s) ON public.users TO app_web', colunas);
 END
 $$;
 

@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import { garantirPerfil } from '@/lib/auth/garantir-perfil'
 import { getSql } from '@/lib/db'
 import { createClient } from '@/lib/supabase/server'
 
 export async function POST(request: Request) {
+  let userId: string | undefined
   try {
     const supabase = await createClient()
     const {
@@ -12,6 +14,14 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json({ ok: false }, { status: 401 })
     }
+
+    userId = user.id
+    const metaName = user.user_metadata?.full_name
+    await garantirPerfil({
+      id: user.id,
+      email: user.email ?? '',
+      fullName: typeof metaName === 'string' ? metaName : null,
+    })
 
     const sql = getSql()
     await sql`
@@ -32,7 +42,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error('Login event error:', error)
+    console.error('Login event error:', {
+      userId,
+      message: error instanceof Error ? error.message : String(error),
+      error,
+    })
     return NextResponse.json({ ok: true })
   }
 }

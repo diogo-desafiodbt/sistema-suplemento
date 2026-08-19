@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { type NextRequest, NextResponse } from 'next/server'
 import postgres from 'postgres'
 import { z } from 'zod'
+import { garantirPerfil } from '@/lib/auth/garantir-perfil'
 import { computeServerCheckoutTotal } from '@/lib/checkout/price'
 import { getSql, withTransaction } from '@/lib/db'
 import { inngest } from '@/lib/inngest/client'
@@ -744,6 +745,13 @@ export async function POST(request: NextRequest) {
     }
 
     const sql = getSql()
+
+    const metaName = user.user_metadata?.full_name
+    await garantirPerfil({
+      id: user.id,
+      email: user.email ?? '',
+      fullName: typeof metaName === 'string' ? metaName : null,
+    })
 
     const profileRows = await sql<
       { full_name: string; email: string; client_code: string }[]
