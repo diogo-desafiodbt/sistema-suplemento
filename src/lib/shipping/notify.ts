@@ -2,6 +2,7 @@ import { Resend } from 'resend'
 import { getSql } from '@/lib/db'
 import { claimOnce, markClaimCompleted, releaseClaim } from '@/lib/idempotency'
 import { trackingEventKey } from '@/lib/shipping/create-label'
+import { getAppBaseUrl } from '@/lib/url-base'
 import type { RastreamentoEvento } from '@/types/shipping'
 
 export type ShippingNotificationKind = 'dispatched' | 'tracking' | 'delivered'
@@ -12,16 +13,6 @@ function escapeHtml(text: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-}
-
-function getAppBaseUrl(): string {
-  if (process.env.NEXT_PUBLIC_APP_URL) {
-    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')
-  }
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`
-  }
-  return 'https://desafiodiabetes.com'
 }
 
 /** Eventos do payload que ainda não estavam em `orders.shipping_json.eventos`. */

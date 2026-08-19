@@ -1,16 +1,7 @@
 import { Resend } from 'resend'
 import { asNumber, getSql } from '@/lib/db'
+import { getAppBaseUrl } from '@/lib/url-base'
 import { inngest } from '../client'
-
-function getAppBaseUrl(): string {
-  if (process.env.NEXT_PUBLIC_APP_URL) {
-    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')
-  }
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`
-  }
-  return 'https://desafiodiabetes.com'
-}
 
 export const supportPendingReminder = inngest.createFunction(
   {

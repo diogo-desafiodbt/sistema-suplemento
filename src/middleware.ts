@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { type NextRequest, NextResponse } from 'next/server'
 import { getUserProfile } from '@/lib/auth/profile'
+import { getAppBaseUrl } from '@/lib/url-base'
 
 export const runtime = 'nodejs'
 
@@ -81,18 +82,18 @@ export async function middleware(request: NextRequest) {
   const isProtected = isAdmin || isProfessional || isDashboard
 
   if (isProtected && !user) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/suplementos/login'
-    return NextResponse.redirect(url)
+    const dest = new URL('/suplementos/login', getAppBaseUrl())
+    dest.search = request.nextUrl.search
+    return NextResponse.redirect(dest)
   }
 
   if (user && (isAdmin || isProfessional)) {
     const profile = await getUserProfile(user.id)
 
     if (isAdmin && profile?.role !== 'admin') {
-      const url = request.nextUrl.clone()
-      url.pathname = '/suplementos/dashboard'
-      return NextResponse.redirect(url)
+      const dest = new URL('/suplementos/dashboard', getAppBaseUrl())
+      dest.search = request.nextUrl.search
+      return NextResponse.redirect(dest)
     }
 
     if (
@@ -100,16 +101,16 @@ export async function middleware(request: NextRequest) {
       profile?.role !== 'professional' &&
       profile?.role !== 'admin'
     ) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/suplementos/dashboard'
-      return NextResponse.redirect(url)
+      const dest = new URL('/suplementos/dashboard', getAppBaseUrl())
+      dest.search = request.nextUrl.search
+      return NextResponse.redirect(dest)
     }
   }
 
   if (user && path === '/suplementos/login') {
-    const url = request.nextUrl.clone()
-    url.pathname = '/suplementos/dashboard'
-    return NextResponse.redirect(url)
+    const dest = new URL('/suplementos/dashboard', getAppBaseUrl())
+    dest.search = request.nextUrl.search
+    return NextResponse.redirect(dest)
   }
 
   return supabaseResponse

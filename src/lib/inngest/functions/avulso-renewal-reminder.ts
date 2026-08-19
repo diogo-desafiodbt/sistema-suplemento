@@ -1,6 +1,7 @@
 import { Resend } from 'resend'
 import { getSql } from '@/lib/db'
 import { isRecurringPlan } from '@/lib/plans'
+import { getAppBaseUrl } from '@/lib/url-base'
 import { inngest } from '../client'
 
 type ReminderKind = 'd-5' | 'd-1' | 'd+3'
@@ -11,16 +12,6 @@ function escapeHtml(text: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-}
-
-function getAppBaseUrl(): string {
-  if (process.env.NEXT_PUBLIC_APP_URL) {
-    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, '')
-  }
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`
-  }
-  return 'https://desafiodiabetes.com'
 }
 
 async function aindaAtivo(userId: string): Promise<boolean> {

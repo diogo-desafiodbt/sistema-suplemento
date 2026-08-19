@@ -1,11 +1,33 @@
+import { createServerClient } from '@supabase/ssr'
 import { type NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
+  const response = new NextResponse(null, {
+    status: 303,
+    headers: { Location: '/suplementos/login' },
+  })
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!url || !anonKey) {
+    throw new Error(
+      'signout: NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY precisam estar definidas.',
+    )
+  }
+
+  const supabase = createServerClient(url, anonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll()
+      },
+      setAll(cookiesToSet) {
+        for (const { name, value, options } of cookiesToSet) {
+          response.cookies.set(name, value, options)
+        }
+      },
+    },
+  })
+
   await supabase.auth.signOut()
-  return NextResponse.redirect(
-    new URL('/suplementos/login', request.nextUrl.origin),
-    303,
-  )
+  return response
 }
