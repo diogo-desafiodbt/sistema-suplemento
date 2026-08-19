@@ -1,6 +1,7 @@
 import { Resend } from 'resend'
 import { asNumber, getSql } from '@/lib/db'
 import { claimOnce, markClaimCompleted, releaseClaim } from '@/lib/idempotency'
+import { registrarFim, registrarInicio } from '@/lib/jobs/registro'
 import { inngest } from '../client'
 
 function escapeHtml(text: string): string {
@@ -125,6 +126,8 @@ export const purchaseConfirmed = inngest.createFunction(
     triggers: [{ event: 'pagamento/confirmado' }],
   },
   async ({ event }) => {
+    const jobId = await registrarInicio('purchase_confirmed')
+    try {
     const {
       subscription_id,
       user_id,
@@ -201,6 +204,11 @@ export const purchaseConfirmed = inngest.createFunction(
     if (!user?.email) {
       console.error('purchase-confirmed: usuário sem e-mail', user_id)
       await logNotification(user_id, 'failed')
+      await registrarFim(jobId, {
+        status: 'completed',
+        affectedRows: 0,
+        payload: { subscription_id, reason: 'missing_email' },
+      })
       return { ok: false, reason: 'missing_email' }
     }
 
@@ -218,6 +226,11 @@ export const purchaseConfirmed = inngest.createFunction(
     if (!resendApiKey) {
       console.error('purchase-confirmed: RESEND_API_KEY ausente')
       await logNotification(user_id, 'failed')
+      await registrarFim(jobId, {
+        status: 'completed',
+        affectedRows: 0,
+        payload: { subscription_id, reason: 'missing_resend_key' },
+      })
       return { ok: false, reason: 'missing_resend_key' }
     }
 
@@ -255,6 +268,11 @@ export const purchaseConfirmed = inngest.createFunction(
       const existingClaim = existingClaimRows[0] ?? null
 
       if (existingClaim?.completed_at) {
+        await registrarFim(jobId, {
+          status: 'completed',
+          affectedRows: 0,
+          payload: { subscription_id, skipped: 'duplicate_payment' },
+        })
         return {
           ok: true,
           skipped: 'duplicate_payment',
@@ -270,6 +288,11 @@ export const purchaseConfirmed = inngest.createFunction(
           payment.id,
           'completed_at',
         )
+        await registrarFim(jobId, {
+          status: 'completed',
+          affectedRows: 0,
+          payload: { subscription_id, skipped: 'duplicate_payment' },
+        })
         return {
           ok: true,
           skipped: 'duplicate_payment',
@@ -338,6 +361,20 @@ export const purchaseConfirmed = inngest.createFunction(
       'completed_at',
     )
     await logNotification(user_id, 'sent')
+    await registrarFim(jobId, {
+      status: 'completed',
+      affectedRows: 1,
+      payload: { subscription_id, payment_id: payment.id },
+    })
     return { ok: true }
+    } catch (error) {
+      await registrarFim(jobId, {
+        status: 'failed',
+        payload: {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+      throw error
+    }
   },
 )

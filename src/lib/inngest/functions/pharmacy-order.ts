@@ -14,6 +14,7 @@ import {
   type PackageItem,
 } from '@/lib/shipping/package'
 import type { ShippingSelection } from '@/types/shipping'
+import { registrarFim, registrarInicio } from '@/lib/jobs/registro'
 import { inngest } from '../client'
 
 type ProtocolItemRow = {
@@ -111,6 +112,8 @@ export const pharmacyOrder = inngest.createFunction(
     triggers: [{ event: 'pagamento/confirmado' }],
   },
   async ({ event }) => {
+    const jobId = await registrarInicio('pharmacy_order')
+    try {
     const {
       subscription_id,
       user_id,
@@ -348,6 +351,11 @@ export const pharmacyOrder = inngest.createFunction(
       const existingClaim = existingClaimRows[0] ?? null
 
       if (existingClaim?.completed_at) {
+        await registrarFim(jobId, {
+          status: 'completed',
+          affectedRows: 0,
+          payload: { subscription_id, skipped: 'already_dispatched' },
+        })
         return {
           ok: true,
           skipped: 'already_dispatched',
@@ -369,6 +377,11 @@ export const pharmacyOrder = inngest.createFunction(
           payment.id,
           'completed_at',
         )
+        await registrarFim(jobId, {
+          status: 'completed',
+          affectedRows: 0,
+          payload: { subscription_id, skipped: 'already_dispatched' },
+        })
         return {
           ok: true,
           skipped: 'already_dispatched',
@@ -399,6 +412,11 @@ export const pharmacyOrder = inngest.createFunction(
           payment.id,
           'completed_at',
         )
+        await registrarFim(jobId, {
+          status: 'completed',
+          affectedRows: 0,
+          payload: { subscription_id, skipped: 'reclaimed_complete_order' },
+        })
         return {
           ok: true,
           skipped: 'reclaimed_complete_order',
@@ -493,6 +511,20 @@ export const pharmacyOrder = inngest.createFunction(
       'completed_at',
     )
 
+    await registrarFim(jobId, {
+      status: 'completed',
+      affectedRows: 1,
+      payload: { subscription_id, orderId },
+    })
     return { orderId }
+    } catch (error) {
+      await registrarFim(jobId, {
+        status: 'failed',
+        payload: {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+      throw error
+    }
   },
 )

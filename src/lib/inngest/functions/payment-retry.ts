@@ -1,5 +1,6 @@
 import { Resend } from 'resend'
 import { getSql, withTransaction } from '@/lib/db'
+import { registrarFim, registrarInicio } from '@/lib/jobs/registro'
 import { inngest } from '../client'
 
 // TODO: trocar pelo link de autoatendimento (/dashboard/assinatura) quando essa página existir
@@ -236,6 +237,10 @@ export const paymentRetry = inngest.createFunction(
     triggers: [{ event: 'pagamento/falhou' }],
   },
   async ({ event, step }) => {
+    const jobId = await step.run('registrar-inicio', () =>
+      registrarInicio('payment_retry'),
+    )
+    try {
     const { subscription_id, user_id } = event.data as {
       subscription_id: string
       user_id: string
@@ -254,6 +259,11 @@ export const paymentRetry = inngest.createFunction(
     })
 
     if (!planInfo || planInfo.plan_type === '1mes') {
+      await registrarFim(jobId, {
+        status: 'completed',
+        affectedRows: 0,
+        payload: { subscription_id, skipped: 'plano-avulso' },
+      })
       return { skipped: 'plano-avulso' }
     }
 
@@ -276,18 +286,33 @@ export const paymentRetry = inngest.createFunction(
 
     await step.sleep('aguardar-d2', '2d')
     if (await step.run('checar-d2', () => assinaturaAtiva(subscription_id))) {
+      await registrarFim(jobId, {
+        status: 'completed',
+        affectedRows: 0,
+        payload: { subscription_id, stopped: 'resolvido-antes-d2' },
+      })
       return { stopped: 'resolvido-antes-d2' }
     }
     await step.run('lembrete-d2', () => sendPaymentFailedEmail(user_id, 'd2'))
 
     await step.sleep('aguardar-d5', '3d')
     if (await step.run('checar-d5', () => assinaturaAtiva(subscription_id))) {
+      await registrarFim(jobId, {
+        status: 'completed',
+        affectedRows: 0,
+        payload: { subscription_id, stopped: 'resolvido-antes-d5' },
+      })
       return { stopped: 'resolvido-antes-d5' }
     }
     await step.run('lembrete-d5', () => sendPaymentFailedEmail(user_id, 'd5'))
 
     await step.sleep('aguardar-d9', '4d')
     if (await step.run('checar-d9', () => assinaturaAtiva(subscription_id))) {
+      await registrarFim(jobId, {
+        status: 'completed',
+        affectedRows: 0,
+        payload: { subscription_id, stopped: 'resolvido-antes-d9' },
+      })
       return { stopped: 'resolvido-antes-d9' }
     }
     await step.run('lembrete-d9', () => sendPaymentFailedEmail(user_id, 'd9'))
@@ -297,6 +322,11 @@ export const paymentRetry = inngest.createFunction(
     if (
       await step.run('checar-fim-grace', () => assinaturaAtiva(subscription_id))
     ) {
+      await registrarFim(jobId, {
+        status: 'completed',
+        affectedRows: 0,
+        payload: { subscription_id, stopped: 'resolvido-antes-fim-grace' },
+      })
       return { stopped: 'resolvido-antes-fim-grace' }
     }
 
@@ -339,6 +369,20 @@ export const paymentRetry = inngest.createFunction(
       })
     })
 
+    await registrarFim(jobId, {
+      status: 'completed',
+      affectedRows: 1,
+      payload: { subscription_id, result: 'canceled' },
+    })
     return { result: 'canceled' }
+    } catch (error) {
+      await registrarFim(jobId, {
+        status: 'failed',
+        payload: {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+      throw error
+    }
   },
 )

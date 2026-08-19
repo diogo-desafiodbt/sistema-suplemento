@@ -3,6 +3,7 @@ import { simpleParser } from 'mailparser'
 import postgres from 'postgres'
 import { getSql } from '@/lib/db'
 import { claimOnce, markClaimCompleted, releaseClaim } from '@/lib/idempotency'
+import { registrarFim, registrarInicio } from '@/lib/jobs/registro'
 import { normalizeMessageId } from '@/lib/support/message-id'
 import { inngest } from '../client'
 
@@ -65,12 +66,15 @@ export const supportInboxPoll = inngest.createFunction(
     triggers: [{ cron: '*/5 * * * *' }],
   },
   async () => {
+    const jobId = await registrarInicio('support_inbox_poll')
+    try {
     const imapHost = process.env.SUPPORT_IMAP_HOST
     const imapUser = process.env.SUPPORT_IMAP_USER
     const imapPassword = process.env.SUPPORT_IMAP_PASSWORD
 
     if (!imapConfigured() || !imapHost || !imapUser || !imapPassword) {
       console.warn('SUPPORT_IMAP_* ausente — poll de suporte ignorado')
+      await registrarFim(jobId, { status: 'completed', affectedRows: 0 })
       return { ok: true, skipped: 'missing_imap_env' }
     }
 
@@ -326,6 +330,19 @@ export const supportInboxPoll = inngest.createFunction(
       }
     }
 
+    await registrarFim(jobId, {
+      status: 'completed',
+      affectedRows: processed,
+    })
     return { ok: true, processed }
+    } catch (error) {
+      await registrarFim(jobId, {
+        status: 'failed',
+        payload: {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+      throw error
+    }
   },
 )

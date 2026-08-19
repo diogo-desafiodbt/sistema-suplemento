@@ -1,5 +1,6 @@
 import { Resend } from 'resend'
 import { getSql } from '@/lib/db'
+import { registrarFim, registrarInicio } from '@/lib/jobs/registro'
 import { isRecurringPlan } from '@/lib/plans'
 import { getAppBaseUrl } from '@/lib/url-base'
 import { inngest } from '../client'
@@ -198,6 +199,10 @@ export const avulsoRenewalReminder = inngest.createFunction(
     triggers: [{ event: 'pagamento/confirmado' }],
   },
   async ({ event, step }) => {
+    const jobId = await step.run('registrar-inicio', () =>
+      registrarInicio('avulso_renewal_reminder'),
+    )
+    try {
     const { subscription_id, user_id } = event.data as {
       subscription_id: string
       user_id: string
@@ -230,6 +235,11 @@ export const avulsoRenewalReminder = inngest.createFunction(
       sub.pagarme_sub_id ||
       !sub.expires_at
     ) {
+      await registrarFim(jobId, {
+        status: 'completed',
+        affectedRows: 0,
+        payload: { subscription_id, skipped: 'plano-e-recorrente' },
+      })
       return { skipped: 'plano-e-recorrente' }
     }
 
@@ -246,6 +256,11 @@ export const avulsoRenewalReminder = inngest.createFunction(
 
     await step.sleepUntil('aguardar-d-5', data5DiasAntes)
     if (await step.run('checar-renovou-1', () => aindaAtivo(user_id))) {
+      await registrarFim(jobId, {
+        status: 'completed',
+        affectedRows: 0,
+        payload: { subscription_id, stopped: 'renovou-antes-d-5' },
+      })
       return { stopped: 'renovou-antes-d-5' }
     }
     await step.run('lembrete-d-5', () =>
@@ -254,6 +269,11 @@ export const avulsoRenewalReminder = inngest.createFunction(
 
     await step.sleepUntil('aguardar-d-1', data1DiaAntes)
     if (await step.run('checar-renovou-2', () => aindaAtivo(user_id))) {
+      await registrarFim(jobId, {
+        status: 'completed',
+        affectedRows: 0,
+        payload: { subscription_id, stopped: 'renovou-antes-d-1' },
+      })
       return { stopped: 'renovou-antes-d-1' }
     }
     await step.run('lembrete-d-1', () =>
@@ -262,12 +282,31 @@ export const avulsoRenewalReminder = inngest.createFunction(
 
     await step.sleepUntil('aguardar-d+3', data3DiasDepois)
     if (await step.run('checar-renovou-3', () => aindaAtivo(user_id))) {
+      await registrarFim(jobId, {
+        status: 'completed',
+        affectedRows: 0,
+        payload: { subscription_id, stopped: 'renovou-apos-expirar' },
+      })
       return { stopped: 'renovou-apos-expirar' }
     }
     await step.run('reativacao-d+3', () =>
       sendRenewalReminderEmail(user_id, 'd+3'),
     )
 
+    await registrarFim(jobId, {
+      status: 'completed',
+      affectedRows: 3,
+      payload: { subscription_id, result: 'sequencia-concluida' },
+    })
     return { result: 'sequencia-concluida' }
+    } catch (error) {
+      await registrarFim(jobId, {
+        status: 'failed',
+        payload: {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+      throw error
+    }
   },
 )

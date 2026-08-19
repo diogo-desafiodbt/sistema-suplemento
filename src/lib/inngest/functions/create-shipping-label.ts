@@ -1,4 +1,5 @@
 import { getSql } from '@/lib/db'
+import { registrarFim, registrarInicio } from '@/lib/jobs/registro'
 import { createShippingLabelForOrder } from '@/lib/shipping/create-label'
 import { addBusinessDays } from '@/lib/shipping/estimate'
 import { inngest } from '../client'
@@ -12,6 +13,10 @@ export const createShippingLabel = inngest.createFunction(
     triggers: [{ event: 'pagamento/confirmado' }],
   },
   async ({ event, step }) => {
+    const jobId = await step.run('registrar-inicio', () =>
+      registrarInicio('create_shipping_label'),
+    )
+    try {
     const { subscription_id, user_id } = event.data as {
       subscription_id: string
       user_id: string
@@ -63,17 +68,40 @@ export const createShippingLabel = inngest.createFunction(
         return createShippingLabelForOrder(order.id)
       })
 
+      await registrarFim(jobId, {
+        status: 'completed',
+        affectedRows: 1,
+        payload: { subscription_id, ok: true },
+      })
       return { ok: true, pickupDate: pickupDateIso, ...result }
     } catch (error) {
       console.error(
         `[create-shipping-label] Falha na subscription ${subscription_id}:`,
         error,
       )
+      await registrarFim(jobId, {
+        status: 'failed',
+        affectedRows: 0,
+        payload: {
+          subscription_id,
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
       return {
         ok: false,
         pickupDate: pickupDateIso,
         error: error instanceof Error ? error.message : String(error),
       }
+    }
+    } catch (error) {
+      await registrarFim(jobId, {
+        status: 'failed',
+        payload: {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+      throw error
     }
   },
 )

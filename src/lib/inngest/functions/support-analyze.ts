@@ -1,5 +1,6 @@
 import { claimByFlag, releaseFlag } from '@/lib/idempotency'
 import { getSql } from '@/lib/db'
+import { registrarFim, registrarInicio } from '@/lib/jobs/registro'
 import { classifySupportThread, draftSupportReply } from '@/lib/support/ai'
 import { fetchSupportFacts, hasRelevantFacts } from '@/lib/support/facts'
 import { identifySupportUser } from '@/lib/support/identify'
@@ -17,6 +18,8 @@ export const supportAnalyze = inngest.createFunction(
     triggers: [{ event: 'suporte/email-recebido' }],
   },
   async ({ event }) => {
+    const jobId = await registrarInicio('support_analyze')
+    try {
     const threadId = (event.data as { thread_id?: string }).thread_id
     if (!threadId)
       throw new Error('Evento suporte/email-recebido sem thread_id')
@@ -113,6 +116,11 @@ export const supportAnalyze = inngest.createFunction(
         SET status = 'aguardando_dados', db_facts = NULL, suggested_reply = NULL
         WHERE id = ${threadId}::uuid
       `
+      await registrarFim(jobId, {
+        status: 'completed',
+        affectedRows: 1,
+        payload: { thread_id: threadId, status: 'aguardando_dados' },
+      })
       return { ok: true, status: 'aguardando_dados' }
     }
 
@@ -154,6 +162,20 @@ export const supportAnalyze = inngest.createFunction(
       WHERE id = ${threadId}::uuid
     `
 
+    await registrarFim(jobId, {
+      status: 'completed',
+      affectedRows: 1,
+      payload: { thread_id: threadId, status: 'aguardando_revisao' },
+    })
     return { ok: true, status: 'aguardando_revisao', category }
+    } catch (error) {
+      await registrarFim(jobId, {
+        status: 'failed',
+        payload: {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+      throw error
+    }
   },
 )

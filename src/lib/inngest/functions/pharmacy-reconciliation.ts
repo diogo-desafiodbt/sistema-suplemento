@@ -1,5 +1,6 @@
 import { Resend } from 'resend'
 import { getSql } from '@/lib/db'
+import { registrarFim, registrarInicio } from '@/lib/jobs/registro'
 import { inngest } from '../client'
 
 const PHARMACY_EMAIL = 'diretorcomercialtk2@gmail.com'
@@ -35,7 +36,20 @@ export const pharmacyReconciliation = inngest.createFunction(
     triggers: [{ cron: 'TZ=America/Sao_Paulo 0 9 * * *' }],
   },
   async ({ step }) => {
-    const report = await step.run('reconciliar-ontem', async () => {
+    const jobId = await step.run('registrar-inicio', () =>
+      registrarInicio('pharmacy_reconciliation'),
+    )
+
+    let report: {
+      date: string
+      totalOrders: number
+      totalCalls: number
+      missing: string[]
+      hadCalls: boolean
+      ok: boolean
+    }
+    try {
+    report = await step.run('reconciliar-ontem', async () => {
       const sql = getSql()
       const yesterday = yesterdayInSaoPaulo(new Date())
       const range = dayRangeUtc(yesterday)
@@ -73,26 +87,22 @@ export const pharmacyReconciliation = inngest.createFunction(
         ok: hadCalls && missing.length === 0,
       }
     })
+    } catch (error) {
+      await registrarFim(jobId, {
+        status: 'failed',
+        payload: {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+      throw error
+    }
 
     await step.run('registrar-background-job', async () => {
-      const sql = getSql()
-      try {
-        await sql`
-          INSERT INTO background_jobs (
-            job_type, status, payload, affected_rows, completed_at, started_at
-          )
-          VALUES (
-            'pharmacy_reconciliation',
-            ${report.ok ? 'completed' : 'failed'},
-            ${sql.json(report as never)},
-            ${report.totalOrders},
-            ${new Date().toISOString()},
-            ${new Date().toISOString()}
-          )
-        `
-      } catch (error) {
-        console.error('Erro ao gravar background_jobs da reconciliação:', error)
-      }
+      await registrarFim(jobId, {
+        status: report.ok ? 'completed' : 'failed',
+        payload: report,
+        affectedRows: report.totalOrders,
+      })
     })
 
     await step.run('enviar-email-reconciliacao', async () => {

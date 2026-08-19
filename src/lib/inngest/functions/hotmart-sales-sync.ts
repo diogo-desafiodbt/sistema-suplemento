@@ -3,34 +3,12 @@ import {
   fetchAllSalesHistory,
   type HotmartSaleItem,
 } from '@/lib/hotmart/client'
-import { getSql } from '@/lib/db'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { registrarFim, registrarInicio } from '@/lib/jobs/registro'
 import { inngest } from '../client'
 
 // As tabelas de conteúdo ainda vivem na Supabase; só o registro do job vai
 // para o RDS. Some quando o banco `conteudo` for migrado.
-
-async function insertBackgroundJob(row: {
-  job_type: string
-  status: string
-  payload: unknown
-  affected_rows: number
-  started_at: string
-  completed_at: string
-}) {
-  const sql = getSql()
-  await sql`
-    INSERT INTO background_jobs (job_type, status, payload, affected_rows, started_at, completed_at)
-    VALUES (
-      ${row.job_type},
-      ${row.status},
-      ${sql.json(row.payload as never)},
-      ${row.affected_rows},
-      ${row.started_at},
-      ${row.completed_at}
-    )
-  `
-}
 
 const SP_OFFSET = '-03:00'
 
@@ -97,25 +75,27 @@ export const hotmartSalesSync = inngest.createFunction(
       const admin = createAdminClient()
       const now = new Date()
       const window = lastTwoCalendarDaysWindow(now)
-      const startedAt = now.toISOString()
+      const jobId = await registrarInicio('hotmart_sales_sync')
+
+      const fail = async (error: unknown, extra?: Record<string, unknown>) => {
+        const message =
+          error instanceof Error ? error.message : String(error)
+        await registrarFim(jobId, {
+          status: 'failed',
+          payload: {
+            totalFetched: 0,
+            totalUpserted: 0,
+            windowStart: window.windowStart,
+            windowEnd: window.windowEnd,
+            error: message,
+            ...extra,
+          },
+        })
+      }
 
       const productId = process.env.HOTMART_PRODUCT_ID
       if (!productId) {
-        const payload = {
-          totalFetched: 0,
-          totalUpserted: 0,
-          windowStart: window.windowStart,
-          windowEnd: window.windowEnd,
-          error: 'HOTMART_PRODUCT_ID ausente',
-        }
-        await insertBackgroundJob({
-          job_type: 'hotmart_sales_sync',
-          status: 'failed',
-          payload,
-          affected_rows: 0,
-          started_at: startedAt,
-          completed_at: new Date().toISOString(),
-        })
+        await fail(new Error('HOTMART_PRODUCT_ID ausente'))
         throw new Error('HOTMART_PRODUCT_ID ausente')
       }
 
@@ -127,22 +107,7 @@ export const hotmartSalesSync = inngest.createFunction(
           endDateMs: window.endMs,
         })
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : String(error)
-        await insertBackgroundJob({
-          job_type: 'hotmart_sales_sync',
-          status: 'failed',
-          payload: {
-            totalFetched: 0,
-            totalUpserted: 0,
-            windowStart: window.windowStart,
-            windowEnd: window.windowEnd,
-            error: message,
-          },
-          affected_rows: 0,
-          started_at: startedAt,
-          completed_at: new Date().toISOString(),
-        })
+        await fail(error)
         throw error
       }
 
@@ -160,20 +125,7 @@ export const hotmartSalesSync = inngest.createFunction(
           })
 
         if (upsertError) {
-          await insertBackgroundJob({
-            job_type: 'hotmart_sales_sync',
-            status: 'failed',
-            payload: {
-              totalFetched: items.length,
-              totalUpserted: 0,
-              windowStart: window.windowStart,
-              windowEnd: window.windowEnd,
-              error: upsertError.message,
-            },
-            affected_rows: 0,
-            started_at: startedAt,
-            completed_at: new Date().toISOString(),
-          })
+          await fail(upsertError, { totalFetched: items.length })
           throw new Error(
             `Erro ao upsert hotmart_sales: ${upsertError.message}`,
           )
@@ -188,21 +140,11 @@ export const hotmartSalesSync = inngest.createFunction(
         windowEnd: window.windowEnd,
       }
 
-      try {
-        await insertBackgroundJob({
-          job_type: 'hotmart_sales_sync',
-          status: 'completed',
-          payload,
-          affected_rows: totalUpserted,
-          started_at: startedAt,
-          completed_at: new Date().toISOString(),
-        })
-      } catch (jobError) {
-        console.error(
-          'Erro ao gravar background_jobs do hotmart_sales_sync:',
-          jobError,
-        )
-      }
+      await registrarFim(jobId, {
+        status: 'completed',
+        payload,
+        affectedRows: totalUpserted,
+      })
 
       return payload
     })

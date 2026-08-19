@@ -1,4 +1,3 @@
-import { getSql } from '@/lib/db'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
   addDaysIso,
@@ -15,32 +14,11 @@ import {
   monthBounds,
   todaySp,
 } from '@/lib/youtube/client'
+import { registrarFim, registrarInicio } from '@/lib/jobs/registro'
 import { inngest } from '../client'
 
 // As tabelas de conteúdo ainda vivem na Supabase; só o registro do job vai
 // para o RDS. Some quando o banco `conteudo` for migrado.
-
-async function insertBackgroundJob(row: {
-  job_type: string
-  status: string
-  payload: unknown
-  affected_rows: number
-  started_at: string
-  completed_at: string
-}) {
-  const sql = getSql()
-  await sql`
-    INSERT INTO background_jobs (job_type, status, payload, affected_rows, started_at, completed_at)
-    VALUES (
-      ${row.job_type},
-      ${row.status},
-      ${sql.json(row.payload as never)},
-      ${row.affected_rows},
-      ${row.started_at},
-      ${row.completed_at}
-    )
-  `
-}
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms))
@@ -57,38 +35,17 @@ type Janela = {
   retencaoInicio: string
 }
 
-async function registrarFalha(error: unknown) {
-  const end = todaySp()
-  const start = addDaysIso(end, -6)
-  const message = error instanceof Error ? error.message : String(error)
-  await insertBackgroundJob({
-    job_type: 'youtube_analytics_sync',
-    status: 'failed',
-    payload: {
-      windowStart: start,
-      windowEnd: end,
-      error: message,
-    },
-    affected_rows: 0,
-    started_at: new Date().toISOString(),
-    completed_at: new Date().toISOString(),
-  })
-}
-
 export const youtubeAnalyticsSync = inngest.createFunction(
   {
     id: 'youtube-analytics-sync',
     name: 'Sync diário YouTube Analytics',
     triggers: [{ cron: 'TZ=America/Sao_Paulo 0 8 * * *' }],
-    onFailure: async ({ error }) => {
-      try {
-        await registrarFalha(error)
-      } catch (err) {
-        console.error('youtube-analytics-sync onFailure:', err)
-      }
-    },
   },
   async ({ step }) => {
+    const jobId = await step.run('registrar-inicio', () =>
+      registrarInicio('youtube_analytics_sync'),
+    )
+    try {
     const janela = await step.run('calcular-janela', async (): Promise<Janela> => {
       const now = new Date()
       const end = todaySp(now)
@@ -284,23 +241,22 @@ export const youtubeAnalyticsSync = inngest.createFunction(
     }
 
     await step.run('registrar-background-job', async () => {
-      try {
-        await insertBackgroundJob({
-          job_type: 'youtube_analytics_sync',
-          status: 'completed',
-          payload,
-          affected_rows: videoDiarioRows + videosMetadata,
-          started_at: janela.startedAt,
-          completed_at: new Date().toISOString(),
-        })
-      } catch (error) {
-        console.error(
-          'Erro ao gravar background_jobs do youtube_analytics_sync:',
-          error,
-        )
-      }
+      await registrarFim(jobId, {
+        status: 'completed',
+        payload,
+        affectedRows: videoDiarioRows + videosMetadata,
+      })
     })
 
     return payload
+    } catch (error) {
+      await registrarFim(jobId, {
+        status: 'failed',
+        payload: {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+      throw error
+    }
   },
 )

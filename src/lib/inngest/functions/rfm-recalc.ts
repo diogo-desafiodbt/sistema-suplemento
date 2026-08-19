@@ -1,4 +1,5 @@
 import { asNumber, getSql } from '@/lib/db'
+import { registrarFim, registrarInicio } from '@/lib/jobs/registro'
 import { inngest } from '../client'
 
 function calcRecencyScore(lastLoginAt: string | Date | null): number {
@@ -60,32 +61,16 @@ export const rfmRecalc = inngest.createFunction(
   async ({ step }) => {
     const result = await step.run('recalcular-rfm', async () => {
       const sql = getSql()
-      const startedAt = new Date().toISOString()
+      const jobId = await registrarInicio('rfm_recalc')
 
-      const jobRows = await sql<{ id: string }[]>`
-        INSERT INTO background_jobs (job_type, status, started_at)
-        VALUES ('rfm_recalc', 'running', ${startedAt})
-        RETURNING id
-      `
-      const job = jobRows[0]
-      if (!job) {
-        throw new Error('rfm-recalc: insert background_jobs sem id')
-      }
-
+      try {
       const users = await sql<{ id: string }[]>`
         SELECT id FROM users
         WHERE rfm_recalc_queued_at IS NOT NULL
       `
 
       if (users.length === 0) {
-        await sql`
-          UPDATE background_jobs
-          SET
-            status = 'completed',
-            completed_at = ${new Date().toISOString()},
-            affected_rows = 0
-          WHERE id = ${job.id}::uuid
-        `
+        await registrarFim(jobId, { status: 'completed', affectedRows: 0 })
         return { recalculated: 0 }
       }
 
@@ -172,16 +157,21 @@ export const rfmRecalc = inngest.createFunction(
         WHERE id = ANY(${sql.array(userIds)}::uuid[])
       `
 
-      await sql`
-        UPDATE background_jobs
-        SET
-          status = 'completed',
-          completed_at = ${new Date().toISOString()},
-          affected_rows = ${processed}
-        WHERE id = ${job.id}::uuid
-      `
+      await registrarFim(jobId, {
+        status: 'completed',
+        affectedRows: processed,
+      })
 
       return { recalculated: processed }
+      } catch (error) {
+        await registrarFim(jobId, {
+          status: 'failed',
+          payload: {
+            error: error instanceof Error ? error.message : String(error),
+          },
+        })
+        throw error
+      }
     })
 
     return result

@@ -1,5 +1,6 @@
 import { Resend } from 'resend'
 import { asNumber, getSql } from '@/lib/db'
+import { registrarFim, registrarInicio } from '@/lib/jobs/registro'
 import { getAppBaseUrl } from '@/lib/url-base'
 import { inngest } from '../client'
 
@@ -10,9 +11,16 @@ export const supportPendingReminder = inngest.createFunction(
     triggers: [{ cron: '0 */12 * * *' }],
   },
   async () => {
+    const jobId = await registrarInicio('support_pending_reminder')
+    try {
     const notifyEmail = process.env.SUPPORT_NOTIFY_EMAIL
     if (!notifyEmail) {
       console.warn('SUPPORT_NOTIFY_EMAIL ausente — lembrete ignorado')
+      await registrarFim(jobId, {
+        status: 'completed',
+        affectedRows: 0,
+        payload: { skipped: 'missing_notify_email' },
+      })
       return { ok: true, skipped: 'missing_notify_email' }
     }
 
@@ -23,12 +31,22 @@ export const supportPendingReminder = inngest.createFunction(
     `
     const pending = asNumber(countRows[0]?.n)
     if (pending < 1) {
+      await registrarFim(jobId, {
+        status: 'completed',
+        affectedRows: 0,
+        payload: { pending: 0 },
+      })
       return { ok: true, pending: 0 }
     }
 
     const resendApiKey = process.env.RESEND_API_KEY
     if (!resendApiKey) {
       console.warn('RESEND_API_KEY ausente — lembrete de suporte não enviado')
+      await registrarFim(jobId, {
+        status: 'completed',
+        affectedRows: pending,
+        payload: { ok: false, reason: 'missing_resend_key', pending },
+      })
       return { ok: false, reason: 'missing_resend_key', pending }
     }
 
@@ -45,6 +63,20 @@ export const supportPendingReminder = inngest.createFunction(
       `.trim(),
     })
 
+    await registrarFim(jobId, {
+      status: 'completed',
+      affectedRows: pending,
+      payload: { pending },
+    })
     return { ok: true, pending }
+    } catch (error) {
+      await registrarFim(jobId, {
+        status: 'failed',
+        payload: {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+      throw error
+    }
   },
 )
