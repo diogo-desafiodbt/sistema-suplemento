@@ -1,0 +1,207 @@
+{
+  "containerDefinitions": [
+    {
+      "name": "sistema-entrada",
+      "image": "768102455037.dkr.ecr.us-east-1.amazonaws.com/sistema-suplemento:latest",
+      "cpu": 0,
+      "portMappings": [
+        {
+          "containerPort": 3000,
+          "hostPort": 3000,
+          "protocol": "tcp"
+        }
+      ],
+      "essential": true,
+      "environment": [
+        {
+          "name": "NODE_ENV",
+          "value": "production"
+        }
+      ],
+      "mountPoints": [],
+      "volumesFrom": [],
+      "secrets": [
+        {
+          "name": "NEXT_PUBLIC_SUPABASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/NEXT_PUBLIC_SUPABASE_URL-A6vBQl"
+        },
+        {
+          "name": "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/NEXT_PUBLIC_SUPABASE_ANON_KEY-q4gxCM"
+        },
+        {
+          "name": "SUPABASE_SERVICE_ROLE_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/SUPABASE_SERVICE_ROLE_KEY-dK4c2O"
+        },
+        {
+          "name": "PAGARME_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/PAGARME_API_KEY-cKyqoL"
+        },
+        {
+          "name": "PAGARME_WEBHOOK_TOKEN",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/PAGARME_WEBHOOK_TOKEN-iY1m0t"
+        },
+        {
+          "name": "NEXT_PUBLIC_PAGARME_PUBLIC_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/NEXT_PUBLIC_PAGARME_PUBLIC_KEY-zPbgpz"
+        },
+        {
+          "name": "ENVIE_AGORA_API_TOKEN",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/ENVIE_AGORA_API_TOKEN-98hdNb"
+        },
+        {
+          "name": "ENVIE_AGORA_BASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/ENVIE_AGORA_BASE_URL-OV2JXd"
+        },
+        {
+          "name": "FARMACIA_API_TOKEN",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/FARMACIA_API_TOKEN-rHg8Cb"
+        },
+        {
+          "name": "SHIPPING_WEBHOOK_TOKEN",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/SHIPPING_WEBHOOK_TOKEN-ba4LQn"
+        },
+        {
+          "name": "SUPPORT_IMAP_PORT",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/SUPPORT_IMAP_PORT-zMAQDP"
+        },
+        {
+          "name": "SUPPORT_IMAP_USER",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/SUPPORT_IMAP_USER-kPSH9v"
+        },
+        {
+          "name": "SUPPORT_IMAP_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/SUPPORT_IMAP_PASSWORD-A4rJw4"
+        },
+        {
+          "name": "SUPPORT_SMTP_HOST",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/SUPPORT_SMTP_HOST-1ftnMt"
+        },
+        {
+          "name": "SUPPORT_SMTP_PORT",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/SUPPORT_SMTP_PORT-MvsDqw"
+        },
+        {
+          "name": "SUPPORT_SMTP_USER",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/SUPPORT_SMTP_USER-zgOtx2"
+        },
+        {
+          "name": "SUPPORT_SMTP_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/SUPPORT_SMTP_PASSWORD-4sTzNh"
+        },
+        {
+          "name": "ANTHROPIC_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/ANTHROPIC_API_KEY-iqXUGR"
+        },
+        {
+          "name": "HOTMART_CLIENT_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/HOTMART_CLIENT_ID-d3sxg7"
+        },
+        {
+          "name": "HOTMART_CLIENT_SECRET",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/HOTMART_CLIENT_SECRET-AmLxIz"
+        },
+        {
+          "name": "HOTMART_BASIC_TOKEN",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/HOTMART_BASIC_TOKEN-Z7su95"
+        },
+        {
+          "name": "HOTMART_PRODUCT_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/HOTMART_PRODUCT_ID-qptnOR"
+        },
+        {
+          "name": "OMIE_APP_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/OMIE_APP_KEY-8U4rD2"
+        },
+        {
+          "name": "OMIE_APP_SECRET",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/OMIE_APP_SECRET-utteAr"
+        },
+        {
+          "name": "YOUTUBE_CLIENT_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/YOUTUBE_CLIENT_ID-V0HeYE"
+        },
+        {
+          "name": "YOUTUBE_CLIENT_SECRET",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/YOUTUBE_CLIENT_SECRET-Qba8zz"
+        },
+        {
+          "name": "YOUTUBE_REFRESH_TOKEN",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/YOUTUBE_REFRESH_TOKEN-uxyWdc"
+        },
+        {
+          "name": "YOUTUBE_CHANNEL_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/YOUTUBE_CHANNEL_ID-vGWhsp"
+        },
+        {
+          "name": "SENHA_PRE_LANCAMENTO",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/SENHA_PRE_LANCAMENTO-i9ZND5"
+        },
+        {
+          "name": "RESEND_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/RESEND_API_KEY-jim8Rk"
+        },
+        {
+          "name": "NEXT_PUBLIC_APP_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/NEXT_PUBLIC_APP_URL-hovbJO"
+        },
+        {
+          "name": "FARMACIA_WEBHOOK_TOKEN",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/FARMACIA_WEBHOOK_TOKEN-tCn9BR"
+        },
+        {
+          "name": "FARMACIA_WEBHOOK_TOKEN_ANTERIOR",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/FARMACIA_WEBHOOK_TOKEN_ANTERIOR-dZZSdZ"
+        },
+        {
+          "name": "SHIPPING_WEBHOOK_TOKEN_ANTERIOR",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/SHIPPING_WEBHOOK_TOKEN_ANTERIOR-0fOxev"
+        },
+        {
+          "name": "TRIAGE_SESSION_SECRET",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/TRIAGE_SESSION_SECRET-zmMELZ"
+        },
+        {
+          "name": "DATABASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/DATABASE_URL_ENTRADA"
+        },
+        {
+          "name": "INNGEST_EVENT_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/INNGEST_EVENT_KEY-Mwgejp"
+        },
+        {
+          "name": "INNGEST_SIGNING_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/INNGEST_SIGNING_KEY-IjHc8L"
+        },
+        {
+          "name": "S3_BUCKET_PRESCRICOES",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/S3_BUCKET_PRESCRICOES-nPNw1w"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/sistema-entrada",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "entrada"
+        }
+      },
+      "systemControls": []
+    }
+  ],
+  "family": "sistema-entrada",
+  "taskRoleArn": "arn:aws:iam::768102455037:role/ecsTaskRoleSistema",
+  "executionRoleArn": "arn:aws:iam::768102455037:role/ecsTaskExecutionRole",
+  "networkMode": "awsvpc",
+  "volumes": [],
+  "placementConstraints": [],
+  "runtimePlatform": {
+    "cpuArchitecture": "ARM64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "256",
+  "memory": "512"
+}
