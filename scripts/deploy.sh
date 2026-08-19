@@ -12,6 +12,7 @@ BUCKET="${BUCKET:-desafiodiabetes-builds}"
 CLUSTER="${CLUSTER:-desafiodiabetes}"
 SERVICO="${SERVICO:-sistema-suplemento}"
 PROJETO="${PROJETO:-sistema-suplemento}"
+REGIAO="${REGIAO:-us-east-1}"
 
 echo "→ empacotando o código-fonte"
 # Apagar antes é obrigatório: o `zip` ACRESCENTA a um arquivo existente em vez
@@ -53,5 +54,26 @@ echo "→ subindo no ECS"
 aws ecs update-service --cluster "$CLUSTER" --service "$SERVICO" \
   --force-new-deployment --query 'service.serviceName' --output text > /dev/null
 aws ecs wait services-stable --cluster "$CLUSTER" --services "$SERVICO"
+
+echo "→ re-sincronizando o Inngest"
+# Sem isto, o Inngest continua com o registro anterior até alguém provocar.
+# Foi o que deixou os 13 jobs parados de 16/08 a 19/08.
+# Mesma origem que getAppBaseUrl() — não inventar host.
+# A fonte de verdade é o Secrets Manager: é de lá que a produção lê. O
+# .env.local da máquina de desenvolvimento nem sempre tem a variável, e quando
+# tem costuma ser localhost — que não serve para registrar no Inngest.
+if [ -z "${NEXT_PUBLIC_APP_URL:-}" ]; then
+  NEXT_PUBLIC_APP_URL=$(aws secretsmanager get-secret-value \
+    --region "$REGIAO" --secret-id sistema/NEXT_PUBLIC_APP_URL \
+    --query SecretString --output text 2>/dev/null || true)
+fi
+APP_BASE="${NEXT_PUBLIC_APP_URL:-}"
+APP_BASE="${APP_BASE%/}"
+if [ -z "$APP_BASE" ]; then
+  echo "   AVISO: NEXT_PUBLIC_APP_URL ausente — rode o PUT em /api/inngest à mão antes de confiar nos jobs"
+else
+  curl -sS -X PUT "$APP_BASE/api/inngest" || \
+    echo "   AVISO: a re-sincronização falhou — rode à mão antes de confiar nos jobs"
+fi
 
 echo "pronto"

@@ -13,12 +13,14 @@ import { supportAnalyze } from '@/lib/inngest/functions/support-analyze'
 import { supportInboxPoll } from '@/lib/inngest/functions/support-inbox-poll'
 import { supportPendingReminder } from '@/lib/inngest/functions/support-pending-reminder'
 import { youtubeAnalyticsSync } from '@/lib/inngest/functions/youtube-analytics-sync'
+import { getAppBaseUrl } from '@/lib/url-base'
 
 /** Cinto de segurança: steps do YouTube (metadata ~3.7k + retenção) precisam >60s. */
 export const maxDuration = 300
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
+  serveOrigin: getAppBaseUrl(),
   functions: [
     rfmRecalc,
     pharmacyOrder,
