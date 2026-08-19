@@ -9,6 +9,7 @@ import {
   getPharmacySkuKey,
   getUnitPriceFromProduct,
 } from '@/lib/plans'
+import { ensureProtocolAfterPayment } from '@/lib/protocol/create-from-checkout'
 import {
   computePackageDimensions,
   type PackageItem,
@@ -162,6 +163,33 @@ export const pharmacyOrder = inngest.createFunction(
         }
       }
     }
+
+    const protocolRows = await sql<{ protocol_id: string | null }[]>`
+      SELECT protocol_id FROM subscriptions
+      WHERE id = ${subscription_id}::uuid AND user_id = ${user_id}::uuid
+      LIMIT 1
+    `
+    const protocolRow = protocolRows[0]
+    if (!protocolRow) {
+      throw new Error(`Assinatura não encontrada: ${subscription_id}`)
+    }
+
+    let protocolId = protocolRow.protocol_id
+    if (!protocolId) {
+      protocolId = await ensureProtocolAfterPayment(subscription_id, user_id)
+    }
+    if (!protocolId) {
+      console.error(
+        'pharmacy-order: protocolo ausente após ensureProtocolAfterPayment',
+        subscription_id,
+      )
+      await registrarFim(jobId, {
+        status: 'failed',
+        payload: { subscription_id, reason: 'protocolo_ausente' },
+      })
+      return { ok: false, reason: 'protocolo_ausente' }
+    }
+
     const rows = await sql<SubscriptionRow[]>`
       SELECT
         s.id, s.plan_type, s.user_id, s.protocol_id, s.pending_checkout,

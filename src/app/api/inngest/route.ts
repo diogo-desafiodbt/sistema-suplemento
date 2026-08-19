@@ -7,6 +7,7 @@ import { omieFinanceiroSync } from '@/lib/inngest/functions/omie-financeiro-sync
 import { paymentRetry } from '@/lib/inngest/functions/payment-retry'
 import { pharmacyOrder } from '@/lib/inngest/functions/pharmacy-order'
 import { pharmacyReconciliation } from '@/lib/inngest/functions/pharmacy-reconciliation'
+import { processarProtocolos } from '@/lib/inngest/functions/processar-protocolos'
 import { purchaseConfirmed } from '@/lib/inngest/functions/purchase-confirmed'
 import { rfmRecalc } from '@/lib/inngest/functions/rfm-recalc'
 import { supportAnalyze } from '@/lib/inngest/functions/support-analyze'
@@ -28,6 +29,7 @@ export const { GET, POST, PUT } = serve({
     avulsoRenewalReminder,
     createShippingLabel,
     pharmacyReconciliation,
+    processarProtocolos,
     omieFinanceiroSync,
     hotmartSalesSync,
     youtubeAnalyticsSync,

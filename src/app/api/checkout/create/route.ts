@@ -13,7 +13,6 @@ import {
   type PurchasePlanType,
 } from '@/lib/plans'
 import type { PendingCheckoutPayload } from '@/lib/protocol/create-from-checkout'
-import { ensureProtocolAfterPayment } from '@/lib/protocol/create-from-checkout'
 import { productKeyFromName } from '@/lib/protocol/triage'
 import {
   quizMatchesTriageSession,
@@ -180,7 +179,6 @@ async function finalizePaidSubscription(opts: {
   expiresAt: Date
 }) {
   await activateSubscriptionRow(opts)
-  return ensureProtocolAfterPayment(opts.subscriptionId, opts.userId)
 }
 
 async function recordTermsAcceptance(opts: {
@@ -957,9 +955,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    let protocolId: string | null = null
     if (result.paid) {
-      protocolId = await finalizePaidSubscription({
+      await finalizePaidSubscription({
         subscriptionId: subscription.id,
         userId: user.id,
         expiresAt,
@@ -985,7 +982,7 @@ export async function POST(request: NextRequest) {
       order_id: result.pagarmeId,
       status: result.chargeStatus ?? 'pending',
       subscription_id: subscription.id,
-      protocol_id: protocolId,
+      protocol_id: null,
       results: {
         [resultKey]: {
           ok: true,

@@ -3,7 +3,6 @@ import postgres from 'postgres'
 import { asNumber, getSql } from '@/lib/db'
 import { inngest } from '@/lib/inngest/client'
 import { addPlanPeriod } from '@/lib/plans'
-import { ensureProtocolAfterPayment } from '@/lib/protocol/create-from-checkout'
 import { summarizePagarmePayload } from '@/lib/security/pagarme'
 import { isBearerOrQueryTokenAuthorized } from '@/lib/security/token'
 
@@ -392,10 +391,6 @@ async function handlePaymentSucceeded(
     DO UPDATE SET status = EXCLUDED.status, expires_at = EXCLUDED.expires_at
   `
 
-  if (!skipFulfillment) {
-    await ensureProtocolAfterPayment(subscriptionId, userId)
-  }
-
   if (webhookLogId) {
     await sql`
       UPDATE webhook_logs SET processed = true WHERE id = ${webhookLogId}::uuid
@@ -403,19 +398,6 @@ async function handlePaymentSucceeded(
   }
 
   if (!skipFulfillment && dispatchPharmacy) {
-    const subRows = await sql<{ protocol_id: string | null }[]>`
-      SELECT protocol_id FROM subscriptions
-      WHERE id = ${subscriptionId}::uuid
-      LIMIT 1
-    `
-    const sub = subRows[0] ?? null
-
-    if (!sub?.protocol_id) {
-      throw new Error(
-        `Farmácia não disparada — protocolo ainda ausente para subscription ${subscriptionId}`,
-      )
-    }
-
     try {
       await inngest.send({
         name: 'pagamento/confirmado',
