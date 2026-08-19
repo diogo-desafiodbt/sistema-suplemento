@@ -25,6 +25,19 @@ GRANT USAGE   ON SCHEMA public    TO app_entrada;
 -- ---------------------------------------------------------------------------
 GRANT SELECT ON orders, payments, products, subscriptions, users TO app_entrada;
 
+-- SELECT também nas tabelas em que a entrada escreve. Descoberto em 19/08 com o
+-- serviço isolado: o webhook da Pagar.me devolvia 500 com
+-- `permission denied for table webhook_logs`, mesmo com INSERT e UPDATE
+-- concedidos.
+--
+-- A causa é `INSERT ... RETURNING id`: RETURNING exige SELECT nas colunas
+-- devolvidas. O levantamento tinha classificado essas tabelas como só-escrita.
+-- Nenhuma delas é clínica — a fronteira que importa continua fechada.
+GRANT SELECT ON
+  addresses, funnel_events, pharmacy_api_logs, terms_acceptances,
+  user_entitlements, user_login_history, webhook_logs
+TO app_entrada;
+
 -- protocols: TRÊS COLUNAS. As rotas da farmácia precisam achar o PDF e filtrar
 -- por assinado. `status` é estado de fluxo, não diagnóstico. Ler qualquer outra
 -- coluna — signed_by, quiz_response_id — passa a ser permission denied.
