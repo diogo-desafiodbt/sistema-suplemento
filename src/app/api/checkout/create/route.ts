@@ -769,28 +769,33 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    await sql`
-      INSERT INTO addresses ${sql({
-        user_id: user.id,
-        zip_code: data.address.zip_code,
-        street: data.address.street,
-        number: data.address.number,
-        complement: data.address.complement ?? '',
-        neighborhood: data.address.neighborhood,
-        city: data.address.city,
-        state: data.address.state,
-        is_default: true,
-      })}
-      ON CONFLICT (user_id) DO UPDATE SET
-        zip_code = EXCLUDED.zip_code,
-        street = EXCLUDED.street,
-        number = EXCLUDED.number,
-        complement = EXCLUDED.complement,
-        neighborhood = EXCLUDED.neighborhood,
-        city = EXCLUDED.city,
-        state = EXCLUDED.state,
-        is_default = EXCLUDED.is_default
-    `
+    try {
+      await sql`
+        INSERT INTO addresses ${sql({
+          user_id: user.id,
+          zip_code: data.address.zip_code,
+          street: data.address.street,
+          number: data.address.number,
+          complement: data.address.complement ?? '',
+          neighborhood: data.address.neighborhood,
+          city: data.address.city,
+          state: data.address.state,
+          is_default: true,
+        })}
+        ON CONFLICT (user_id) DO UPDATE SET
+          zip_code = EXCLUDED.zip_code,
+          street = EXCLUDED.street,
+          number = EXCLUDED.number,
+          complement = EXCLUDED.complement,
+          neighborhood = EXCLUDED.neighborhood,
+          city = EXCLUDED.city,
+          state = EXCLUDED.state,
+          is_default = EXCLUDED.is_default
+      `
+    } catch (addressError) {
+      console.error('addresses upsert error:', addressError)
+      throw addressError
+    }
 
     const forwardedFor = request.headers.get('x-forwarded-for')
     const ipAddress = forwardedFor?.split(',')[0]?.trim() || null
