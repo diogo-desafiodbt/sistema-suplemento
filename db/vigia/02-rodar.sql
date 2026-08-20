@@ -68,7 +68,22 @@ SELECT 'suporte-sem-resposta:' || t.id, 'suporte-sem-resposta',
 FROM support_threads t
 WHERE t.status <> 'respondido' AND t.last_message_at < now() - interval '24 hours';
 
--- 6) assinatura ativa com validade vencida
+-- 6) A CAMADA ASSINCRONA PAROU
+-- Não pergunta por um job específico: pergunta se ALGUM job rodou. Se nenhum
+-- rodou em 20 minutos, o Inngest não está chamando o app — foi o que aconteceu
+-- duas vezes em 19/08, sem gerar um único erro, e nas duas o sintoma foi
+-- silêncio. Cobre a causa que eu ainda não sei explicar.
+-- O poll de suporte roda de 5 em 5 minutos, então 20 é folga de 4 ciclos.
+INSERT INTO achados
+SELECT 'inngest-parado:' || to_char(date_trunc('hour', now()), 'YYYY-MM-DD-HH24'),
+       'inngest-parado',
+       jsonb_build_object(
+         'ultima_execucao', max(started_at),
+         'minutos', round(extract(epoch FROM (now() - max(started_at)))/60))
+FROM background_jobs
+HAVING max(started_at) IS NULL OR max(started_at) < now() - interval '20 minutes';
+
+-- 7) assinatura ativa com validade vencida
 INSERT INTO achados
 SELECT 'assinatura-vencida:' || s.id, 'assinatura-vencida',
        jsonb_build_object('email', u.email, 'venceu_em', s.expires_at)
