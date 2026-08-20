@@ -1,0 +1,16 @@
+{
+  "Arn": "arn:aws:ecs:us-east-1:768102455037:cluster/desafiodiabetes",
+  "RoleArn": "arn:aws:iam::768102455037:role/eventBridgeRodarVigia",
+  "EcsParameters": {
+    "TaskDefinitionArn": "arn:aws:ecs:us-east-1:768102455037:task-definition/vigia",
+    "LaunchType": "FARGATE",
+    "NetworkConfiguration": {
+      "awsvpcConfiguration": {
+        "Subnets": ["subnet-0d4ea5ca6340ec271"],
+        "SecurityGroups": ["sg-016f50c2f996dc2d4"],
+        "AssignPublicIp": "ENABLED"
+      }
+    }
+  },
+  "Input": "{\"containerOverrides\":[{\"name\":\"psql\",\"command\":[\"sh\",\"-c\",\"apk add --no-cache curl >/dev/null 2>&1; curl -sS -X PUT https://desafiodiabetes.com/api/inngest\"]}]}"
+}
