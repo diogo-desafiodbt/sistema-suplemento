@@ -1,64 +1,73 @@
-# App stops receiving invocations, no deploy involved
+# RESOLVIDO — era a integração Vercel, não o Inngest
 
-**App:** `desafio-diabetes` · SDK `inngest@^4.4.0` · Next.js 16.2.6
-**Hosting:** AWS ECS Fargate behind ALB + CloudFront (not Vercel)
+**Diagnóstico fechado em 20/08/2026.** Este documento era um relato para o
+suporte do Inngest. Não precisou: a causa era nossa.
 
-## Symptom
+## O que estava acontecendo
 
-Functions silently stop being invoked. No errors on our side — the SDK never
-gets called, so there is nothing to log. Crons stop firing and events produce no
-runs.
+O app `desafio-diabetes` estava registrado no Inngest **como um app da Vercel**:
 
-`curl -X PUT https://desafiodiabetes.com/api/inngest` restores it immediately
-and always returns `{"message":"Successfully registered","modified":true}` —
-`modified` is `true` on **every** call, including two consecutive calls seconds
-apart, so we can't use it to tell whether anything actually changed.
+```
+Platform            Vercel
+Vercel project      sistema-suplemento
+URL                 https://sistema-suplemento.vercel.app/api/inngest
+Method              Serve
+```
 
-## Occurrences
+A integração Inngest ↔ Vercel continuava ligada depois do corte para a AWS. A
+cada `git push` no repositório, a Vercel construía o projeto antigo, sincronizava
+com o Inngest e registrava **a URL dela** — sobrescrevendo a nossa.
 
-| # | Stopped | Detected | Duration |
-|---|---|---|---|
-| 1 | ~16 Aug | 19 Aug 11:45 | ~3 days |
-| 2 | 19 Aug 21:45 UTC | 19 Aug 23:20 | 98 min |
-| 3 | 20 Aug 17:00 UTC | 20 Aug 17:50 | 50 min |
+O Inngest então chamava a Vercel, não a AWS. Os 13 jobs paravam.
 
-Detection is from our own table: every function records start/finish in
-Postgres, so "last execution" is exact. A 5-minute cron is the canary.
+**Cada push quebrava a camada assíncrona.** Por isso não havia relação com deploy
+na AWS: o gatilho era o push, não o deploy.
 
-## What we have ruled out
+## O histórico de syncs mostrava a disputa
 
-- **No deploy between #2 and #3.** ECS reports `steady state` since 19 Aug
-  17:23 for the core service and 18:54 for the second one. No task was replaced.
-- **`serveOrigin` is set** to the public origin (`https://desafiodiabetes.com`),
-  so the SDK never reports the container's internal hostname.
-- **Routing is pinned.** An ALB rule at priority 1 sends `/api/inngest*` to the
-  core service only. `/api/inngest` is reachable and returns 200.
-- **App id is stable** (`desafio-diabetes`), never changed.
+```
+19/08 20:23  Success     ← nosso PUT
+19/08 20:25  No change   ← a Vercel volta
+20/08 14:50  Success     ← nossa ressincronização
+20/08 15:30  Success
+```
 
-## What might be relevant
+E o commit exibido no painel era o nosso, da branch `reestrutura-suplementos` —
+a Vercel construindo código que já não roda em lugar nenhum.
 
-We run **two ECS services from the same image**, both containing the
-`serve()` handler with the same app id. Only one of them ever receives
-`/api/inngest` traffic (ALB rule above); the other exists to serve public API
-routes with a lower-privilege database credential.
+## Por que as hipóteses anteriores falharam
 
-Occurrence #2 happened shortly after that second service was created — but #3
-happened with no infrastructure change at all, so we don't think that is the
-cause.
+**`serveOrigin` não ajudava.** Ele controla o que o NOSSO app reporta. A Vercel
+registra a URL dela, do lado dela — nenhuma configuração nossa alcança isso.
 
-## Questions
+**A regra do ALB não ajudava.** Ela garante que o Inngest, ao nos chamar, chegue
+no núcleo. Mas o Inngest não estava nos chamando.
 
-1. Does an app registration expire or get invalidated server-side after some
-   period or condition?
-2. Can a second instance running `serve()` with the same app id affect the
-   registration even if it never receives sync traffic?
-3. What does `modified: true` mean on the PUT response? It is always `true`
-   here, which makes it useless as a signal.
-4. Is there a supported way to detect from our side that an app has stopped
-   being invoked, other than instrumenting every function as we did?
+**Dois serviços com o mesmo app id não era o problema.** Era um serviço a mais
+do que eu contava: o da Vercel, que eu achava desligado porque a memória do
+projeto dizia "arquivado no painel do Inngest".
 
-## Current workaround
+Arquivar o app não desliga a integração.
 
-A scheduled task calls the PUT every 15 minutes, and an independent watchdog
-alerts when no function has run for 20 minutes. Both are treatment of the
-symptom.
+## A correção
+
+Integração Vercel desconectada no Inngest e projeto apagado na Vercel, em
+20/08/2026.
+
+## O que fica
+
+- **Ressincronização a cada 15 minutos** (`scripts/ligar-ressync-inngest.sh`):
+  vira desnecessária, mas fica por enquanto — só removo depois de alguns pushes
+  sem quebra.
+- **A pergunta 6 do vigia** fica para sempre. Ela pegou a terceira ocorrência em
+  49 minutos, contra três dias da primeira. E foi ela que forçou a investigação
+  que chegou aqui.
+
+## A lição
+
+Eu passei horas procurando no lado errado porque a memória do projeto dizia que
+a Vercel tinha sido "arquivada" e eu tratei isso como "desligada". Arquivar um
+app não desconecta a integração que o alimenta.
+
+Quando algo quebra sem relação com o que você mudou, a pergunta certa não é
+"o que eu fiz?" — é "o que ainda está ligado que eu achei que tinha desligado?".
