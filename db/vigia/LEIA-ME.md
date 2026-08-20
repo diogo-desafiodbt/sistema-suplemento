@@ -43,13 +43,34 @@ demais para alguém olhar.
 ## Arquivos
 
 - `01-tabela.sql` — a tabela de estado. Roda uma vez.
-- `02-rodar.sql` — as seis perguntas + contabilidade. Roda de hora em hora.
+- `02-rodar.sql` — as sete perguntas, em forma legível. **Fonte da verdade
+  para leitura**; não é o que roda.
+- `03-funcao.sql` — as mesmas perguntas empacotadas em `vigia_rodar()`. **É o
+  que roda.** Aplicar mudança = aplicar esta migração.
 
 Para rodar à mão:
 
 ```
-./scripts/rodar-sql.sh clinico db/vigia/02-rodar.sql
+./scripts/rodar-sql.sh clinico -c 'SELECT * FROM vigia_rodar()'
 ```
+
+## Por que virou função
+
+O SQL viajava embutido em base64 dentro do alvo do EventBridge. Dois defeitos:
+
+**Teto de 8 KB** no override da tarefa ECS — estourado em 20/08 com 9.144 bytes,
+na sétima pergunta. Cada pergunta nova empurrava o limite.
+
+**Divergência silenciosa**, que é o pior: editar o arquivo não mudava o que
+rodava. Em 20/08 corrigi um falso positivo, a execução manual passou, e a
+execução agendada seguinte trouxe o alerta de volta — ainda rodava a cópia
+antiga. Arquivo versionado que mente sobre produção é pior que arquivo nenhum.
+
+Como função, o tamanho deixa de importar e o alvo do agendamento virou uma
+linha: `SELECT * FROM vigia_rodar()`. Não há mais cópia para divergir.
+
+**Ao mudar `02-rodar.sql`, regenerar `03-funcao.sql` e aplicar.** Os dois
+precisam andar juntos.
 
 ## Como o alarme chega
 
