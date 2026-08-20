@@ -53,12 +53,35 @@ GROUP BY e.job_type, e.limite
 HAVING max(b.started_at) IS NULL OR max(b.started_at) < now() - e.limite;
 
 -- 4) job cuja última execução falhou
+--
+-- Só `failed`. NÃO alertar sobre `running`: três funções dormem de propósito —
+-- create-shipping-label espera D+2 úteis da compra, avulso-renewal-reminder
+-- espera D-5/D-1/D+3 da renovação, payment-retry espera entre tentativas.
+-- Ficar em `running` por dias é o trabalho acontecendo, não parando.
+--
+-- A primeira versão tratava `running` como falha e disparou sobre comportamento
+-- normal em 20/08. Alarme que grita sobre o que é correto é o que faz alguém
+-- desligar o alarme.
+--
+-- Cobertura do caso oposto — job que morre no meio e fica preso em `running`
+-- para sempre — vem da pergunta 6, que olha se ALGUM job rodou; e de `running`
+-- com mais de 30 dias, que nenhum sleepUntil daqui alcança.
 INSERT INTO achados
 SELECT 'job-falhou:' || job_type || ':' || started_at, 'job-falhou',
        jsonb_build_object('job', job_type, 'status', status, 'quando', started_at)
 FROM (SELECT DISTINCT ON (job_type) job_type, status, started_at
       FROM background_jobs ORDER BY job_type, started_at DESC) t
-WHERE status <> 'completed';
+WHERE status = 'failed';
+
+-- 4b) job preso: `running` velho demais para ser sono legítimo.
+-- O sleepUntil mais longo do sistema é D+3 de uma renovação; 30 dias é folga
+-- larga o bastante para não confundir sono com morte.
+INSERT INTO achados
+SELECT 'job-preso:' || job_type || ':' || started_at, 'job-preso',
+       jsonb_build_object('job', job_type, 'desde', started_at,
+         'dias', round(extract(epoch FROM (now() - started_at))/86400))
+FROM background_jobs
+WHERE status = 'running' AND started_at < now() - interval '30 days';
 
 -- 5) cliente de suporte sem resposta
 INSERT INTO achados
