@@ -1,0 +1,52 @@
+{
+  "descricao": "Divisão do tráfego entre a Zona 0-E (entrada) e o núcleo. Aplicada em 20/08/2026.",
+  "listener": "arn:aws:elasticloadbalancing:us-east-1:768102455037:listener/app/desafiodiabetes/e20eb1369c9bd802/3af8184f1066952b",
+  "regras": [
+    {
+      "prioridade": 1,
+      "caminhos": [
+        "/api/inngest*"
+      ],
+      "destino": "tg-sistema-suplemento",
+      "porque": "o Inngest precisa alcançar quem TEM credencial clinica para executar as 14 funcoes. Prioridade 1 para vir antes de qualquer regra de entrada."
+    },
+    {
+      "prioridade": 5,
+      "caminhos": [
+        "/api/checkout*",
+        "/api/products*",
+        "/api/funnel*",
+        "/api/shipping*",
+        "/api/auth*"
+      ],
+      "destino": "tg-sistema-entrada",
+      "porque": "teto de 5 caminhos por condicao no ALB — dai duas regras"
+    },
+    {
+      "prioridade": 6,
+      "caminhos": [
+        "/api/quiz*",
+        "/api/assinatura*",
+        "/api/farmacia*",
+        "/api/webhooks*"
+      ],
+      "destino": "tg-sistema-entrada"
+    },
+    {
+      "prioridade": 10,
+      "caminhos": [
+        "/blog*"
+      ],
+      "destino": "tg-blog"
+    },
+    {
+      "prioridade": "default",
+      "caminhos": [
+        "*"
+      ],
+      "destino": "tg-sistema-suplemento",
+      "porque": "admin, painel do profissional, portal do paciente e /api/prescricao/assinar — tudo que precisa de prontuario"
+    }
+  ],
+  "reverter": "aws elbv2 modify-rule --rule-arn <arn> --conditions 'Field=path-pattern,Values=/api/__desligado'"
+}
