@@ -78,10 +78,25 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
         }),
       ])
 
-      if (!perfilRes.ok || !enderecoRes.ok) throw new Error()
-      toast.success('Perfil atualizado com sucesso.')
+      // São dois salvamentos independentes: um pode passar e o outro não.
+      // Dizer só "erro ao salvar" faz a pessoa achar que nada foi gravado e
+      // refazer tudo — quando metade já está lá. Falar qual metade falhou
+      // custa três linhas e evita isso.
+      if (perfilRes.ok && enderecoRes.ok) {
+        toast.success('Perfil atualizado com sucesso.')
+      } else if (perfilRes.ok) {
+        toast.error(
+          'Seus dados pessoais foram salvos, mas o endereço não. Confira o CEP e tente de novo.',
+        )
+      } else if (enderecoRes.ok) {
+        toast.error(
+          'Seu endereço foi salvo, mas os dados pessoais não. Confira nome e data de nascimento.',
+        )
+      } else {
+        toast.error('Erro ao salvar. Tente novamente.')
+      }
     } catch {
-      toast.error('Erro ao salvar. Tente novamente.')
+      toast.error('Sem conexão. Tente de novo em instantes.')
     } finally {
       setLoading(false)
     }
