@@ -3,10 +3,28 @@ import { z } from 'zod'
 import { requirePacienteSession } from '@/app/api/contrato/paciente/_session'
 import { getSql } from '@/lib/db'
 
+/**
+ * Campo em branco no formulário chega como `''`, não como ausente — e `''`
+ * passa por `z.string()`. Sem esta normalização, `birth_date = ''` ia para uma
+ * coluna `date` e o driver estourava `RangeError: Invalid time value` antes
+ * mesmo de falar com o banco: o perfil inteiro deixava de salvar por causa de
+ * um campo que a pessoa nem preencheu.
+ */
+const vazioVirauNulo = (v: string | undefined) => {
+  const t = v?.trim()
+  return t ? t : null
+}
+
 const bodySchema = z.object({
-  full_name: z.string().min(1),
+  full_name: z.string().trim().min(1),
   phone: z.string().optional(),
-  birth_date: z.string().optional(),
+  // aaaa-mm-dd, que é o que o <input type="date"> manda. Em branco vira nulo.
+  birth_date: z
+    .string()
+    .optional()
+    .refine((v) => !v?.trim() || /^\d{4}-\d{2}-\d{2}$/.test(v.trim()), {
+      message: 'Data de nascimento inválida',
+    }),
 })
 
 export async function POST(request: NextRequest) {
@@ -27,8 +45,8 @@ export async function POST(request: NextRequest) {
       UPDATE users
       SET
         full_name = ${full_name},
-        phone = ${phone ?? null},
-        birth_date = ${birth_date ?? null}
+        phone = ${vazioVirauNulo(phone)},
+        birth_date = ${vazioVirauNulo(birth_date)}
       WHERE id = ${session.userId}::uuid
     `
 
