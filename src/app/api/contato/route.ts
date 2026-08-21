@@ -10,7 +10,9 @@ const bodySchema = z.object({
   assunto: z.enum([
     'meu-pedido',
     'minha-assinatura',
-    'duvida-sobre-produto',
+    'guia-digital',
+    'aplicativo',
+    'consulta',
     'outro',
   ]),
   mensagem: z.string().trim().min(10).max(4000),
@@ -21,9 +23,11 @@ const bodySchema = z.object({
 })
 
 const ROTULO: Record<string, string> = {
-  'meu-pedido': 'Meu pedido',
+  'meu-pedido': 'Meu pedido de suplementos',
   'minha-assinatura': 'Minha assinatura',
-  'duvida-sobre-produto': 'Dúvida sobre produto',
+  'guia-digital': 'Guia Digital da Reversão do Diabetes',
+  aplicativo: 'Aplicativo',
+  consulta: 'Consulta com o Dr. Turí Souza',
   outro: 'Outro assunto',
 }
 
@@ -52,7 +56,7 @@ export async function POST(request: NextRequest) {
     if (!apiKey) {
       console.error('contato: RESEND_API_KEY ausente')
       return NextResponse.json(
-        { error: 'Não conseguimos enviar agora. Tente pelo WhatsApp.' },
+        { error: 'Não conseguimos enviar agora. Escreva para suporte@desafiodiabetes.com.' },
         { status: 503 },
       )
     }
@@ -76,7 +80,7 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error('contato: falha no envio', error)
       return NextResponse.json(
-        { error: 'Não conseguimos enviar agora. Tente pelo WhatsApp.' },
+        { error: 'Não conseguimos enviar agora. Escreva para suporte@desafiodiabetes.com.' },
         { status: 502 },
       )
     }
