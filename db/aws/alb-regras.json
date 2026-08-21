@@ -1,6 +1,5 @@
 {
-  "descricao": "Divisão do tráfego entre a Zona 0-E (entrada) e o núcleo. Aplicada em 20/08/2026.",
-  "listener": "arn:aws:elasticloadbalancing:us-east-1:768102455037:listener/app/desafiodiabetes/e20eb1369c9bd802/3af8184f1066952b",
+  "descricao": "Divisão do tráfego entre as zonas. ATENÇÃO: o ALB tem DOIS listeners e a CloudFront fala com o de porta 80 (OriginProtocolPolicy=http-only). Regra que existe só no 443 NÃO vale para cliente nenhum — foi assim que a Fase 4 ficou 24h sem efeito. Toda regra precisa existir nos dois.",
   "regras": [
     {
       "prioridade": 1,
@@ -8,7 +7,8 @@
         "/api/inngest*"
       ],
       "destino": "tg-sistema-suplemento",
-      "porque": "o Inngest precisa alcançar quem TEM credencial clinica para executar as 14 funcoes. Prioridade 1 para vir antes de qualquer regra de entrada."
+      "porque": "o Inngest precisa alcançar quem TEM credencial clinica para executar as 14 funcoes. Prioridade 1 para vir antes de qualquer regra de entrada.",
+      "nos_dois_listeners": false
     },
     {
       "prioridade": 5,
@@ -20,7 +20,9 @@
         "/api/auth*"
       ],
       "destino": "tg-sistema-entrada",
-      "porque": "teto de 5 caminhos por condicao no ALB — dai duas regras"
+      "porque": "teto de 5 caminhos por condicao no ALB — dai duas regras",
+      "nos_dois_listeners": false,
+      "alerta": "SÓ existe no 443 — a CloudFront usa o 80, então este tráfego continua indo para o núcleo. Ver medição de 21/08: tg-sistema-entrada recebeu 0 requisições em 24h."
     },
     {
       "prioridade": 6,
@@ -30,14 +32,17 @@
         "/api/farmacia*",
         "/api/webhooks*"
       ],
-      "destino": "tg-sistema-entrada"
+      "destino": "tg-sistema-entrada",
+      "nos_dois_listeners": false,
+      "alerta": "SÓ existe no 443 — a CloudFront usa o 80, então este tráfego continua indo para o núcleo. Ver medição de 21/08: tg-sistema-entrada recebeu 0 requisições em 24h."
     },
     {
       "prioridade": 10,
       "caminhos": [
         "/blog*"
       ],
-      "destino": "tg-blog"
+      "destino": "tg-blog",
+      "nos_dois_listeners": true
     },
     {
       "prioridade": "default",
@@ -45,8 +50,23 @@
         "*"
       ],
       "destino": "tg-sistema-suplemento",
-      "porque": "admin, painel do profissional, portal do paciente e /api/prescricao/assinar — tudo que precisa de prontuario"
+      "porque": "admin, painel do profissional, portal do paciente e /api/prescricao/assinar — tudo que precisa de prontuario",
+      "nos_dois_listeners": false
+    },
+    {
+      "prioridade": 7,
+      "caminhos": [
+        "/suplementos/dashboard*"
+      ],
+      "destino": "tg-sistema-portal",
+      "porque": "Zona 1: o portal do paciente, servido por contêiner SEM DATABASE_URL e SEM taskRoleArn. Criada nos dois listeners em 21/08/2026.",
+      "nos_dois_listeners": true
     }
   ],
-  "reverter": "aws elbv2 modify-rule --rule-arn <arn> --conditions 'Field=path-pattern,Values=/api/__desligado'"
+  "reverter": "aws elbv2 modify-rule --rule-arn <arn> --conditions 'Field=path-pattern,Values=/api/__desligado'",
+  "listeners": {
+    "443_https": "arn:aws:elasticloadbalancing:us-east-1:768102455037:listener/app/desafiodiabetes/e20eb1369c9bd802/3af8184f1066952b",
+    "80_http": "arn:aws:elasticloadbalancing:us-east-1:768102455037:listener/app/desafiodiabetes/e20eb1369c9bd802/99a3a35482c12b10",
+    "qual_a_cloudfront_usa": "80_http"
+  }
 }
