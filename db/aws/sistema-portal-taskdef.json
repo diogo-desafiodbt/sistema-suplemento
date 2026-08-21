@@ -1,0 +1,70 @@
+{
+  "containerDefinitions": [
+    {
+      "name": "sistema-portal",
+      "image": "768102455037.dkr.ecr.us-east-1.amazonaws.com/sistema-suplemento:latest",
+      "cpu": 0,
+      "portMappings": [
+        {
+          "containerPort": 3000,
+          "hostPort": 3000,
+          "protocol": "tcp"
+        }
+      ],
+      "essential": true,
+      "environment": [
+        {
+          "name": "NODE_ENV",
+          "value": "production"
+        },
+        {
+          "name": "NUCLEO_URL",
+          "value": "https://desafiodiabetes.com"
+        }
+      ],
+      "mountPoints": [],
+      "volumesFrom": [],
+      "secrets": [
+        {
+          "name": "NEXT_PUBLIC_SUPABASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/NEXT_PUBLIC_SUPABASE_URL-A6vBQl"
+        },
+        {
+          "name": "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/NEXT_PUBLIC_SUPABASE_ANON_KEY-q4gxCM"
+        },
+        {
+          "name": "SENHA_PRE_LANCAMENTO",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/SENHA_PRE_LANCAMENTO-i9ZND5"
+        },
+        {
+          "name": "NEXT_PUBLIC_APP_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/NEXT_PUBLIC_APP_URL-hovbJO"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/sistema-portal",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "portal"
+        }
+      },
+      "systemControls": []
+    }
+  ],
+  "family": "sistema-portal",
+  "executionRoleArn": "arn:aws:iam::768102455037:role/ecsTaskExecutionRole",
+  "networkMode": "awsvpc",
+  "volumes": [],
+  "placementConstraints": [],
+  "runtimePlatform": {
+    "cpuArchitecture": "ARM64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "256",
+  "memory": "512"
+}
