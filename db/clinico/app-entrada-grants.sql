@@ -84,3 +84,20 @@ GRANT USAGE, SELECT ON SEQUENCE public.client_code_seq TO app_entrada;
 -- protocol_creation_locks a trava do núcleo
 --
 -- Nenhum DELETE, em tabela nenhuma.
+
+-- ---------------------------------------------------------------------------
+-- system_config: SELECT, e só
+-- ---------------------------------------------------------------------------
+--
+-- A cotação de frete lê daqui o endereço de quem despacha (Curitiba ou
+-- Fortaleza, conforme o destino) e as dimensões das caixas. Sem isso ela
+-- falha com 42501 e o checkout diz "não foi possível cotar o frete" — foi
+-- o que aconteceu em 21/08/2026, na primeira compra que passou de verdade
+-- pela entrada.
+--
+-- Conferido antes de conceder: a tabela guarda 27 chaves de configuração
+-- operacional — códigos da farmácia, medidas de caixa, endereços de origem.
+-- Nenhum segredo, nenhum dado de paciente. Escrita continua fora: quem muda
+-- configuração é o admin, no núcleo.
+GRANT SELECT ON public.system_config TO app_entrada;
+
