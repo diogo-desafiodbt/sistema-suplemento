@@ -196,9 +196,10 @@ export function AssinaturaClient({ subscription, payments }: Props) {
                     </span>
                     <span className="font-semibold text-[#13244f]">
                       R${' '}
-                      {((payment.amount ?? 0) / 100)
-                        .toFixed(2)
-                        .replace('.', ',')}
+                      {/* payments.amount é numeric em REAIS, igual a
+                          orders.total_amount. Aqui dividia por 100 e um
+                          pagamento de R$ 331,80 aparecia como R$ 3,32. */}
+                      {(payment.amount ?? 0).toFixed(2).replace('.', ',')}
                     </span>
                     <span className={`font-medium ${pStatus.className}`}>
                       {pStatus.label}
