@@ -8,7 +8,7 @@ import PromoBar from '@/components/PromoBar'
 
 const menuItems = [
   { label: 'Suplementos', href: '/suplementos' },
-  { label: 'Contato', href: '/oprimeiropasso/contato/' },
+  { label: 'Contato', href: '/contato/' },
   { label: 'Termos de Uso', href: '/suplementos/termos-de-uso' },
   { label: 'Entrar', href: '/suplementos/login' },
 ] as const

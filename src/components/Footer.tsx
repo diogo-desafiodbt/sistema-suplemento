@@ -45,7 +45,7 @@ export default function Footer() {
               Home
             </Link>
             <a
-              href="/oprimeiropasso/contato/"
+              href="/contato/"
               className="block text-xs py-1.5 opacity-70 hover:opacity-100 transition"
             >
               Contato
