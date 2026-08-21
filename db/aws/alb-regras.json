@@ -120,6 +120,14 @@
         "destino": "tg-sistema-entrada"
       },
       {
+        "prioridade": 23,
+        "caminhos": [
+          "/api/webhooks*"
+        ],
+        "destino": "tg-sistema-entrada",
+        "porque": "movido em 21/08/2026 com autorização do Diogo, depois de conferir no banco que app_entrada tem INSERT/UPDATE em payments, orders, subscriptions, webhook_logs e user_entitlements — e continua sem enxergar quiz_responses, health_records e protocols."
+      },
+      {
         "prioridade": "default",
         "caminhos": [
           "*"
@@ -127,13 +135,10 @@
         "destino": "tg-sistema-suplemento"
       }
     ],
-    "ainda_no_nucleo": [
-      "/api/webhooks*"
-    ],
-    "porque_webhooks_ficaram": "movê-los manda pagamento confirmado para um serviço que nunca atendeu requisição real. Fica para um passo separado, com o Diogo avisado.",
     "medido_em_21_08_2026": "as 4 sondas responderam 401 (comportamento correto) e a métrica confirmou 4 requisições em tg-sistema-entrada.",
     "armadilha_1": "regra recém-criada leva ~1 min para valer. Sonda imediata cai na regra padrão e parece que a regra não funcionou.",
     "armadilha_2": "o portão de pré-lançamento só compara o VALOR do cookie: `acesso_equipe=1` basta para atravessar, sem senha. Serve para testar de fora, e é bom lembrar que ele esconde, não protege.",
-    "/api/assinatura*": "SAIU: a rota foi apagada na Fase 5, o portal usa o contrato. O padrão continua no listener 443 e não aponta para nada."
+    "/api/assinatura*": "SAIU: a rota foi apagada na Fase 5, o portal usa o contrato. O padrão continua no listener 443 e não aponta para nada.",
+    "falta_provar": "compra de teste real: Pagar.me -> webhook na entrada -> payment gravado -> Inngest no núcleo -> pedido. As sondas provam que a rota roda e rejeita sem credencial; só a compra prova o caminho inteiro."
   }
 }
