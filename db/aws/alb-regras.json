@@ -68,5 +68,72 @@
     "443_https": "arn:aws:elasticloadbalancing:us-east-1:768102455037:listener/app/desafiodiabetes/e20eb1369c9bd802/3af8184f1066952b",
     "80_http": "arn:aws:elasticloadbalancing:us-east-1:768102455037:listener/app/desafiodiabetes/e20eb1369c9bd802/99a3a35482c12b10",
     "qual_a_cloudfront_usa": "80_http"
+  },
+  "listener_80_http": {
+    "porque": "É este que a CloudFront usa. Regra que não existe aqui não vale para cliente nenhum.",
+    "regras": [
+      {
+        "prioridade": 1,
+        "caminhos": [
+          "/api/inngest*"
+        ],
+        "destino": "tg-sistema-suplemento",
+        "porque": "explícito de propósito: uma regra futura de /api/* engoliria as 14 funções em silêncio, que é como elas já pararam uma vez"
+      },
+      {
+        "prioridade": 7,
+        "caminhos": [
+          "/suplementos/dashboard*"
+        ],
+        "destino": "tg-sistema-portal"
+      },
+      {
+        "prioridade": 10,
+        "caminhos": [
+          "/blog*"
+        ],
+        "destino": "tg-blog"
+      },
+      {
+        "prioridade": 20,
+        "caminhos": [
+          "/api/products*"
+        ],
+        "destino": "tg-sistema-entrada"
+      },
+      {
+        "prioridade": 21,
+        "caminhos": [
+          "/api/auth*",
+          "/api/checkout*",
+          "/api/funnel*",
+          "/api/shipping*",
+          "/api/quiz*"
+        ],
+        "destino": "tg-sistema-entrada"
+      },
+      {
+        "prioridade": 22,
+        "caminhos": [
+          "/api/farmacia*"
+        ],
+        "destino": "tg-sistema-entrada"
+      },
+      {
+        "prioridade": "default",
+        "caminhos": [
+          "*"
+        ],
+        "destino": "tg-sistema-suplemento"
+      }
+    ],
+    "ainda_no_nucleo": [
+      "/api/webhooks*"
+    ],
+    "porque_webhooks_ficaram": "movê-los manda pagamento confirmado para um serviço que nunca atendeu requisição real. Fica para um passo separado, com o Diogo avisado.",
+    "medido_em_21_08_2026": "as 4 sondas responderam 401 (comportamento correto) e a métrica confirmou 4 requisições em tg-sistema-entrada.",
+    "armadilha_1": "regra recém-criada leva ~1 min para valer. Sonda imediata cai na regra padrão e parece que a regra não funcionou.",
+    "armadilha_2": "o portão de pré-lançamento só compara o VALOR do cookie: `acesso_equipe=1` basta para atravessar, sem senha. Serve para testar de fora, e é bom lembrar que ele esconde, não protege.",
+    "/api/assinatura*": "SAIU: a rota foi apagada na Fase 5, o portal usa o contrato. O padrão continua no listener 443 e não aponta para nada."
   }
 }
