@@ -74,7 +74,10 @@ export function buildPharmacyJson(params: {
     CupomDescontoCodigo: '',
     Origem: 'S',
     CupomDescontoValor: '0.00',
-    NumeroObjeto: '',
+    // Decisão do Diogo em 21/08/2026: a etiqueta deixa de ser emitida por nós.
+    // A farmácia pega direto com a transportadora, então mandamos o aviso no
+    // lugar do número do objeto — em branco parecia esquecimento nosso.
+    NumeroObjeto: 'a emitir',
     Observacoes: params.prescriptionPdfUrl,
     ObservacoesLoja: 'Importado via API Desafio Diabetes',
     CodigoStatus: 11,
