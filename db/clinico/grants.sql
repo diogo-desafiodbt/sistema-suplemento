@@ -54,18 +54,38 @@ GRANT SELECT, INSERT ON prescription_audit_logs TO app_web, job_interno;
 
 -- Substitui `trg_prevent_role_escalation`, que lia `auth.role()` e não existe
 -- no RDS. Em vez de gatilho conferindo intenção, o privilégio simplesmente não
--- está lá: app_web recebe UPDATE em toda coluna de `users` menos `role`.
+-- está lá.
+--
+-- Três colunas de `users` NÃO se editam por requisição:
+--
+--   role   ninguém se promove a profissional.
+--   cpf    identidade fiscal; nada no código escreve. Chega no cadastro e
+--          fica. Correção de CPF é operação de gente, não de formulário.
+--   email  é a chave de login. Poder trocá-lo por requisição é poder tomar a
+--          conta de alguém. Continua no INSERT — o cadastro precisa gravar.
+--
+-- Sem isso, a promessa de "CPF e e-mail só na leitura" mora no zod de uma
+-- rota, e a próxima rota que alguém escrever pode esquecer. Aqui o banco
+-- recusa, e não tem como esquecer.
 DO $$
 DECLARE
-  colunas text;
+  cols_update text;
+  cols_insert text;
 BEGIN
   SELECT string_agg(quote_ident(column_name), ', ' ORDER BY ordinal_position)
-    INTO colunas
+    INTO cols_update
   FROM information_schema.columns
-  WHERE table_schema = 'public' AND table_name = 'users' AND column_name <> 'role';
+  WHERE table_schema = 'public' AND table_name = 'users'
+    AND column_name NOT IN ('role', 'cpf', 'email');
+
+  SELECT string_agg(quote_ident(column_name), ', ' ORDER BY ordinal_position)
+    INTO cols_insert
+  FROM information_schema.columns
+  WHERE table_schema = 'public' AND table_name = 'users'
+    AND column_name NOT IN ('role', 'cpf');
 
   EXECUTE format('REVOKE UPDATE ON public.users FROM app_web');
-  EXECUTE format('GRANT UPDATE (%s) ON public.users TO app_web', colunas);
+  EXECUTE format('GRANT UPDATE (%s) ON public.users TO app_web', cols_update);
 
   -- O mesmo vale para o INSERT, e isso passou batido até 19/08/2026: a
   -- aplicação podia criar um usuário JÁ administrador. `garantirPerfil`
@@ -75,7 +95,7 @@ BEGIN
   -- inteira, e concessão ampla continua cobrindo a coluna revogada. Tem que
   -- revogar amplo e conceder estreito — como acima.
   EXECUTE format('REVOKE INSERT ON public.users FROM app_web');
-  EXECUTE format('GRANT INSERT (%s) ON public.users TO app_web', colunas);
+  EXECUTE format('GRANT INSERT (%s) ON public.users TO app_web', cols_insert);
 END
 $$;
 
