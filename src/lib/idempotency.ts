@@ -99,9 +99,14 @@ export async function claimOnce(
     if (existing[col] != null) return { won: false }
   }
 
-  const protectNulls = protectColumns.flatMap((col) => [
-    sql`AND ${sql(col)} IS NULL`,
-  ])
+  // Array VAZIO não pode ser interpolado aqui. postgres.js trata `[]` como
+  // valor, não como pedaço de SQL, e emite um parâmetro onde a consulta
+  // espera uma cláusula — daí `syntax error at or near "$3"`. Só aparece
+  // quando `protectColumns` vem vazio, que é o caso do job da farmácia; os
+  // dois chamadores que passam colunas nunca esbarraram nisso.
+  const protectNulls = protectColumns.length
+    ? protectColumns.flatMap((col) => [sql`AND ${sql(col)} IS NULL`])
+    : sql``
   const completedNull = completedColumn
     ? sql`AND ${sql(completedColumn)} IS NULL`
     : sql``
