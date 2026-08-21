@@ -77,6 +77,29 @@ export async function POST(request: NextRequest) {
         ? (order.shipping_json as { eventos?: unknown[] })
         : null
 
+    let payment_method: 'credit_card' | 'pix' | null = null
+    const paymentRows = await sql<{ webhook_payload: unknown }[]>`
+      SELECT pay.webhook_payload
+      FROM payments pay
+      JOIN subscriptions s ON s.id = pay.subscription_id
+      JOIN orders o ON o.subscription_id = s.id
+      WHERE o.id = ${order_id}::uuid
+        AND s.user_id = ${session.userId}::uuid
+      ORDER BY pay.created_at DESC
+      LIMIT 1
+    `
+    const payload = paymentRows[0]?.webhook_payload
+    if (payload && typeof payload === 'object') {
+      const p = payload as Record<string, unknown>
+      const charges = p.charges
+      if (Array.isArray(charges) && charges[0] && typeof charges[0] === 'object') {
+        const method = (charges[0] as Record<string, unknown>).payment_method
+        if (method === 'credit_card' || method === 'pix') payment_method = method
+      } else if (p.payment_method === 'credit_card' || p.payment_method === 'pix') {
+        payment_method = p.payment_method
+      }
+    }
+
     return NextResponse.json({
       id: order.id,
       status: order.status,
@@ -87,6 +110,7 @@ export async function POST(request: NextRequest) {
       pharmacy_sent_at: isoDate(order.pharmacy_sent_at),
       shipping_quote_json: order.shipping_quote_json,
       pharmacy_json: order.pharmacy_json,
+      payment_method,
       rastreamento: shippingJson?.eventos ?? [],
       itens: (order.order_items ?? []).map((item) => ({
         id: item.id,

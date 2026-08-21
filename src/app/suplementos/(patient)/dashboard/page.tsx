@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getUserProfile } from '@/lib/auth/profile'
+import { perguntarAoNucleo } from '@/lib/contrato/nucleo'
 import { createClient } from '@/lib/supabase/server'
 
 export default async function DashboardPage() {
@@ -10,11 +10,16 @@ export default async function DashboardPage() {
 
   if (!user) redirect('/suplementos/login')
 
-  const profile = await getUserProfile(user.id)
+  const papel = await perguntarAoNucleo<{
+    role: string
+    full_name: string | null
+    client_code: string | null
+  }>('meu-papel')
 
-  if (profile?.role === 'professional')
-    redirect('/suplementos/profissional/fila')
-  if (profile?.role === 'admin') redirect('/suplementos/admin/usuarios')
+  if (!papel) redirect('/suplementos/login')
+
+  if (papel.role === 'professional') redirect('/suplementos/profissional/fila')
+  if (papel.role === 'admin') redirect('/suplementos/admin/usuarios')
 
   redirect('/suplementos/dashboard/pedidos')
 }

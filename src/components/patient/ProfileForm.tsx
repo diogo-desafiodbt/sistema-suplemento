@@ -61,18 +61,24 @@ export function ProfileForm({ initialData }: ProfileFormProps) {
     setLoading(true)
 
     try {
-      const res = await fetch('/api/perfil/atualizar', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          full_name: fullName,
-          phone,
-          birth_date: birthDate,
-          address,
+      const [perfilRes, enderecoRes] = await Promise.all([
+        fetch('/api/contrato/paciente/atualizar-perfil', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            full_name: fullName,
+            phone,
+            birth_date: birthDate,
+          }),
         }),
-      })
+        fetch('/api/contrato/paciente/salvar-endereco', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(address),
+        }),
+      ])
 
-      if (!res.ok) throw new Error()
+      if (!perfilRes.ok || !enderecoRes.ok) throw new Error()
       toast.success('Perfil atualizado com sucesso.')
     } catch {
       toast.error('Erro ao salvar. Tente novamente.')

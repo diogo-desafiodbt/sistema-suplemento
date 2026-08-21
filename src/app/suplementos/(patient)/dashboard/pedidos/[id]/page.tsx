@@ -4,12 +4,12 @@ import { notFound, redirect } from 'next/navigation'
 import imgLogoAzul from '@/../public/logo-azul.png'
 import { CopyButton } from '@/components/CopyButton'
 import { DashboardNav } from '@/components/patient/DashboardNav'
+import { perguntarAoNucleo } from '@/lib/contrato/nucleo'
 import {
   getPatientOrderStatus,
   getPatientOrderStatusColor,
 } from '@/lib/order-status'
 import { getProductDisplayName } from '@/lib/product-display-names'
-import { asNumber, getSql } from '@/lib/db'
 import {
   addBusinessDays,
   estimateCustomerDeliveryDays,
@@ -42,38 +42,22 @@ type PharmacyJsonAddress = {
   EntregaCEP?: string
 }
 
-type OrderDetail = {
+type PedidoDetalhe = {
   id: string
   status: string
-  created_at: string
+  created_at: string | null
   total_amount: number | null
   tracking_code: string | null
   pharmacy_sent_at: string | null
-  subscription_id: string | null
   shipping_quote_json: {
     tipo?: string
     valor?: number
     prazoDias?: number
   } | null
-  shipping_json: { eventos?: TrackingEvent[] } | null
   pharmacy_json: PharmacyJsonAddress | null
-  order_items: OrderItem[]
-}
-
-function extractPaymentMethod(payload: unknown): 'credit_card' | 'pix' | null {
-  if (!payload || typeof payload !== 'object') return null
-  const p = payload as Record<string, unknown>
-
-  const charges = p.charges
-  if (Array.isArray(charges) && charges[0] && typeof charges[0] === 'object') {
-    const method = (charges[0] as Record<string, unknown>).payment_method
-    if (method === 'credit_card' || method === 'pix') return method
-  }
-
-  const direct = p.payment_method
-  if (direct === 'credit_card' || direct === 'pix') return direct
-
-  return null
+  payment_method: 'credit_card' | 'pix' | null
+  rastreamento: TrackingEvent[]
+  itens: OrderItem[]
 }
 
 function fmtCep(cep: string): string {
@@ -96,45 +80,20 @@ export default async function PedidoDetalhePage({
   } = await supabase.auth.getUser()
   if (!user) redirect('/suplementos/login')
 
-  const sql = getSql()
   const { id } = await params
 
-  const orderRows = await sql<OrderDetail[]>`
-    SELECT o.id, o.status, o.created_at, o.total_amount, o.tracking_code,
-           o.pharmacy_sent_at, o.subscription_id, o.shipping_quote_json,
-           o.shipping_json, o.pharmacy_json,
-      COALESCE(it.list, '[]'::jsonb) AS order_items
-    FROM orders o
-    LEFT JOIN LATERAL (
-      SELECT jsonb_agg(jsonb_build_object(
-        'id', oi.id, 'quantity', oi.quantity, 'unit_price', oi.unit_price,
-        'products', CASE WHEN pr.id IS NULL THEN NULL
-          ELSE jsonb_build_object('name', pr.name) END
-      ) ORDER BY oi.id) AS list
-      FROM order_items oi LEFT JOIN products pr ON pr.id = oi.product_id
-      WHERE oi.order_id = o.id) it ON true
-    WHERE o.id = ${id}::uuid AND o.user_id = ${user.id}::uuid
-    LIMIT 1
-  `
+  const orderData = await perguntarAoNucleo<PedidoDetalhe>('meu-pedido', {
+    order_id: id,
+  })
+  if (!orderData) notFound()
 
-  const order = orderRows[0] ?? null
-  if (!order) notFound()
-
-  const orderData: OrderDetail = {
-    ...order,
-    total_amount: order.total_amount == null ? null : asNumber(order.total_amount),
-    order_items: (order.order_items ?? []).map((item) => ({
-      ...item,
-      unit_price: asNumber(item.unit_price),
-    })),
-  }
   const statusMessage = getPatientOrderStatus(
     orderData.status,
     orderData.tracking_code,
     orderData.pharmacy_sent_at,
   )
 
-  const eventos = [...(orderData.shipping_json?.eventos ?? [])].sort((a, b) => {
+  const eventos = [...(orderData.rastreamento ?? [])].sort((a, b) => {
     const ta = a.datahora ? new Date(a.datahora).getTime() : 0
     const tb = b.datahora ? new Date(b.datahora).getTime() : 0
     return ta - tb
@@ -145,7 +104,10 @@ export default async function PedidoDetalhePage({
 
   const prazoDias = orderData.shipping_quote_json?.prazoDias
   const estimatedDate =
-    !delivered && typeof prazoDias === 'number' && prazoDias > 0
+    !delivered &&
+    typeof prazoDias === 'number' &&
+    prazoDias > 0 &&
+    orderData.created_at
       ? addBusinessDays(
           new Date(orderData.created_at),
           estimateCustomerDeliveryDays(prazoDias),
@@ -154,22 +116,7 @@ export default async function PedidoDetalhePage({
 
   const pharmacy = orderData.pharmacy_json
   const address = pharmacy?.EntregaLogradouro ? pharmacy : null
-
-  // Forma de pagamento: inspeciona o payload do pagamento da mesma subscription
-  let paymentMethod: 'credit_card' | 'pix' | null = null
-  if (orderData.subscription_id) {
-    const paymentRows = await sql<{ webhook_payload: unknown }[]>`
-      SELECT pay.webhook_payload
-      FROM payments pay
-      JOIN subscriptions s ON s.id = pay.subscription_id
-      WHERE pay.subscription_id = ${orderData.subscription_id}::uuid
-        AND s.user_id = ${user.id}::uuid
-      ORDER BY pay.created_at DESC
-      LIMIT 1
-    `
-    paymentMethod = extractPaymentMethod(paymentRows[0]?.webhook_payload)
-  }
-
+  const paymentMethod = orderData.payment_method
   const freteValor = orderData.shipping_quote_json?.valor
 
   return (
@@ -208,7 +155,9 @@ export default async function PedidoDetalhePage({
           <div>
             <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-1">
               Pedido de{' '}
-              {new Date(orderData.created_at).toLocaleDateString('pt-BR')}
+              {orderData.created_at
+                ? new Date(orderData.created_at).toLocaleDateString('pt-BR')
+                : '—'}
             </p>
             <h1 className="text-2xl font-bold text-[#13244f]">
               Detalhes do pedido
@@ -222,7 +171,8 @@ export default async function PedidoDetalhePage({
             </span>
             {eventos.length > 0 && eventos[eventos.length - 1]?.datahora && (
               <p className="text-xs text-gray-400">
-                Atualizado em {(() => {
+                Atualizado em{' '}
+                {(() => {
                   const d = new Date(eventos[eventos.length - 1].datahora!)
                   const day = d.toLocaleDateString('pt-BR', {
                     day: '2-digit',
@@ -239,7 +189,6 @@ export default async function PedidoDetalhePage({
           </div>
         </div>
 
-        {/* 2.3 — Prazo estimado / data real de entrega */}
         {delivered
           ? deliveredEvent?.datahora && (
               <div className="bg-green-50 border border-green-100 rounded-2xl px-5 py-4 text-sm text-green-800 font-semibold">
@@ -254,13 +203,12 @@ export default async function PedidoDetalhePage({
               </div>
             )}
 
-        {/* 2.1 — Produtos */}
         <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-4">
             Produtos
           </p>
           <div className="space-y-4">
-            {orderData.order_items?.map((item) => {
+            {orderData.itens?.map((item) => {
               const name = item.products?.name ?? 'Produto'
               const image = findSupplementImageByProductName(name)
               const displayName = getProductDisplayName(name)
@@ -319,7 +267,6 @@ export default async function PedidoDetalhePage({
           </div>
         </section>
 
-        {/* 2.6 — Código de rastreio */}
         <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-3">
             Rastreio
@@ -341,7 +288,6 @@ export default async function PedidoDetalhePage({
             </p>
           )}
 
-          {/* 2.2 — Linha do tempo */}
           <div className="mt-5 border-t border-gray-100 pt-4">
             {eventos.length === 0 ? (
               <p className="text-sm text-gray-400">
@@ -381,7 +327,6 @@ export default async function PedidoDetalhePage({
           </div>
         </section>
 
-        {/* 2.4 — Endereço de entrega (retrato do pedido, do pharmacy_json) */}
         <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-3">
             Endereço de entrega
@@ -410,7 +355,6 @@ export default async function PedidoDetalhePage({
           )}
         </section>
 
-        {/* 2.5 — Pagamento */}
         <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-3">
             Pagamento

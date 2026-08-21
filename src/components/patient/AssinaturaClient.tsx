@@ -72,7 +72,9 @@ export function AssinaturaClient({ subscription, payments }: Props) {
   async function handleCancel() {
     setLoading(true)
     try {
-      const res = await fetch('/api/assinatura/cancelar', { method: 'POST' })
+      const res = await fetch('/api/contrato/paciente/cancelar-assinatura', {
+        method: 'POST',
+      })
       if (!res.ok) throw new Error()
       setCanceled(true)
       setShowModal(false)

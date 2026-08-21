@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import imgLogoAzul from '@/../public/logo-azul.png'
 import { DashboardNav } from '@/components/patient/DashboardNav'
-import { asNumber, getSql } from '@/lib/db'
+import { perguntarAoNucleo } from '@/lib/contrato/nucleo'
 import {
   getPatientOrderStatus,
   getPatientOrderStatusColor,
@@ -19,14 +19,14 @@ type OrderItem = {
   products: { name: string } | null
 }
 
-type Order = {
+type Pedido = {
   id: string
   status: string
-  created_at: string
+  created_at: string | null
   tracking_code: string | null
   pharmacy_sent_at: string | null
-  total_amount: number
-  order_items: OrderItem[]
+  total_amount: number | null
+  itens: OrderItem[]
 }
 
 export default async function PedidosPage() {
@@ -36,32 +36,9 @@ export default async function PedidosPage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/suplementos/login')
 
-  const sql = getSql()
-  const orders = await sql<Order[]>`
-    SELECT o.id, o.status, o.created_at, o.tracking_code, o.pharmacy_sent_at,
-           o.total_amount,
-      COALESCE(it.list, '[]'::jsonb) AS order_items
-    FROM orders o
-    LEFT JOIN LATERAL (
-      SELECT jsonb_agg(jsonb_build_object(
-        'id', oi.id, 'quantity', oi.quantity, 'unit_price', oi.unit_price,
-        'products', CASE WHEN pr.id IS NULL THEN NULL
-          ELSE jsonb_build_object('name', pr.name) END
-      ) ORDER BY oi.id) AS list
-      FROM order_items oi LEFT JOIN products pr ON pr.id = oi.product_id
-      WHERE oi.order_id = o.id) it ON true
-    WHERE o.user_id = ${user.id}::uuid
-    ORDER BY o.created_at DESC
-  `
-
-  const orderList = orders.map((order) => ({
-    ...order,
-    total_amount: asNumber(order.total_amount),
-    order_items: (order.order_items ?? []).map((item) => ({
-      ...item,
-      unit_price: asNumber(item.unit_price),
-    })),
-  }))
+  const res = await perguntarAoNucleo<{ pedidos: Pedido[] }>('meus-pedidos')
+  if (!res) redirect('/suplementos/login')
+  const orderList = res.pedidos
 
   return (
     <div className="min-h-screen bg-[#f5f0eb]">
@@ -115,7 +92,9 @@ export default async function PedidosPage() {
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm text-gray-500">
                     Pedido de{' '}
-                    {new Date(order.created_at).toLocaleDateString('pt-BR')}
+                    {order.created_at
+                      ? new Date(order.created_at).toLocaleDateString('pt-BR')
+                      : '—'}
                   </span>
                   <span
                     className={`text-xs font-bold px-3 py-1 rounded-full ${getPatientOrderStatusColor(message)}`}
@@ -125,7 +104,7 @@ export default async function PedidosPage() {
                 </div>
 
                 <div className="space-y-3">
-                  {order.order_items?.map((item) => {
+                  {order.itens?.map((item) => {
                     const name = item.products?.name ?? 'Produto'
                     const image = findSupplementImageByProductName(name)
                     const displayName = getProductDisplayName(name)
@@ -183,7 +162,8 @@ export default async function PedidosPage() {
 
                 <div className="flex items-center justify-between border-t border-gray-100 pt-3">
                   <span className="text-sm font-bold text-[#13244f]">
-                    Total: R$ {order.total_amount?.toFixed(2).replace('.', ',')}
+                    Total: R${' '}
+                    {(order.total_amount ?? 0).toFixed(2).replace('.', ',')}
                   </span>
                   <span className="text-xs font-bold text-[#13244f]/60">
                     Ver detalhes →

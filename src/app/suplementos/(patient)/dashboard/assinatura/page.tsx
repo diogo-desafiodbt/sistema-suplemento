@@ -3,8 +3,26 @@ import { redirect } from 'next/navigation'
 import imgLogoAzul from '@/../public/logo-azul.png'
 import { AssinaturaClient } from '@/components/patient/AssinaturaClient'
 import { DashboardNav } from '@/components/patient/DashboardNav'
-import { asNumber, getSql } from '@/lib/db'
+import { perguntarAoNucleo } from '@/lib/contrato/nucleo'
 import { createClient } from '@/lib/supabase/server'
+
+type Assinatura = {
+  id: string
+  plan_type: string
+  status: string
+  expires_at: string | null
+  grace_period_ends_at: string | null
+  pagarme_sub_id: string | null
+}
+
+type PagamentosRes = {
+  payments: Array<{
+    id: string
+    amount: number | null
+    status: string
+    paid_at: string | null
+  }>
+}
 
 export default async function AssinaturaPage() {
   const supabase = await createClient()
@@ -13,61 +31,21 @@ export default async function AssinaturaPage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/suplementos/login')
 
-  const sql = getSql()
-  const subscriptionRows = await sql<
-    {
-      id: string
-      plan_type: string
-      status: string
-      expires_at: string | Date | null
-      grace_period_ends_at: string | Date | null
-      pagarme_sub_id: string | null
-    }[]
-  >`
-    SELECT id, plan_type, status, expires_at, grace_period_ends_at, pagarme_sub_id
-    FROM subscriptions
-    WHERE user_id = ${user.id}::uuid
-    ORDER BY created_at DESC
-    LIMIT 1
-  `
-  const sub = subscriptionRows[0] ?? null
-  const subscription = sub
-    ? {
-        ...sub,
-        expires_at:
-          sub.expires_at instanceof Date
-            ? sub.expires_at.toISOString()
-            : sub.expires_at,
-        grace_period_ends_at:
-          sub.grace_period_ends_at instanceof Date
-            ? sub.grace_period_ends_at.toISOString()
-            : sub.grace_period_ends_at,
-      }
-    : null
+  const [assinaturaRes, pagamentosRes] = await Promise.all([
+    perguntarAoNucleo<Assinatura | { subscription: null }>('minha-assinatura'),
+    perguntarAoNucleo<PagamentosRes>('meus-pagamentos'),
+  ])
 
-  const paymentRows = subscription
-    ? await sql<
-        {
-          id: string
-          amount: string | number | null
-          status: string
-          paid_at: string | Date | null
-        }[]
-      >`
-        SELECT id, amount, status, paid_at FROM payments
-        WHERE subscription_id = ${subscription.id}::uuid
-        ORDER BY paid_at DESC NULLS LAST
-        LIMIT 5
-      `
-    : []
+  if (assinaturaRes === null || pagamentosRes === null) {
+    redirect('/suplementos/login')
+  }
 
-  const payments = paymentRows.map((p) => ({
-    id: p.id,
-    amount: p.amount == null ? null : asNumber(p.amount),
-    status: p.status,
-    paid_at:
-      p.paid_at instanceof Date ? p.paid_at.toISOString() : p.paid_at,
-  }))
+  const subscription =
+    'subscription' in assinaturaRes && assinaturaRes.subscription === null
+      ? null
+      : (assinaturaRes as Assinatura)
+
+  const payments = pagamentosRes.payments
 
   return (
     <div className="min-h-screen bg-[#f5f0eb]">

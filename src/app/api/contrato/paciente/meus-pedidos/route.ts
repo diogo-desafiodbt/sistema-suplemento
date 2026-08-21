@@ -24,10 +24,13 @@ export async function POST() {
         status: string
         created_at: string | Date
         tracking_code: string | null
+        pharmacy_sent_at: string | Date | null
+        total_amount: string | number | null
         order_items: OrderItem[]
       }[]
     >`
-      SELECT o.id, o.status, o.created_at, o.tracking_code,
+      SELECT o.id, o.status, o.created_at, o.tracking_code, o.pharmacy_sent_at,
+             o.total_amount,
         COALESCE(it.list, '[]'::jsonb) AS order_items
       FROM orders o
       LEFT JOIN LATERAL (
@@ -48,6 +51,9 @@ export async function POST() {
         status: order.status,
         created_at: isoDate(order.created_at),
         tracking_code: order.tracking_code,
+        pharmacy_sent_at: isoDate(order.pharmacy_sent_at),
+        total_amount:
+          order.total_amount == null ? null : asNumber(order.total_amount),
         itens: (order.order_items ?? []).map((item) => ({
           id: item.id,
           quantity: asNumber(item.quantity),
