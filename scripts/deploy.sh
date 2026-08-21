@@ -10,7 +10,11 @@ cd "$(dirname "$0")/.."
 
 BUCKET="${BUCKET:-desafiodiabetes-builds}"
 CLUSTER="${CLUSTER:-desafiodiabetes}"
-SERVICO="${SERVICO:-sistema-suplemento}"
+# Os TRÊS serviços rodam a mesma tag :latest. Atualizar só o núcleo deixa a
+# entrada e o portal na imagem velha — e o portal é quem serve as telas do
+# paciente, então correção de tela some sem ninguém entender por quê.
+# Aconteceu em 21/08/2026. `SERVICOS` aceita sobrescrita para subir um só.
+SERVICOS="${SERVICOS:-sistema-suplemento sistema-entrada sistema-portal}"
 PROJETO="${PROJETO:-sistema-suplemento}"
 REGIAO="${REGIAO:-us-east-1}"
 
@@ -50,10 +54,14 @@ if [ "$STATUS" != "SUCCEEDED" ]; then
   exit 1
 fi
 
-echo "→ subindo no ECS"
-aws ecs update-service --cluster "$CLUSTER" --service "$SERVICO" \
-  --force-new-deployment --query 'service.serviceName' --output text > /dev/null
-aws ecs wait services-stable --cluster "$CLUSTER" --services "$SERVICO"
+echo "→ subindo no ECS ($SERVICOS)"
+for S in $SERVICOS; do
+  aws ecs update-service --region "$REGIAO" --cluster "$CLUSTER" --service "$S" \
+    --force-new-deployment --query 'service.serviceName' --output text > /dev/null
+done
+# Espera todos: se um subir e outro não, ficam versões diferentes atendendo
+# caminhos diferentes do mesmo site.
+aws ecs wait services-stable --region "$REGIAO" --cluster "$CLUSTER" --services $SERVICOS
 
 echo "→ re-sincronizando o Inngest"
 # Sem isto, o Inngest continua com o registro anterior até alguém provocar.

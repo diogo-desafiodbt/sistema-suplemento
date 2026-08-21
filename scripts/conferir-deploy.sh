@@ -10,7 +10,7 @@ set -uo pipefail
 
 REGIAO="${REGIAO:-us-east-1}"
 CLUSTER="${CLUSTER:-desafiodiabetes}"
-SERVICO="${SERVICO:-sistema-suplemento}"
+SERVICOS="${SERVICOS:-sistema-suplemento sistema-entrada sistema-portal}"
 BASE="${BASE:-https://desafiodiabetes.com}"
 RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -26,27 +26,37 @@ contar() {
 ok()    { echo "  ✓ $1"; }
 falha() { echo "  ✗ $1"; echo "     → $2"; FALHAS=$((FALHAS+1)); }
 
-echo "1/5 serviço estabilizou?"
-if aws ecs wait services-stable --region "$REGIAO" --cluster "$CLUSTER" --services "$SERVICO" 2>/dev/null; then
-  REV=$(aws ecs describe-services --region "$REGIAO" --cluster "$CLUSTER" --services "$SERVICO" \
-        --query 'services[0].taskDefinition' --output text | sed 's|.*/||')
-  ok "estável em $REV"
-else
-  falha "não estabilizou" "aws ecs describe-services --cluster $CLUSTER --services $SERVICO"
-fi
+# Os três, não só o núcleo: em 21/08 o portal e a entrada ficaram na imagem
+# velha depois de um deploy e ninguém percebeu, porque a conferência olhava
+# um serviço só.
+echo "1/5 os serviços estabilizaram?"
+for S in $SERVICOS; do
+  if aws ecs wait services-stable --region "$REGIAO" --cluster "$CLUSTER" --services "$S" 2>/dev/null; then
+    REV=$(aws ecs describe-services --region "$REGIAO" --cluster "$CLUSTER" --services "$S" \
+          --query 'services[0].taskDefinition' --output text | sed 's|.*/||')
+    ok "$S estável em $REV"
+  else
+    falha "$S não estabilizou" "aws ecs describe-services --cluster $CLUSTER --services $S"
+  fi
+done
 
-echo "2/5 arrancou sem erro?"
-FLUXO=$(aws logs describe-log-streams --region "$REGIAO" --log-group-name "/ecs/$SERVICO" \
-  --order-by LastEventTime --descending --max-items 1 \
-  --query 'logStreams[0].logStreamName' --output text 2>/dev/null | head -1)
-ERROS=$(aws logs get-log-events --region "$REGIAO" --log-group-name "/ecs/$SERVICO" \
-  --log-stream-name "$FLUXO" --start-from-head --limit 40 \
-  --query 'events[].message' --output text 2>/dev/null | grep -ciE "error|precisa estar definida" || true)
-[ "${ERROS:-0}" -eq 0 ] && ok "arranque limpo" \
-  || falha "$ERROS linha(s) de erro no arranque" "ver /ecs/$SERVICO, fluxo $FLUXO"
+echo "2/5 arrancaram sem erro?"
+for S in $SERVICOS; do
+  FLUXO=$(aws logs describe-log-streams --region "$REGIAO" --log-group-name "/ecs/$S" \
+    --order-by LastEventTime --descending --max-items 1 \
+    --query 'logStreams[0].logStreamName' --output text 2>/dev/null | head -1)
+  ERROS=$(aws logs get-log-events --region "$REGIAO" --log-group-name "/ecs/$S" \
+    --log-stream-name "$FLUXO" --start-from-head --limit 40 \
+    --query 'events[].message' --output text 2>/dev/null | grep -ciE "error|precisa estar definida" || true)
+  [ "${ERROS:-0}" -eq 0 ] && ok "$S arrancou limpo" \
+    || falha "$S: $ERROS linha(s) de erro no arranque" "ver /ecs/$S, fluxo $FLUXO"
+done
 
-echo "3/5 as páginas respondem?"
-for P in /suplementos /api/products; do
+# Um caminho de cada serviço: /suplementos vai ao núcleo, /api/products à
+# entrada, /suplementos/dashboard ao portal. Se um estiver fora, a sonda que
+# só bate no núcleo diz que está tudo bem.
+echo "3/5 as páginas respondem? (uma por serviço)"
+for P in /suplementos /api/products /suplementos/dashboard/pedidos; do
   CODIGO=$(curl -s -o /dev/null -w "%{http_code}" "$BASE$P")
   [ "$CODIGO" = "200" ] && ok "$P ($CODIGO)" || falha "$P devolveu $CODIGO" "curl -v $BASE$P"
 done
