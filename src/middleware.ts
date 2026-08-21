@@ -27,6 +27,13 @@ function portaoFechado(request: NextRequest): boolean {
   // A própria tela e o endpoint que valida a senha precisam continuar
   // acessíveis, senão não há como entrar.
   if (path === '/em-breve' || path === '/api/acesso-equipe') return false
+  // A página de contato mora no site estático, fora do portão — mas o envio
+  // do formulário chega aqui. Sem esta linha, o cliente preenche tudo e
+  // recebe a tela "Em breve" no lugar da confirmação.
+  //
+  // É o único buraco no portão, e é estreito de propósito: esta rota manda
+  // e-mail e não toca no banco. Nada do sistema fica visível por ela.
+  if (path === '/api/contato') return false
   // Arquivos estáticos servidos da pasta public (logo da própria tela).
   if (/\.(png|jpg|jpeg|svg|webp|ico|gif|mp4|woff2?)$/i.test(path)) return false
 

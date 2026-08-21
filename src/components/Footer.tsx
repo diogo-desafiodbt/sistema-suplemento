@@ -44,12 +44,12 @@ export default function Footer() {
             >
               Home
             </Link>
-            <Link
-              href="/suplementos/contato"
+            <a
+              href="/oprimeiropasso/contato/"
               className="block text-xs py-1.5 opacity-70 hover:opacity-100 transition"
             >
               Contato
-            </Link>
+            </a>
             <span className="block text-xs py-1.5 opacity-70 hover:opacity-100 transition">
               Perguntas Frequentes
             </span>
