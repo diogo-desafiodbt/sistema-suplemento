@@ -1,6 +1,11 @@
 import { createServerClient } from '@supabase/ssr'
 import { type NextRequest, NextResponse } from 'next/server'
 import { getUserProfile } from '@/lib/auth/profile'
+import {
+  assinarSessaoSatelite,
+  SESSAO_SATELITE_COOKIE,
+  SESSAO_SATELITE_MAX_AGE,
+} from '@/lib/sessao-satelite'
 import { getAppBaseUrl } from '@/lib/url-base'
 
 export const runtime = 'nodejs'
@@ -101,6 +106,22 @@ export async function middleware(request: NextRequest) {
       const dest = new URL('/suplementos/dashboard', getAppBaseUrl())
       dest.search = request.nextUrl.search
       return NextResponse.redirect(dest)
+    }
+
+    if (isAdmin && profile?.role === 'admin') {
+      // Next não deixa gravar cookie no layout (RSC). O carimbo sai daqui,
+      // no mesmo instante em que o papel já foi conferido.
+      supabaseResponse.cookies.set(
+        SESSAO_SATELITE_COOKIE,
+        assinarSessaoSatelite(user.id, profile.role),
+        {
+          httpOnly: true,
+          secure: true,
+          sameSite: 'lax',
+          path: '/',
+          maxAge: SESSAO_SATELITE_MAX_AGE,
+        },
+      )
     }
 
     if (

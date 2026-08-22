@@ -29,5 +29,12 @@ export async function POST(request: NextRequest) {
   })
 
   await supabase.auth.signOut()
+  response.cookies.set('sessao_satelite', '', {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 0,
+  })
   return response
 }

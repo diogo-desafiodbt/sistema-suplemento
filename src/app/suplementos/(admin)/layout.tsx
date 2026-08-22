@@ -1,12 +1,24 @@
 import Image from 'next/image'
+import { redirect } from 'next/navigation'
 import imgLogoBranca from '@/../public/logo-branca.png'
 import { AdminNav } from '@/components/admin/AdminNav'
+import { getUserProfile } from '@/lib/auth/profile'
+import { createClient } from '@/lib/supabase/server'
 
-export default function AdminLayout({
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect('/suplementos/login')
+
+  const profile = await getUserProfile(user.id)
+  if (profile?.role !== 'admin') redirect('/suplementos/dashboard')
+
   return (
     <div className="min-h-screen bg-[#f5f0eb]">
       <header className="bg-[#13244f] px-6 py-4 flex items-center justify-between">
