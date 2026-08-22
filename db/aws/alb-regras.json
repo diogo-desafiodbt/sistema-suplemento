@@ -61,6 +61,16 @@
       "destino": "tg-sistema-portal",
       "porque": "Zona 1: o portal do paciente, servido por contêiner SEM DATABASE_URL e SEM taskRoleArn. Criada nos dois listeners em 21/08/2026.",
       "nos_dois_listeners": true
+    },
+    {
+      "prioridade": 8,
+      "caminhos": [
+        "/suplementos/admin/alertas*"
+      ],
+      "destino": "tg-satelite-alertas (Lambda)",
+      "porque": "Primeiro satélite da Fase 6. Alvo do tipo lambda — sem contêiner, sem NAT, sem API Gateway.",
+      "nos_dois_listeners": true,
+      "por_que_debaixo_de_suplementos": "/alertas não existe na CloudFront: cairia na regra padrão, que vai para o S3, e devolvia 404. Abrir comportamento novo lá gastaria a quinta e última vaga do plano gratuito. /suplementos* já vai para o ALB."
     }
   ],
   "reverter": "aws elbv2 modify-rule --rule-arn <arn> --conditions 'Field=path-pattern,Values=/api/__desligado'",
@@ -72,6 +82,16 @@
   "listener_80_http": {
     "porque": "É este que a CloudFront usa. Regra que não existe aqui não vale para cliente nenhum.",
     "regras": [
+      {
+        "prioridade": 8,
+        "caminhos": [
+          "/suplementos/admin/alertas*"
+        ],
+        "destino": "tg-satelite-alertas (Lambda)",
+        "porque": "Primeiro satélite da Fase 6. Alvo do tipo lambda — sem contêiner, sem NAT, sem API Gateway.",
+        "nos_dois_listeners": true,
+        "por_que_debaixo_de_suplementos": "/alertas não existe na CloudFront: cairia na regra padrão, que vai para o S3, e devolvia 404. Abrir comportamento novo lá gastaria a quinta e última vaga do plano gratuito. /suplementos* já vai para o ALB."
+      },
       {
         "prioridade": 1,
         "caminhos": [
