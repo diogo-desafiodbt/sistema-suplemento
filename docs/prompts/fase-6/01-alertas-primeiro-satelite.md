@@ -1,101 +1,136 @@
-# Prompt — a aba de alertas como PRIMEIRO SATÉLITE (Zona 2)
-
-> **Não rodar antes da Fase 6.** Decidido pelo Diogo em 19/08/2026.
-
-## Por que este prompt está na Fase 6 e não na de observabilidade
-
-Ele foi escrito para o núcleo, lendo `alertas` pelo `getSql()` com a credencial
-`app_web` — a mesma que alcança prontuário. Isso contraria a regra de zonas:
-
-> *"Essa tela precisa ler quiz, protocolo, prescrição, CPF ou endereço?"*
-> Se não, é microserviço. **Todo serviço novo nasce na Zona 2.**
-
-A aba lê **uma tabela**, `alertas`. Nenhum dado clínico, nenhum CPF, nenhum
-endereço. **A resposta é não — ela é Zona 2.**
-
-E é o melhor primeiro satélite que existe no sistema: lê zero dado clínico, não
-escreve nada, e se der errado ninguém se machuca. Serve de ensaio barato do
-padrão que a Fase 6 vai aplicar em coisas mais delicadas.
-
-**A credencial já existe:** o papel `vigia` tem `SELECT` em `alertas` e em mais
-nada de escrita. O satélite pode usar essa identidade — não precisa de
-credencial nova nem de acesso ao núcleo.
-
-**Regra de custo que vale aqui:** satélite não nasce em contêiner. Estático ou
-função sob demanda; contêiner ligado 24h para uma tela consultada raramente é
-US$ 7/mês de ociosidade.
-
-## O que precisa ser decidido quando a Fase 6 começar
-
-- Como o satélite autentica quem entra (a casca entrega sessão, nunca dado)
-- Estático com dado embutido na build, ou função sob demanda consultando ao vivo
-- Se entra na casca do admin como aba ou vive em endereço próprio
-
-O corpo abaixo descreve o CONTEÚDO da tela, que continua válido. O que muda é
-onde ela mora e com que credencial lê.
-
----
+# Prompt — Fase 6, satélite 1: a tela de alertas
 
 > Referencie no Cursor com `@01-alertas-primeiro-satelite.md`.
 > Branch: `reestrutura-suplementos`.
+> Reescrito em 22/08/2026. A versão anterior punha a tela no núcleo — o que
+> contraria a regra de zonas. O conteúdo da tela continua igual; o que mudou é
+> **onde ela mora e com que credencial lê**.
 
-Uma página nova e uma linha na navegação. Faz parte da **fase de
-observabilidade**, criada em 19/08/2026 depois de a camada assíncrona inteira
-ficar dias parada sem gerar um único erro.
+O primeiro satélite. Uma tela que lê **uma tabela** e não escreve nada — de
+propósito: se o padrão estiver errado, erramos onde não machuca ninguém.
 
-## O que já existe (não precisa criar)
-
-A tabela **`alertas`** está no banco `clinico` e já é alimentada de hora em hora
-por uma tarefa agendada fora da aplicação. `app_web` tem **`SELECT`** nela.
+## O desenho
 
 ```
-id             uuid
-digital        text         -- impressão digital: tipo + chave do problema
-tipo           text         -- pagamento-sem-pedido, job-atrasado, ...
-detalhe        jsonb        -- e-mail, valor, horas, nome do job...
-visto_em       timestamptz  -- quando apareceu
-ultima_vez_em  timestamptz  -- última execução que ainda viu o problema
-notificado_em  timestamptz  -- quando virou e-mail (nulo = ainda não)
-resolvido_em   timestamptz  -- nulo = aberto
+navegador → ALB → Lambda "satelite-alertas" → RDS (só a tabela alertas)
 ```
 
-Tipos possíveis hoje: `pagamento-sem-pedido`, `assinada-sem-despacho`,
-`job-atrasado`, `job-falhou`, `suporte-sem-resposta`, `assinatura-vencida`.
+**Não é contêiner.** Contêiner ligado 24h para uma tela olhada uma vez por dia
+é ociosidade paga. Lambda cobra por execução; nesta escala, é centavos.
 
-**Não invente escrita.** A página é somente leitura: quem escreve é o vigia.
-Se aparecer `INSERT`/`UPDATE`/`DELETE` em `alertas`, está errado.
+**Não usa `app_web`.** Um papel novo, `satelite_alertas`, com `SELECT` em
+`alertas` e **em mais nada**. Nem `users`, nem `payments`, nem prontuário. Se o
+satélite for comprometido, o que vaza é a lista de alertas.
 
-## A página: `src/app/suplementos/(admin)/admin/alertas/page.tsx`
+**Sem senha.** Entra por token IAM, como o núcleo. A Lambda não guarda
+credencial de banco.
 
-Siga o padrão das outras telas do admin (`clientes`, `suporte`): componente de
-servidor, `getSql()`, sem client component desnecessário.
+A infraestrutura — papel no banco, função, regra do ALB — **é minha**. Este
+prompt cobre o código.
 
-### Bloco 1 — quando o vigia rodou pela última vez
+## Parte 1 — o núcleo passa a carimbar quem é admin
 
-**Este é o bloco mais importante da página, e o menos óbvio.**
+Aqui está o problema a resolver: a Lambda precisa saber quem entrou, e **não
+alcança a internet** (está na VPC, sem NAT). Não pode perguntar ao Supabase nem
+ao núcleo.
+
+Então o núcleo, que já sabe, **carimba**.
+
+Crie `src/lib/sessao-satelite.ts`:
+
+```ts
+export function assinarSessaoSatelite(userId: string, role: string): string
+export function verificarSessaoSatelite(cookie: string): { sub: string; role: string } | null
+```
+
+- Formato: `base64url(payload).base64url(hmacSHA256(payload, segredo))`
+- Payload: `{ sub, role, exp }`, com **exp de 30 minutos**
+- Segredo: `process.env.SATELITE_SESSION_SECRET` — **falhe alto se faltar**,
+  nunca caia para outra chave
+- Use `crypto` do Node. Não instale biblioteca de JWT para isto.
+- Compare a assinatura com `crypto.timingSafeEqual`
+
+No layout do admin (`src/app/suplementos/(admin)/layout.tsx`), depois de
+confirmar que o papel é `admin`, grave o cookie **`sessao_satelite`**:
+`httpOnly`, `secure`, `sameSite: 'lax'`, `path: '/'`, `maxAge` de 30 minutos.
+
+Assim o carimbo se renova sozinho enquanto a pessoa usa o admin, e morre
+sozinho quando ela para.
+
+**A casca entrega sessão, nunca dado.** O cookie diz *quem é*; não diz nada
+sobre alertas. É a regra da Fase 6b, e é o que impede a casca de virar chave
+mestra.
+
+## Parte 2 — o satélite
+
+Pasta nova na raiz: **`satelites/alertas/`**. Fora de `src/` de propósito — é
+outro deployable, não faz parte do Next.
+
+```
+satelites/alertas/
+  handler.mjs      a função
+  package.json     dependência única: postgres
+  LEIA-ME.md       o desenho em 10 linhas, para quem abrir daqui a um ano
+```
+
+### `handler.mjs`
+
+Recebe evento do ALB (`event.headers`, `event.path`) e devolve
+`{ statusCode, headers, body }` com **HTML** — página inteira, sem framework.
+
+**Ordem obrigatória:**
+
+1. Lê o cookie `sessao_satelite` do cabeçalho `Cookie`.
+2. Verifica com o mesmo HMAC da parte 1. Sem cookie, assinatura inválida ou
+   expirado → **302 para `/suplementos/login`**. Papel diferente de `admin` →
+   **404**, não 403.
+3. Só então consulta o banco.
+
+**Nunca consulte antes de verificar.** É a ordem que impede que uma falha de
+autenticação vire vazamento.
+
+### A conexão
+
+`postgres` (mesma biblioteca do núcleo), com senha como **função assíncrona**
+que gera token IAM — o mesmo padrão de `src/lib/db.ts`. Use
+`@aws-sdk/rds-signer`, que já vem no runtime da Lambda.
+
+```
+host     desafiodiabetes.c0fsqek8ykxr.us-east-1.rds.amazonaws.com
+porta    5432
+banco    clinico
+usuário  satelite_alertas
+ssl      require
+```
+
+Reaproveite a conexão entre execuções (variável de módulo), mas **não** deixe
+`idle_timeout` alto — Lambda congela entre chamadas.
+
+## Parte 3 — a tela
+
+Três blocos, nesta ordem.
+
+### Bloco 1 — quando o vigia passou por aqui (o mais importante)
 
 ```sql
 SELECT max(greatest(visto_em, ultima_vez_em)) AS ultima_passagem FROM alertas
 ```
 
-Mostre a idade dessa data em destaque. Se passar de **90 minutos**, pinte como
-problema e escreva algo como *"o vigia não passa por aqui há X horas"*.
+Mostre a idade em destaque. **Acima de 90 minutos, pinte como problema**:
+*"o vigia não passa por aqui há X horas"*.
 
-Motivo: se o vigia morrer, a tela fica mostrando dado velho e parece saudável.
-Uma tela de alertas que não sabe se está atualizada é pior que nenhuma — ela
-transmite calma falsa. **Quem vigia o vigia é esta linha.**
+Se o vigia morrer, a tela mostra dado velho e parece saudável. Uma tela de
+alertas que não sabe se está atualizada é pior que nenhuma — ela transmite
+calma falsa. **Quem vigia o vigia é esta linha.**
 
 ### Bloco 2 — abertos
 
-`WHERE resolvido_em IS NULL`, agrupados por `tipo`, mais antigo primeiro.
+`WHERE resolvido_em IS NULL`, agrupados por `tipo`, mais antigo primeiro. Para
+cada um: o rótulo em português, o conteúdo relevante do `detalhe`, e há quanto
+tempo está aberto.
 
-Para cada um: o tipo em linguagem de gente, o conteúdo relevante do `detalhe`,
-e há quanto tempo está aberto (a partir de `visto_em`).
-
-Distinga visualmente **notificado** de **ainda não notificado** — o segundo é
-coisa que apareceu agora e ainda não te acordou.
-
-Rótulos em português, não o slug:
+Distinga **notificado** de **ainda não notificado** — o segundo apareceu agora
+e ainda não te acordou.
 
 | tipo | rótulo |
 |---|---|
@@ -108,56 +143,46 @@ Rótulos em português, não o slug:
 
 ### Bloco 3 — resolvidos nas últimas 48h
 
-`WHERE resolvido_em > now() - interval '48 hours'`, discreto, no fim.
-
-Não é enfeite: é a prova de que o vigia fecha o que conserta. Sem esse bloco,
-alerta que some parece alerta que foi perdido.
+Discreto, no fim. Não é enfeite: é a prova de que o vigia fecha o que conserta.
+Sem ele, alerta que some parece alerta que foi perdido.
 
 ### Estado vazio
 
-Se não houver nada aberto, diga que está tudo certo **e mostre quando foi a
-última passagem do vigia**. "Nenhum alerta" sozinho é ambíguo — pode significar
-"tudo bem" ou "ninguém olhou".
+"Nenhum alerta" sozinho é ambíguo — pode ser *tudo bem* ou *ninguém olhou*.
+Diga que está tudo certo **e mostre a última passagem do vigia**.
 
-## Navegação
+### Visual
 
-`src/components/admin/AdminNav.tsx` tem uma lista de abas. Acrescente
-**Alertas** — sugiro logo depois de `Visão Geral`, porque é o que se olha
-primeiro num dia ruim.
+Paleta da marca, sem framework: fundo `#fafbfe`, texto `#212529`, azul
+`#13244f`, vermelho de ação `#f4001e`. Estado usa a paleta semântica —
+`#7dc668`, `#ff7076`, `#f5b666` —, **nunca o vermelho da marca**, que num
+painel compete com o vermelho de erro.
 
-Se der para mostrar a contagem de abertos junto do rótulo (tipo `Alertas 3`),
-melhor; mas **não** faça isso custar uma consulta em toda navegação do admin —
-se complicar, deixe só o rótulo.
-
-## Sobre "tempo real"
-
-O Diogo pediu tempo real. **O dado nasce de hora em hora**, então atualização
-contínua mostraria a mesma coisa 3.600 vezes.
-
-Se quiser, ponha `export const revalidate = 60` na página — atualiza a cada
-minuto quando alguém está com ela aberta, e é honesto com a cadência real.
-**Não** implemente polling, websocket nem streaming.
+CSS embutido na própria resposta. Sem arquivo externo, sem fonte remota.
 
 ## O que NÃO fazer
 
-- **Não escreva em `alertas`.** Leitura apenas.
-- **Não rode SQL contra o banco**, não faça deploy, não mexa em task definition,
-  Secrets Manager, EventBridge ou CloudWatch.
-- **Não mexa no `db/vigia/`** — o SQL do vigia não é da aplicação.
+- **Não escreva em `alertas`.** Se aparecer `INSERT`, `UPDATE` ou `DELETE`,
+  está errado. Quem escreve é o vigia.
 - **Não crie botão de "resolver" ou "silenciar".** O vigia fecha sozinho quando
-  a condição some; um botão manual criaria estado que o vigia não conhece e as
-  duas verdades divergiriam.
-- **Não crie `/nova-senha`** nem mexa na trava de assinatura concorrente.
+  a condição some; um botão manual criaria estado que ele não conhece, e as
+  duas verdades passariam a divergir.
+- **Não consulte nenhuma tabela além de `alertas`.** O papel nem vai deixar —
+  mas se você escrever, descobrimos com erro em produção em vez de aqui.
+- **Não ponha a tela dentro do `src/app`.** Ela não é do Next.
+- **Não crie função, papel no banco, regra de ALB nem segredo.** Meu.
+- **Não rode SQL, não faça deploy.**
+- **Não mexa em `db/vigia/`** — aquele SQL não é da aplicação.
 
 ## Critério de pronto
 
-1. `npm run build` e `npx tsc --noEmit` passam.
-2. `/suplementos/admin/alertas` existe e aparece na navegação.
-3. A página mostra a idade da última passagem do vigia, com destaque acima de
-   90 minutos.
-4. `grep -n "alertas" src/app/suplementos/\(admin\)/admin/alertas/page.tsx`
-   não mostra `INSERT`, `UPDATE` nem `DELETE`.
-5. O estado vazio informa a última passagem do vigia.
+1. `npm run build` e `npx tsc --noEmit` passam no núcleo.
+2. `satelites/alertas/handler.mjs` existe e **não importa nada de `src/`**.
+3. `grep -rn "INSERT\|UPDATE\|DELETE" satelites/alertas/` volta vazio.
+4. `grep -rn "FROM" satelites/alertas/handler.mjs` mostra **só** `alertas`.
+5. Sem cookie válido, o handler devolve 302 **sem** ter aberto conexão com o
+   banco — dá para ver pela ordem do código.
+6. `SATELITE_SESSION_SECRET` ausente derruba na partida, não silenciosamente.
 
-Quando terminar, me chame para verificar antes de mexer em qualquer outra coisa
-no editor.
+Quando terminar, me chame para verificar antes de mexer em outra coisa. Eu crio
+o papel, a função e a regra do ALB, e testo com sessão real.
