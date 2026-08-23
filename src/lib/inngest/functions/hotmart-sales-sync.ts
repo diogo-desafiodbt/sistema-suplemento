@@ -3,12 +3,9 @@ import {
   fetchAllSalesHistory,
   type HotmartSaleItem,
 } from '@/lib/hotmart/client'
-import { createConteudoClient } from '@/lib/conteudo/rest'
+import { getSqlConteudo, upsertConteudo } from '@/lib/conteudo/db'
 import { registrarFim, registrarInicio } from '@/lib/jobs/registro'
 import { inngest } from '../client'
-
-// As tabelas de conteúdo ainda vivem fora do RDS clínico; só o registro do job vai
-// para o RDS. Some quando o banco `conteudo` for migrado.
 
 const SP_OFFSET = '-03:00'
 
@@ -72,7 +69,7 @@ export const hotmartSalesSync = inngest.createFunction(
   },
   async ({ step }) => {
     const result = await step.run('sync-hotmart-sales', async () => {
-      const admin = createConteudoClient()
+      const sql = getSqlConteudo()
       const now = new Date()
       const window = lastTwoCalendarDaysWindow(now)
       const jobId = await registrarInicio('hotmart_sales_sync')
@@ -117,20 +114,14 @@ export const hotmartSalesSync = inngest.createFunction(
 
       let totalUpserted = 0
       if (rows.length > 0) {
-        const { error: upsertError, count } = await admin
-          .from('hotmart_sales')
-          .upsert(rows, {
-            onConflict: 'transaction_code',
-            count: 'exact',
-          })
-
-        if (upsertError) {
-          await fail(upsertError, { totalFetched: items.length })
+        try {
+          totalUpserted = await upsertConteudo(sql, 'hotmart_sales', rows)
+        } catch (error) {
+          await fail(error, { totalFetched: items.length })
           throw new Error(
-            `Erro ao upsert hotmart_sales: ${upsertError.message}`,
+            `Erro ao upsert hotmart_sales: ${error instanceof Error ? error.message : String(error)}`,
           )
         }
-        totalUpserted = count ?? rows.length
       }
 
       const payload = {

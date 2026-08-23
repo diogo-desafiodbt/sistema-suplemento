@@ -5,12 +5,9 @@ import {
   mapCategoriaRow,
   mapMovimentoRow,
 } from '@/lib/omie/client'
-import { createConteudoClient } from '@/lib/conteudo/rest'
+import { getSqlConteudo, upsertConteudo } from '@/lib/conteudo/db'
 import { registrarFim, registrarInicio } from '@/lib/jobs/registro'
 import { inngest } from '../client'
-
-// As tabelas de conteúdo ainda vivem fora do RDS clínico; só o registro do job vai
-// para o RDS. Some quando o banco `conteudo` for migrado.
 
 const SP_OFFSET = '-03:00'
 
@@ -43,7 +40,7 @@ export const omieFinanceiroSync = inngest.createFunction(
   },
   async ({ step }) => {
     const result = await step.run('sync-omie-financeiro', async () => {
-      const admin = createConteudoClient()
+      const sql = getSqlConteudo()
       const now = new Date()
       const window = lastThreeCalendarDaysWindow(now)
       const jobId = await registrarInicio('omie_financeiro_sync')
@@ -55,14 +52,7 @@ export const omieFinanceiroSync = inngest.createFunction(
           .filter((row): row is NonNullable<typeof row> => row !== null)
 
         if (categoriaRows.length > 0) {
-          const { error: catError } = await admin
-            .from('omie_categorias')
-            .upsert(categoriaRows, { onConflict: 'codigo' })
-          if (catError) {
-            throw new Error(
-              `Upsert omie_categorias: ${catError.message}`,
-            )
-          }
+          await upsertConteudo(sql, 'omie_categorias', categoriaRows)
         }
 
         const movimentos = await fetchAllMovimentosLiquidados({
@@ -76,18 +66,11 @@ export const omieFinanceiroSync = inngest.createFunction(
 
         let totalMovimentosUpserted = 0
         if (movimentoRows.length > 0) {
-          const { error: movError, count } = await admin
-            .from('omie_movimentos_financeiros')
-            .upsert(movimentoRows, {
-              onConflict: 'codigo_titulo',
-              count: 'exact',
-            })
-          if (movError) {
-            throw new Error(
-              `Upsert omie_movimentos_financeiros: ${movError.message}`,
-            )
-          }
-          totalMovimentosUpserted = count ?? movimentoRows.length
+          totalMovimentosUpserted = await upsertConteudo(
+            sql,
+            'omie_movimentos_financeiros',
+            movimentoRows,
+          )
         }
 
         const payload = {

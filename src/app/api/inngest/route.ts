@@ -12,7 +12,6 @@ import { rfmRecalc } from '@/lib/inngest/functions/rfm-recalc'
 import { supportAnalyze } from '@/lib/inngest/functions/support-analyze'
 import { supportInboxPoll } from '@/lib/inngest/functions/support-inbox-poll'
 import { supportPendingReminder } from '@/lib/inngest/functions/support-pending-reminder'
-import { youtubeAnalyticsSync } from '@/lib/inngest/functions/youtube-analytics-sync'
 import { getAppBaseUrl } from '@/lib/url-base'
 
 /** Cinto de segurança: steps do YouTube (metadata ~3.7k + retenção) precisam >60s. */
@@ -35,7 +34,10 @@ export const { GET, POST, PUT } = serve({
     processarProtocolos,
     omieFinanceiroSync,
     hotmartSalesSync,
-    youtubeAnalyticsSync,
+    // youtube-analytics-sync DESLIGADO em 23/08/2026: o Diogo não vai usar o
+    // dado do canal por enquanto. O arquivo continua no repositório e JÁ grava
+    // no RDS — religar é devolver esta linha e o import. As 10 tabelas dele
+    // estão prontas e vazias no banco `conteudo`.
     purchaseConfirmed,
     supportInboxPoll,
     supportAnalyze,
