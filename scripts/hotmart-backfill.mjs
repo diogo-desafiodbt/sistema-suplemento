@@ -1,20 +1,23 @@
 /**
- * Backfill único — últimos ~6 meses de vendas Hotmart (Guia Primeiro Passo).
- * Uso: node scripts/hotmart-backfill.mjs
+ * Backfill — últimos 12 meses de vendas Hotmart (Guia Primeiro Passo).
+ *
+ * Uso:
+ *   node scripts/hotmart-backfill.mjs           # conta antiga (HOTMART_*)
+ *   node scripts/hotmart-backfill.mjs --conta=2 # conta nova (HOTMART2_*)
  *
  * Idempotente (upsert por transaction_code). Não altera o job diário Inngest.
  */
 
-import { createClient } from '@supabase/supabase-js'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { getSqlConteudo, upsertConteudo } from './lib/conteudo-db.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = resolve(__dirname, '..')
 
 const MONTH_MS = 30 * 24 * 60 * 60 * 1000
-const SLICE_COUNT = 6
+const SLICE_COUNT = 12
 
 function loadEnv() {
   const envPath = resolve(root, '.env.local')
@@ -38,35 +41,47 @@ function requireEnv(name) {
   return value
 }
 
-const supabase = createClient(
-  requireEnv('NEXT_PUBLIC_SUPABASE_URL'),
-  requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
-  { auth: { autoRefreshToken: false, persistSession: false } },
-)
+function parseContaArg() {
+  const arg = process.argv.find((a) => a.startsWith('--conta='))
+  const raw = arg ? arg.split('=')[1] : '1'
+  const conta = Number(raw)
+  if (conta !== 1 && conta !== 2) {
+    throw new Error('--conta deve ser 1 ou 2')
+  }
+  return conta
+}
 
+function hotmartCredentials(conta) {
+  const prefix = conta === 2 ? 'HOTMART2' : 'HOTMART'
+  return {
+    conta,
+    clientId: requireEnv(`${prefix}_CLIENT_ID`),
+    clientSecret: requireEnv(`${prefix}_CLIENT_SECRET`),
+    basicToken: requireEnv(`${prefix}_BASIC_TOKEN`),
+    productId: requireEnv(`${prefix}_PRODUCT_ID`),
+  }
+}
+
+/** @type {{ token: string; expiresAt: number } | null} */
 let tokenCache = null
 
-async function getHotmartAccessToken() {
+async function getHotmartAccessToken(creds) {
   const now = Date.now()
   if (tokenCache && tokenCache.expiresAt > now + 60_000) {
     return tokenCache.token
   }
 
-  const clientId = requireEnv('HOTMART_CLIENT_ID')
-  const clientSecret = requireEnv('HOTMART_CLIENT_SECRET')
-  const basicToken = requireEnv('HOTMART_BASIC_TOKEN')
-
   const url = new URL(
     'https://api-sec-vlc.hotmart.com/security/oauth/token',
   )
   url.searchParams.set('grant_type', 'client_credentials')
-  url.searchParams.set('client_id', clientId)
-  url.searchParams.set('client_secret', clientSecret)
+  url.searchParams.set('client_id', creds.clientId)
+  url.searchParams.set('client_secret', creds.clientSecret)
 
   const res = await fetch(url.toString(), {
     method: 'POST',
     headers: {
-      Authorization: basicToken,
+      Authorization: creds.basicToken,
       'Content-Type': 'application/x-www-form-urlencoded',
     },
   })
@@ -99,8 +114,8 @@ async function getHotmartAccessToken() {
   return parsed.access_token
 }
 
-async function fetchAllSalesHistory({ productId, startDateMs, endDateMs }) {
-  const accessToken = await getHotmartAccessToken()
+async function fetchAllSalesHistory(creds, startDateMs, endDateMs) {
+  const accessToken = await getHotmartAccessToken(creds)
   const all = []
   let pageToken
 
@@ -108,7 +123,7 @@ async function fetchAllSalesHistory({ productId, startDateMs, endDateMs }) {
     const url = new URL(
       'https://developers.hotmart.com/payments/api/v1/sales/history',
     )
-    url.searchParams.set('product_id', productId)
+    url.searchParams.set('product_id', creds.productId)
     url.searchParams.set('start_date', String(startDateMs))
     url.searchParams.set('end_date', String(endDateMs))
     url.searchParams.set('max_results', '50')
@@ -154,8 +169,7 @@ function epochMsToIso(ms) {
   return new Date(ms).toISOString()
 }
 
-/** Mesmo mapeamento de mapSaleRow em hotmart-sales-sync.ts */
-function mapSaleRow(item) {
+function mapSaleRow(item, contaProductId) {
   const purchase = item.purchase
   const transaction = purchase?.transaction
   if (!transaction) return null
@@ -169,6 +183,7 @@ function mapSaleRow(item) {
   return {
     transaction_code: transaction,
     product_id: productId,
+    conta_product_id: contaProductId,
     product_name: item.product?.name ?? null,
     buyer_name: item.buyer?.name ?? null,
     buyer_email: item.buyer?.email ?? null,
@@ -205,12 +220,15 @@ function buildMonthlySlices(endMs) {
 }
 
 async function main() {
-  const productId = requireEnv('HOTMART_PRODUCT_ID')
+  const conta = parseContaArg()
+  const creds = hotmartCredentials(conta)
+  const contaProductId = Number(creds.productId)
+  const sql = getSqlConteudo()
   const endMs = Date.now()
   const slices = buildMonthlySlices(endMs)
 
   console.log(
-    `Hotmart backfill — produto ${productId}, ${SLICE_COUNT} fatias (~6 meses)`,
+    `Hotmart backfill — conta ${conta}, produto ${creds.productId}, ${SLICE_COUNT} fatias (~12 meses)`,
   )
   console.log(
     `Janela total: ${new Date(slices[0].startMs).toISOString()} → ${new Date(endMs).toISOString()}`,
@@ -223,32 +241,23 @@ async function main() {
   for (const slice of slices) {
     console.log(`\n[${slice.index}/${SLICE_COUNT}] ${slice.label}`)
 
-    const items = await fetchAllSalesHistory({
-      productId,
-      startDateMs: slice.startMs,
-      endDateMs: slice.endMs,
-    })
+    const items = await fetchAllSalesHistory(
+      creds,
+      slice.startMs,
+      slice.endMs,
+    )
 
     const rows = []
     let discarded = 0
     for (const item of items) {
-      const row = mapSaleRow(item)
+      const row = mapSaleRow(item, contaProductId)
       if (row) rows.push(row)
       else discarded++
     }
 
     let upserted = 0
     if (rows.length > 0) {
-      const { error, count } = await supabase.from('hotmart_sales').upsert(rows, {
-        onConflict: 'transaction_code',
-        count: 'exact',
-      })
-      if (error) {
-        throw new Error(
-          `Upsert fatia ${slice.index} falhou: ${error.message}`,
-        )
-      }
-      upserted = count ?? rows.length
+      upserted = await upsertConteudo(sql, 'hotmart_sales', rows)
     }
 
     totalFetched += items.length
@@ -256,13 +265,15 @@ async function main() {
     totalDiscarded += discarded
 
     console.log(
-      `  API: ${items.length} itens | upsert: ${upserted} | descartados: ${discarded}`,
+      `  fatia ${slice.index}/${SLICE_COUNT}: ${items.length} vendas, ${upserted} gravadas` +
+        (discarded > 0 ? ` (${discarded} descartadas)` : '') +
+        (items.length === 0 ? ' — janela vazia, banco não chamado' : ''),
     )
   }
 
   console.log('\n———')
   console.log(
-    `Total: fetched=${totalFetched} upserted=${totalUpserted} discarded=${totalDiscarded}`,
+    `Total conta ${conta}: fetched=${totalFetched} upserted=${totalUpserted} discarded=${totalDiscarded}`,
   )
 }
 

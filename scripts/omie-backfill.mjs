@@ -1,20 +1,20 @@
 /**
- * Backfill único — categorias Omie + últimos ~6 meses de movimentos liquidados.
+ * Backfill — categorias Omie + últimos 12 meses de movimentos liquidados.
  * Uso: node scripts/omie-backfill.mjs
  *
  * Idempotente (upsert por codigo / codigo_titulo). Não altera o job diário.
  */
 
-import { createClient } from '@supabase/supabase-js'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { getSqlConteudo, upsertConteudo } from './lib/conteudo-db.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = resolve(__dirname, '..')
 
 const MONTH_MS = 30 * 24 * 60 * 60 * 1000
-const SLICE_COUNT = 6
+const SLICE_COUNT = 12
 const PAGE_DELAY_MS = 300
 const CATEGORIAS_URL = 'https://app.omie.com.br/api/v1/geral/categorias/'
 const MOVIMENTOS_URL = 'https://app.omie.com.br/api/v1/financas/mf/'
@@ -44,12 +44,6 @@ function requireEnv(name) {
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms))
 }
-
-const supabase = createClient(
-  requireEnv('NEXT_PUBLIC_SUPABASE_URL'),
-  requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
-  { auth: { autoRefreshToken: false, persistSession: false } },
-)
 
 function snToBool(value) {
   if (value === 'S') return true
@@ -236,23 +230,26 @@ function buildMonthlySlices(endMs) {
 }
 
 async function main() {
-  console.log('Omie backfill — categorias + movimentos liquidados (~6 meses)')
+  const sql = getSqlConteudo()
+
+  console.log('Omie backfill — categorias + movimentos liquidados (~12 meses)')
 
   console.log('\n[1] Sincronizando categorias…')
   const categorias = await fetchAllCategorias()
   const catRows = categorias.map(mapCategoriaRow).filter(Boolean)
+  let catUpserted = 0
   if (catRows.length > 0) {
-    const { error } = await supabase
-      .from('omie_categorias')
-      .upsert(catRows, { onConflict: 'codigo' })
-    if (error) throw new Error(`Upsert categorias: ${error.message}`)
+    catUpserted = await upsertConteudo(sql, 'omie_categorias', catRows)
   }
-  console.log(`  Categorias: API=${categorias.length} upsert=${catRows.length}`)
+  console.log(
+    `  categorias: ${categorias.length} da API, ${catUpserted} gravadas` +
+      (catRows.length === 0 ? ' — vazio, banco não chamado' : ''),
+  )
 
   const endMs = Date.now()
   const slices = buildMonthlySlices(endMs)
   console.log(
-    `\n[2] Movimentos liquidados — ${SLICE_COUNT} fatias (~6 meses)`,
+    `\n[2] Movimentos liquidados — ${SLICE_COUNT} fatias (~12 meses)`,
   )
 
   let totalFetched = 0
@@ -277,13 +274,11 @@ async function main() {
 
     let upserted = 0
     if (rows.length > 0) {
-      const { error, count } = await supabase
-        .from('omie_movimentos_financeiros')
-        .upsert(rows, { onConflict: 'codigo_titulo', count: 'exact' })
-      if (error) {
-        throw new Error(`Upsert fatia ${slice.index}: ${error.message}`)
-      }
-      upserted = count ?? rows.length
+      upserted = await upsertConteudo(
+        sql,
+        'omie_movimentos_financeiros',
+        rows,
+      )
     }
 
     totalFetched += items.length
@@ -291,7 +286,9 @@ async function main() {
     totalDiscarded += discarded
 
     console.log(
-      `  API: ${items.length} | upsert: ${upserted} | descartados: ${discarded}`,
+      `  fatia ${slice.index}/${SLICE_COUNT}: ${items.length} movimentos, ${upserted} gravados` +
+        (discarded > 0 ? ` (${discarded} descartados)` : '') +
+        (items.length === 0 ? ' — janela vazia, banco não chamado' : ''),
     )
   }
 

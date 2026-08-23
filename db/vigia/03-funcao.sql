@@ -59,7 +59,9 @@ BEGIN
     ('rfm_recalc'::job_type,              interval '2 hours'),
     ('hotmart_sales_sync'::job_type,      interval '26 hours'),
     ('omie_financeiro_sync'::job_type,    interval '26 hours'),
-    ('youtube_analytics_sync'::job_type,  interval '26 hours'),
+    -- youtube_analytics_sync saiu em 23/08/2026: o job foi desligado a pedido
+    -- do Diogo. Cobrar cron que ninguém agendou acende alerta todo dia, e
+    -- alerta que dispara à toa é alerta que se aprende a ignorar.
     ('pharmacy_reconciliation'::job_type, interval '26 hours')
   )
   SELECT 'job-atrasado:' || e.job_type, 'job-atrasado',
