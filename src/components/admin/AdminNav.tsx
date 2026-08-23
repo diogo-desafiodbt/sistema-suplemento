@@ -10,7 +10,11 @@ import { usePathname } from 'next/navigation'
 const tabs = [
   { label: 'Visão Geral', href: '/suplementos/admin' },
   { label: 'Clientes', href: '/suplementos/admin/clientes' },
-  { label: 'Pedidos', href: '/suplementos/admin/pedidos' },
+  // Aponta para o satélite. A tela antiga continua em
+  // /suplementos/admin/pedidos, viva como rede: a renderização de uma linha
+  // com dado real ainda não foi provada — a base está zerada desde a limpeza.
+  // Some quando a primeira compra de verdade aparecer certa.
+  { label: 'Pedidos', href: '/suplementos/admin/pedidos-lista', externa: true },
   { label: 'Suporte', href: '/suplementos/admin/suporte' },
   { label: 'Usuários', href: '/suplementos/admin/usuarios' },
   {
