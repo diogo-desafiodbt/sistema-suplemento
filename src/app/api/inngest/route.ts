@@ -1,7 +1,9 @@
 import { serve } from 'inngest/next'
 import { inngest } from '@/lib/inngest/client'
 import { avulsoRenewalReminder } from '@/lib/inngest/functions/avulso-renewal-reminder'
+import { hotmartBackfill } from '@/lib/inngest/functions/hotmart-backfill'
 import { hotmartSalesSync } from '@/lib/inngest/functions/hotmart-sales-sync'
+import { omieBackfill } from '@/lib/inngest/functions/omie-backfill'
 import { omieFinanceiroSync } from '@/lib/inngest/functions/omie-financeiro-sync'
 import { paymentRetry } from '@/lib/inngest/functions/payment-retry'
 import { pharmacyOrder } from '@/lib/inngest/functions/pharmacy-order'
@@ -33,7 +35,9 @@ export const { GET, POST, PUT } = serve({
     pharmacyReconciliation,
     processarProtocolos,
     omieFinanceiroSync,
+    omieBackfill,
     hotmartSalesSync,
+    hotmartBackfill,
     // youtube-analytics-sync DESLIGADO em 23/08/2026: o Diogo não vai usar o
     // dado do canal por enquanto. O arquivo continua no repositório e JÁ grava
     // no RDS — religar é devolver esta linha e o import. As 10 tabelas dele

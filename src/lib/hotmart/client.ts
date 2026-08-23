@@ -121,11 +121,89 @@ export type FetchSalesHistoryParams = {
   maxResults?: number
 }
 
-/** Lista vendas com paginação por cursor (page_token). */
-export async function fetchAllSalesHistory(
+export type HotmartConta = 1 | 2
+
+const tokenCaches: Partial<Record<HotmartConta, TokenCache>> = {}
+
+function hotmartEnvPrefix(conta: HotmartConta): string {
+  return conta === 2 ? 'HOTMART2' : 'HOTMART'
+}
+
+export function parseHotmartConta(value: unknown): HotmartConta {
+  const conta = Number(value)
+  if (conta !== 1 && conta !== 2) {
+    throw new Error('conta deve ser 1 ou 2')
+  }
+  return conta
+}
+
+export function hotmartProductIdForConta(conta: HotmartConta): string {
+  return requireEnv(`${hotmartEnvPrefix(conta)}_PRODUCT_ID`)
+}
+
+/** OAuth por conta — backfill usa HOTMART2_* na conta 2. */
+export async function getHotmartAccessTokenForConta(
+  conta: HotmartConta,
+): Promise<string> {
+  const now = Date.now()
+  const cached = tokenCaches[conta]
+  if (cached && cached.expiresAt > now + 60_000) {
+    return cached.token
+  }
+
+  const prefix = hotmartEnvPrefix(conta)
+  const clientId = requireEnv(`${prefix}_CLIENT_ID`)
+  const clientSecret = requireEnv(`${prefix}_CLIENT_SECRET`)
+  const basicToken = requireEnv(`${prefix}_BASIC_TOKEN`)
+
+  const url = new URL(
+    'https://api-sec-vlc.hotmart.com/security/oauth/token',
+  )
+  url.searchParams.set('grant_type', 'client_credentials')
+  url.searchParams.set('client_id', clientId)
+  url.searchParams.set('client_secret', clientSecret)
+
+  const res = await fetch(url.toString(), {
+    method: 'POST',
+    headers: {
+      Authorization: basicToken,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+  })
+
+  const text = await res.text()
+  let parsed: unknown = text
+  try {
+    parsed = text ? JSON.parse(text) : null
+  } catch {
+    /* keep raw */
+  }
+
+  if (!res.ok) {
+    const detail =
+      typeof parsed === 'object' && parsed !== null
+        ? JSON.stringify(parsed)
+        : String(parsed)
+    throw new Error(`Hotmart OAuth (conta ${conta}) → ${res.status}: ${detail}`)
+  }
+
+  const data = parsed as HotmartTokenResponse
+  if (!data.access_token) {
+    throw new Error(`Hotmart OAuth (conta ${conta}): access_token ausente`)
+  }
+
+  const expiresInMs = (data.expires_in ?? 86400) * 1000
+  tokenCaches[conta] = {
+    token: data.access_token,
+    expiresAt: now + expiresInMs,
+  }
+  return data.access_token
+}
+
+async function fetchAllSalesHistoryWithToken(
+  accessToken: string,
   params: FetchSalesHistoryParams,
 ): Promise<HotmartSaleItem[]> {
-  const accessToken = await getHotmartAccessToken()
   const maxResults = params.maxResults ?? 50
   const all: HotmartSaleItem[] = []
   let pageToken: string | undefined
@@ -174,6 +252,24 @@ export async function fetchAllSalesHistory(
   } while (pageToken)
 
   return all
+}
+
+/** Lista vendas com paginação por cursor (page_token). */
+export async function fetchAllSalesHistory(
+  params: FetchSalesHistoryParams,
+): Promise<HotmartSaleItem[]> {
+  return fetchAllSalesHistoryWithToken(await getHotmartAccessToken(), params)
+}
+
+export async function fetchAllSalesHistoryForConta(
+  conta: HotmartConta,
+  params: Omit<FetchSalesHistoryParams, 'productId'> & { productId?: string },
+): Promise<HotmartSaleItem[]> {
+  const productId = params.productId ?? hotmartProductIdForConta(conta)
+  return fetchAllSalesHistoryWithToken(
+    await getHotmartAccessTokenForConta(conta),
+    { ...params, productId },
+  )
 }
 
 export function epochMsToIso(ms: number | undefined): string | null {
