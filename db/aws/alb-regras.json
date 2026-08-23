@@ -65,31 +65,34 @@
     {
       "prioridade": 8,
       "caminhos": [
-        "/suplementos/admin/alertas*"
+        "/suplementos/admin/painel/alertas*"
       ],
       "destino": "tg-satelite-alertas (Lambda)",
       "porque": "Primeiro satélite da Fase 6. Alvo do tipo lambda — sem contêiner, sem NAT, sem API Gateway.",
       "nos_dois_listeners": true,
-      "por_que_debaixo_de_suplementos": "/alertas não existe na CloudFront: cairia na regra padrão, que vai para o S3, e devolvia 404. Abrir comportamento novo lá gastaria a quinta e última vaga do plano gratuito. /suplementos* já vai para o ALB."
+      "por_que_debaixo_de_suplementos": "/alertas não existe na CloudFront: cairia na regra padrão, que vai para o S3, e devolvia 404. Abrir comportamento novo lá gastaria a quinta e última vaga do plano gratuito. /suplementos* já vai para o ALB.",
+      "casca": "Movido em 23/08/2026 para debaixo de /painel/. O caminho sem /painel/ passou a ser a MOLDURA, servida pelo núcleo: menu, cabeçalho e sessão. O conteúdo vem daqui, direto para o navegador — a casca não busca dado do satélite."
     },
     {
       "prioridade": 9,
       "caminhos": [
-        "/suplementos/admin/ajustes*"
+        "/suplementos/admin/painel/ajustes*"
       ],
       "destino": "tg-satelite-ajustes (Lambda)",
       "porque": "Satélite 2 da Fase 6: cupons e configuração. Primeiro que escreve.",
-      "nos_dois_listeners": true
+      "nos_dois_listeners": true,
+      "casca": "Movido em 23/08/2026 para debaixo de /painel/. O caminho sem /painel/ passou a ser a MOLDURA, servida pelo núcleo: menu, cabeçalho e sessão. O conteúdo vem daqui, direto para o navegador — a casca não busca dado do satélite."
     },
     {
       "prioridade": 11,
       "caminhos": [
-        "/suplementos/admin/pedidos-lista*"
+        "/suplementos/admin/painel/pedidos*"
       ],
       "destino": "tg-satelite-pedidos (Lambda)",
       "porque": "Satélite 3: a LISTA de pedidos. Os três botões continuam no núcleo, que é onde endereço e CPF já moram.",
       "nos_dois_listeners": true,
-      "nota": "prioridade 10 já era do blog; 11 estava livre."
+      "nota": "prioridade 10 já era do blog; 11 estava livre.",
+      "casca": "Movido em 23/08/2026 para debaixo de /painel/. O caminho sem /painel/ passou a ser a MOLDURA, servida pelo núcleo: menu, cabeçalho e sessão. O conteúdo vem daqui, direto para o navegador — a casca não busca dado do satélite."
     }
   ],
   "reverter": "aws elbv2 modify-rule --rule-arn <arn> --conditions 'Field=path-pattern,Values=/api/__desligado'",
@@ -104,31 +107,34 @@
       {
         "prioridade": 8,
         "caminhos": [
-          "/suplementos/admin/alertas*"
+          "/suplementos/admin/painel/alertas*"
         ],
         "destino": "tg-satelite-alertas (Lambda)",
         "porque": "Primeiro satélite da Fase 6. Alvo do tipo lambda — sem contêiner, sem NAT, sem API Gateway.",
         "nos_dois_listeners": true,
-        "por_que_debaixo_de_suplementos": "/alertas não existe na CloudFront: cairia na regra padrão, que vai para o S3, e devolvia 404. Abrir comportamento novo lá gastaria a quinta e última vaga do plano gratuito. /suplementos* já vai para o ALB."
+        "por_que_debaixo_de_suplementos": "/alertas não existe na CloudFront: cairia na regra padrão, que vai para o S3, e devolvia 404. Abrir comportamento novo lá gastaria a quinta e última vaga do plano gratuito. /suplementos* já vai para o ALB.",
+        "casca": "Movido em 23/08/2026 para debaixo de /painel/. O caminho sem /painel/ passou a ser a MOLDURA, servida pelo núcleo: menu, cabeçalho e sessão. O conteúdo vem daqui, direto para o navegador — a casca não busca dado do satélite."
       },
       {
         "prioridade": 9,
         "caminhos": [
-          "/suplementos/admin/ajustes*"
+          "/suplementos/admin/painel/ajustes*"
         ],
         "destino": "tg-satelite-ajustes (Lambda)",
         "porque": "Satélite 2 da Fase 6: cupons e configuração. Primeiro que escreve.",
-        "nos_dois_listeners": true
+        "nos_dois_listeners": true,
+        "casca": "Movido em 23/08/2026 para debaixo de /painel/. O caminho sem /painel/ passou a ser a MOLDURA, servida pelo núcleo: menu, cabeçalho e sessão. O conteúdo vem daqui, direto para o navegador — a casca não busca dado do satélite."
       },
       {
         "prioridade": 11,
         "caminhos": [
-          "/suplementos/admin/pedidos-lista*"
+          "/suplementos/admin/painel/pedidos*"
         ],
         "destino": "tg-satelite-pedidos (Lambda)",
         "porque": "Satélite 3: a LISTA de pedidos. Os três botões continuam no núcleo, que é onde endereço e CPF já moram.",
         "nos_dois_listeners": true,
-        "nota": "prioridade 10 já era do blog; 11 estava livre."
+        "nota": "prioridade 10 já era do blog; 11 estava livre.",
+        "casca": "Movido em 23/08/2026 para debaixo de /painel/. O caminho sem /painel/ passou a ser a MOLDURA, servida pelo núcleo: menu, cabeçalho e sessão. O conteúdo vem daqui, direto para o navegador — a casca não busca dado do satélite."
       },
       {
         "prioridade": 1,
