@@ -80,6 +80,16 @@
       "destino": "tg-satelite-ajustes (Lambda)",
       "porque": "Satélite 2 da Fase 6: cupons e configuração. Primeiro que escreve.",
       "nos_dois_listeners": true
+    },
+    {
+      "prioridade": 11,
+      "caminhos": [
+        "/suplementos/admin/pedidos-lista*"
+      ],
+      "destino": "tg-satelite-pedidos (Lambda)",
+      "porque": "Satélite 3: a LISTA de pedidos. Os três botões continuam no núcleo, que é onde endereço e CPF já moram.",
+      "nos_dois_listeners": true,
+      "nota": "prioridade 10 já era do blog; 11 estava livre."
     }
   ],
   "reverter": "aws elbv2 modify-rule --rule-arn <arn> --conditions 'Field=path-pattern,Values=/api/__desligado'",
@@ -109,6 +119,16 @@
         "destino": "tg-satelite-ajustes (Lambda)",
         "porque": "Satélite 2 da Fase 6: cupons e configuração. Primeiro que escreve.",
         "nos_dois_listeners": true
+      },
+      {
+        "prioridade": 11,
+        "caminhos": [
+          "/suplementos/admin/pedidos-lista*"
+        ],
+        "destino": "tg-satelite-pedidos (Lambda)",
+        "porque": "Satélite 3: a LISTA de pedidos. Os três botões continuam no núcleo, que é onde endereço e CPF já moram.",
+        "nos_dois_listeners": true,
+        "nota": "prioridade 10 já era do blog; 11 estava livre."
       },
       {
         "prioridade": 1,
