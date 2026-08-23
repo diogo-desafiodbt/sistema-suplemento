@@ -197,7 +197,15 @@ function validarNovoCupom(dados) {
   return { code, type, value, expires_at: expiresAt, max_uses: maxUses }
 }
 
-function nav(abasAtiva) {
+// Cupons e Config são DUAS ABAS DA CASCA, servidas pelo mesmo satélite. A
+// barra que troca entre elas é do admin, não daqui — desenhar uma segunda por
+// dentro cria dois menus concorrentes na mesma tela.
+//
+// Continua existindo para quando a página é aberta direto pelo endereço, sem a
+// moldura: aí não há barra nenhuma e a pessoa ficaria sem saída. Dentro do
+// quadro, some.
+function nav(abasAtiva, dentroDaMoldura) {
+  if (dentroDaMoldura) return ''
   const tabs = [
     { label: 'Cupons', href: `${BASE}/cupons`, id: 'cupons' },
     { label: 'Config', href: `${BASE}/config`, id: 'config' },
@@ -378,6 +386,15 @@ function estilos() {
   `
 }
 
+// O navegador diz para que serve a requisição. `iframe` significa que estamos
+// dentro da moldura do admin — e aí a barra de abas é dela, não nossa.
+let DENTRO_DA_MOLDURA = false
+export function marcarMoldura(event) {
+  const h = event?.headers ?? {}
+  const dest = h['sec-fetch-dest'] ?? h['Sec-Fetch-Dest'] ?? ''
+  DENTRO_DA_MOLDURA = dest === 'iframe'
+}
+
 function layout({ titulo, aba, estreito, conteudo }) {
   return `<!doctype html>
 <html lang="pt-BR">
@@ -388,7 +405,7 @@ function layout({ titulo, aba, estreito, conteudo }) {
   <style>${estilos()}</style>
 </head>
 <body>
-  ${nav(aba)}
+  ${nav(aba, DENTRO_DA_MOLDURA)}
   <main class="${estreito ? 'estreito' : ''}">
     ${conteudo}
   </main>
@@ -640,6 +657,7 @@ async function tratarPostConfig(db, form) {
 }
 
 export async function handler(event) {
+  marcarMoldura(event)
   const sessao = verificarSessao(cookieDoEvento(event))
   if (!sessao) return redirectLogin()
   if (sessao.role !== 'admin') return notFound()
