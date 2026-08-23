@@ -5,6 +5,8 @@ import {
   LOGIN_URL,
   verificarSessao,
 } from '../comum/sessao.mjs'
+import { estiloBase } from '../comum/estilo.mjs'
+
 const HOST = 'desafiodiabetes.c0fsqek8ykxr.us-east-1.rds.amazonaws.com'
 const PORT = 5432
 const DB = 'clinico'
@@ -212,64 +214,48 @@ function pagina({ ultimaPassagem, abertos, resolvidos }) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Alertas</title>
   <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      padding: 12px 16px;
-      font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
-      color: #212529;
-      line-height: 1.45;
-      background: transparent;
-    }
-    main { max-width: 760px; margin: 0 auto; padding: 0 0 24px; }
-    .card {
-      background: #fff;
-      border: 1px solid #e8ecf3;
-      border-radius: 16px;
-      padding: 20px 22px;
-      margin-bottom: 16px;
-    }
-    h2 { margin: 0 0 12px; font-size: 15px; color: #13244f; }
-    h3 { margin: 16px 0 8px; font-size: 13px; color: #13244f; }
+    ${estiloBase()}
+    main { max-width: 760px; }
+    h2 { margin: 0 0 12px; font-size: 15px; color: var(--marinho); }
+    h3 { margin: 16px 0 8px; font-size: 13px; color: var(--marinho); }
     .count {
       font-weight: 600;
       font-size: 12px;
-      background: #13244f;
+      background: var(--marinho);
       color: #fff;
-      border-radius: 999px;
+      border-radius: var(--raio);
       padding: 1px 8px;
       margin-left: 6px;
     }
-    .passagem { font-size: 28px; font-weight: 700; color: #13244f; margin: 0 0 6px; }
-    .passagem.problema { color: #ff7076; }
+    .passagem { font-size: 28px; font-weight: 700; color: var(--marinho); margin: 0 0 6px; }
+    .passagem.problema { color: var(--perigo); }
     .aviso {
-      background: #fff6ea;
+      background: color-mix(in srgb, var(--atencao) 28%, white);
       color: #8a5a12;
-      border-radius: 10px;
+      border-radius: var(--raio);
       padding: 10px 12px;
       font-size: 14px;
     }
     .ok p { margin: 0 0 6px; }
-    .muted { color: #6c757d; font-size: 13px; }
     ul { list-style: none; margin: 0; padding: 0; }
-    li { padding: 10px 0; border-top: 1px solid #f0f2f7; }
+    li { padding: 10px 0; border-top: 1px solid var(--borda); }
     .grupo ul li:first-child { border-top: 0; }
     .linha { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    .badge {
+    .badge { /* legado; preferir .selo */
       font-size: 11px;
       font-weight: 700;
       letter-spacing: .03em;
       text-transform: uppercase;
-      border-radius: 999px;
+      border-radius: var(--raio);
       padding: 2px 8px;
     }
-    .novo .badge { background: #fde8e9; color: #b4232c; }
-    .conhecido .badge { background: #e8f6e4; color: #2f6b24; }
-    .tempo { font-size: 12px; color: #6c757d; }
+    .novo .badge { background: color-mix(in srgb, var(--perigo) 22%, white); color: #9b2c2c; }
+    .conhecido .badge { background: color-mix(in srgb, var(--ok) 22%, white); color: #2f6b24; }
+    .tempo { font-size: 12px; color: var(--tinta-fraca); }
     li p { margin: 6px 0 0; font-size: 14px; }
     .discreto { opacity: .92; }
     .resolvidos li { font-size: 14px; }
-    .resolvidos strong { color: #13244f; margin-right: 8px; }
+    .resolvidos strong { color: var(--marinho); margin-right: 8px; }
   </style>
 </head>
 <body>

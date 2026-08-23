@@ -2,11 +2,9 @@ import { AbaDeServico } from '@/components/admin/AbaDeServico'
 
 export default function AdminPedidosPage() {
   return (
-    <main className="px-6 py-8">
-      <AbaDeServico
-        src="/suplementos/admin/painel/pedidos"
-        titulo="Pedidos"
-      />
-    </main>
+    <AbaDeServico
+      src="/suplementos/admin/painel/pedidos"
+      titulo="Pedidos"
+    />
   )
 }

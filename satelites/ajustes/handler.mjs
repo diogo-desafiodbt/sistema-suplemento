@@ -5,6 +5,7 @@ import {
   LOGIN_URL,
   verificarSessao,
 } from '../comum/sessao.mjs'
+import { estiloBase } from '../comum/estilo.mjs'
 
 const HOST = 'desafiodiabetes.c0fsqek8ykxr.us-east-1.rds.amazonaws.com'
 const PORT = 5432
@@ -222,18 +223,10 @@ function nav(abasAtiva, dentroDaMoldura) {
 
 function estilos() {
   return `
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      padding: 12px 16px;
-      font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
-      color: #212529;
-      line-height: 1.45;
-      background: transparent;
-    }
+    ${estiloBase()}
     .tabs {
-      background: #fff;
-      border-bottom: 1px solid #e8ecf3;
+      background: var(--papel);
+      border-bottom: 1px solid var(--borda);
       padding: 10px 24px;
       display: flex;
       gap: 6px;
@@ -241,16 +234,16 @@ function estilos() {
     }
     .tabs a {
       padding: 8px 16px;
-      border-radius: 8px;
+      border-radius: var(--raio);
       font-size: 14px;
       font-weight: 500;
-      color: rgba(19, 36, 79, .6);
+      color: color-mix(in srgb, var(--marinho) 60%, transparent);
       text-decoration: none;
       white-space: nowrap;
     }
-    .tabs a:hover { background: rgba(19, 36, 79, .08); color: #13244f; }
-    .tabs a.ativa { background: #13244f; color: #fff; }
-    main { max-width: 960px; margin: 0 auto; padding: 0 0 24px; }
+    .tabs a:hover { background: rgba(19, 36, 79, .08); color: var(--marinho); }
+    .tabs a.ativa { background: var(--marinho); color: #fff; }
+    main { max-width: 960px; }
     main.estreito { max-width: 640px; }
     .topo { margin-bottom: 20px; }
     .topo .secao {
@@ -258,26 +251,11 @@ function estilos() {
       font-weight: 700;
       letter-spacing: .08em;
       text-transform: uppercase;
-      color: rgba(19, 36, 79, .5);
+      color: var(--tinta-fraca);
       margin: 0 0 4px;
     }
-    .topo h1 { margin: 0; font-size: 24px; color: #13244f; }
-    .topo p { margin: 4px 0 0; font-size: 14px; color: #6c757d; }
-    .card {
-      background: #fff;
-      border: 1px solid #e8ecf3;
-      border-radius: 16px;
-      padding: 20px 22px;
-      margin-bottom: 16px;
-    }
-    .card h2 {
-      margin: 0 0 14px;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      color: rgba(19, 36, 79, .5);
-    }
+    .topo h1 { margin: 0; font-size: 24px; color: var(--marinho); }
+    .topo p { margin: 4px 0 0; font-size: 14px; color: var(--tinta-fraca); }
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -289,82 +267,49 @@ function estilos() {
       font-weight: 700;
       letter-spacing: .04em;
       text-transform: uppercase;
-      color: rgba(19, 36, 79, .6);
+      color: var(--tinta-fraca);
       margin-bottom: 4px;
     }
     input, select {
       width: 100%;
-      border: 1px solid #e0e4ec;
-      border-radius: 12px;
+      border: 1px solid var(--borda);
+      border-radius: var(--raio);
       padding: 8px 12px;
       font-size: 14px;
-      color: #13244f;
-      background: #fff;
+      color: var(--marinho);
+      background: var(--papel);
+      font-family: inherit;
     }
     input:focus, select:focus {
       outline: none;
       box-shadow: 0 0 0 2px rgba(19, 36, 79, .15);
     }
-    .btn {
-      display: inline-block;
-      border: 0;
-      border-radius: 999px;
-      padding: 10px 22px;
-      font-size: 14px;
-      font-weight: 700;
-      cursor: pointer;
-      text-decoration: none;
-    }
-    .btn-primario { background: #f4001e; color: #fff; }
-    .btn-primario:hover { background: #a30000; }
-    .btn-secundario {
-      background: #fff;
-      color: #13244f;
-      border: 1px solid #e0e4ec;
-    }
     .acoes { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
-    table { width: 100%; border-collapse: collapse; font-size: 14px; }
-    th {
-      text-align: left;
-      padding: 12px 16px;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: .06em;
-      text-transform: uppercase;
-      color: rgba(19, 36, 79, .5);
-      border-bottom: 1px solid #eef1f6;
-    }
-    td {
-      padding: 14px 16px;
-      border-bottom: 1px solid #f5f7fa;
-      vertical-align: middle;
-    }
-    tr:hover td { background: rgba(245, 240, 235, .35); }
-    .mono { font-family: ui-monospace, monospace; font-weight: 700; color: #13244f; }
+    .mono { font-family: ui-monospace, monospace; font-weight: 700; color: var(--marinho); }
     .pill {
       display: inline-block;
       font-size: 11px;
       font-weight: 700;
-      border-radius: 999px;
+      border-radius: var(--raio);
       padding: 4px 10px;
       border: 0;
       cursor: pointer;
+      font-family: inherit;
     }
-    .pill-ativo { background: #e8f6e4; color: #2f6b24; }
-    .pill-inativo { background: #f0f2f5; color: #6c757d; }
-    .muted { color: #6c757d; font-size: 13px; }
+    .pill-ativo { background: color-mix(in srgb, var(--ok) 22%, white); color: #2f6b24; }
+    .pill-inativo { background: #f0f2f5; color: var(--tinta-fraca); }
     .flash-ok {
-      background: #e8f6e4;
+      background: color-mix(in srgb, var(--ok) 22%, white);
       color: #2f6b24;
-      border-radius: 10px;
+      border-radius: var(--raio);
       padding: 10px 14px;
       margin-bottom: 16px;
       font-size: 14px;
     }
     .flash-erro {
-      background: #fde8e9;
-      color: #b4232c;
-      border-radius: 10px;
+      background: color-mix(in srgb, var(--perigo) 22%, white);
+      color: #9b2c2c;
+      border-radius: var(--raio);
       padding: 10px 14px;
       margin-bottom: 16px;
       font-size: 14px;
@@ -377,12 +322,11 @@ function estilos() {
       font-weight: 700;
       letter-spacing: .06em;
       text-transform: uppercase;
-      color: rgba(19, 36, 79, .5);
+      color: var(--tinta-fraca);
       margin: 0 0 4px;
     }
     .config-linha { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     .config-linha input { flex: 1; min-width: 200px; font-family: ui-monospace, monospace; }
-    .vazio { text-align: center; padding: 32px 16px; color: #6c757d; }
   `
 }
 

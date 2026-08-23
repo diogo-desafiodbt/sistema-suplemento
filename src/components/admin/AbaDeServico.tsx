@@ -69,14 +69,11 @@ export function AbaDeServico({ src, titulo }: Props) {
 
   if (erro) {
     return (
-      <div className="rounded-2xl border border-[#ff7076]/30 bg-white px-6 py-10 text-center">
-        <p className="text-[#13244f] font-medium mb-3">
+      <div className="admin-card" style={{ textAlign: 'center', padding: '40px 24px' }}>
+        <p className="admin-vazio-titulo" style={{ marginBottom: 12 }}>
           Não conseguimos carregar esta aba agora.
         </p>
-        <a
-          href={src}
-          className="text-sm font-semibold text-[#f4001e] hover:underline"
-        >
+        <a href={src} className="admin-btn admin-btn--primario">
           Tentar de novo
         </a>
       </div>

@@ -3,41 +3,65 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-const tabs = [
-  { label: 'Visão Geral', href: '/suplementos/admin' },
-  { label: 'Clientes', href: '/suplementos/admin/clientes' },
-  { label: 'Pedidos', href: '/suplementos/admin/pedidos' },
-  { label: 'Suporte', href: '/suplementos/admin/suporte' },
-  { label: 'Usuários', href: '/suplementos/admin/usuarios' },
-  { label: 'Cupons', href: '/suplementos/admin/cupons' },
-  { label: 'Config', href: '/suplementos/admin/config' },
-  { label: 'Auditoria', href: '/suplementos/admin/auditoria' },
-  { label: 'Alertas', href: '/suplementos/admin/alertas' },
+type Item = { label: string; href: string }
+
+const grupos: { titulo: string; itens: Item[] }[] = [
+  {
+    titulo: 'Operação',
+    itens: [
+      { label: 'Visão Geral', href: '/suplementos/admin' },
+      { label: 'Pedidos', href: '/suplementos/admin/pedidos' },
+      { label: 'Suporte', href: '/suplementos/admin/suporte' },
+      { label: 'Alertas', href: '/suplementos/admin/alertas' },
+    ],
+  },
+  {
+    titulo: 'Clínico',
+    itens: [
+      { label: 'Clientes', href: '/suplementos/admin/clientes' },
+      { label: 'Auditoria', href: '/suplementos/admin/auditoria' },
+    ],
+  },
+  {
+    titulo: 'Ajustes',
+    itens: [
+      { label: 'Cupons', href: '/suplementos/admin/cupons' },
+      { label: 'Config', href: '/suplementos/admin/config' },
+      { label: 'Usuários', href: '/suplementos/admin/usuarios' },
+    ],
+  },
 ]
+
+function isActive(pathname: string, href: string): boolean {
+  if (href === '/suplementos/admin') return pathname === '/suplementos/admin'
+  return pathname === href || pathname.startsWith(`${href}/`)
+}
 
 export function AdminNav() {
   const pathname = usePathname()
 
-  function isActive(href: string): boolean {
-    if (href === '/suplementos/admin') return pathname === '/suplementos/admin'
-    return pathname === href || pathname.startsWith(`${href}/`)
-  }
-
   return (
-    <nav className="flex gap-1 overflow-x-auto">
-      {tabs.map((tab) => {
-        const classe = `px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-          isActive(tab.href)
-            ? 'bg-[#13244f] text-white'
-            : 'text-[#13244f]/60 hover:bg-[#13244f]/10 hover:text-[#13244f]'
-        }`
-
-        return (
-          <Link key={tab.href} href={tab.href} className={classe}>
-            {tab.label}
-          </Link>
-        )
-      })}
+    <nav className="admin-nav flex flex-col gap-6 px-3 py-5">
+      {grupos.map((grupo) => (
+        <div key={grupo.titulo}>
+          <p className="admin-nav-secao px-3 mb-2">{grupo.titulo}</p>
+          <ul className="flex flex-col gap-0.5">
+            {grupo.itens.map((item) => {
+              const ativo = isActive(pathname, item.href)
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={`admin-nav-item ${ativo ? 'admin-nav-item--ativo' : ''}`}
+                  >
+                    {item.label}
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      ))}
     </nav>
   )
 }

@@ -5,6 +5,7 @@ import {
   LOGIN_URL,
   verificarSessao,
 } from '../comum/sessao.mjs'
+import { estiloBase } from '../comum/estilo.mjs'
 
 const HOST = 'desafiodiabetes.c0fsqek8ykxr.us-east-1.rds.amazonaws.com'
 const PORT = 5432
@@ -182,96 +183,50 @@ function pagina(pedidos) {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Pedidos</title>
   <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      padding: 12px 16px;
-      font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
-      color: #212529;
-      line-height: 1.45;
-      background: transparent;
-    }
-    main { max-width: 1080px; margin: 0 auto; padding: 0 0 24px; }
+    ${estiloBase()}
+    main { max-width: 1080px; }
     .topo { margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
     .topo .secao {
       font-size: 11px;
       font-weight: 700;
       letter-spacing: .08em;
       text-transform: uppercase;
-      color: rgba(19, 36, 79, .5);
+      color: var(--tinta-fraca);
       margin: 0 0 4px;
     }
-    .topo h1 { margin: 0; font-size: 24px; color: #13244f; }
-    .topo .contagem { font-size: 14px; color: #6c757d; }
-    .card {
-      background: #fff;
-      border: 1px solid #e8ecf3;
-      border-radius: 16px;
-      overflow: hidden;
-    }
-    table { width: 100%; border-collapse: collapse; font-size: 14px; }
-    th {
-      text-align: left;
-      padding: 14px 20px;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: .06em;
-      text-transform: uppercase;
-      color: rgba(19, 36, 79, .5);
-      border-bottom: 1px solid #eef1f6;
-    }
-    td {
-      padding: 16px 20px;
-      border-bottom: 1px solid #f5f7fa;
-      vertical-align: top;
-    }
-    tr:hover td { background: rgba(245, 240, 235, .35); }
-    .nome { margin: 0; font-weight: 600; color: #13244f; }
-    .codigo { margin: 2px 0 0; font-size: 12px; color: #6c757d; }
-    .valor { font-weight: 600; color: #13244f; white-space: nowrap; }
-    .rastreio { font-family: ui-monospace, monospace; font-size: 12px; color: #6c757d; }
-    .data { font-size: 12px; color: #6c757d; white-space: nowrap; }
+    .topo h1 { margin: 0; font-size: 24px; color: var(--marinho); }
+    .topo .contagem { font-size: 14px; color: var(--tinta-fraca); }
+    .card { padding: 0; overflow: hidden; }
+    .tabela-wrap, .card > table { display: block; overflow-x: auto; }
+    table th { padding: 14px 20px; }
+    table td { padding: 16px 20px; vertical-align: top; }
+    .nome { margin: 0; font-weight: 600; color: var(--marinho); }
+    .codigo { margin: 2px 0 0; font-size: 12px; color: var(--tinta-fraca); }
+    .valor { font-weight: 600; color: var(--marinho); white-space: nowrap; }
+    .rastreio { font-family: ui-monospace, monospace; font-size: 12px; color: var(--tinta-fraca); }
+    .data { font-size: 12px; color: var(--tinta-fraca); white-space: nowrap; }
     .pill {
       display: inline-block;
       font-size: 11px;
       font-weight: 700;
-      border-radius: 999px;
+      border-radius: var(--raio);
       padding: 4px 10px;
     }
     .status-pending { background: #f0f2f5; color: #495057; }
     .status-farmacia { background: #e8f0fe; color: #1e4fad; }
-    .status-caminho { background: #fff6ea; color: #9a6b12; }
-    .status-entregue { background: #e8f6e4; color: #2f6b24; }
-    .status-falhou { background: #fde8e9; color: #b4232c; }
+    .status-caminho { background: color-mix(in srgb, var(--atencao) 28%, white); color: #8a5a12; }
+    .status-entregue { background: color-mix(in srgb, var(--ok) 22%, white); color: #2f6b24; }
+    .status-falhou { background: color-mix(in srgb, var(--perigo) 22%, white); color: #9b2c2c; }
     .acoes { display: flex; flex-direction: column; gap: 6px; min-width: 10rem; }
     .acoes form { margin: 0; }
-    .btn {
-      display: block;
-      width: 100%;
-      border: 0;
-      border-radius: 999px;
-      padding: 6px 12px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      text-align: center;
-    }
-    .btn-primario { background: #13244f; color: #fff; }
-    .btn-primario:hover { background: #0e1b3d; }
-    .btn-secundario {
-      background: #fff;
-      color: #13244f;
-      border: 1px solid rgba(19, 36, 79, .3);
-    }
-    .btn-secundario:hover { background: rgba(19, 36, 79, .05); }
+    .acoes .btn { display: block; width: 100%; padding: 6px 12px; font-size: 12px; text-align: center; }
     .btn-pdf {
-      background: #fff;
-      color: #f4001e;
-      border: 1px solid rgba(244, 0, 30, .3);
+      background: var(--papel);
+      color: var(--vermelho);
+      border: 1px solid color-mix(in srgb, var(--vermelho) 30%, white);
     }
-    .btn-pdf:hover { background: rgba(244, 0, 30, .05); }
+    .btn-pdf:hover { background: color-mix(in srgb, var(--vermelho) 6%, white); }
     .sem-acao { font-size: 12px; color: #ced4da; }
-    .vazio { text-align: center; padding: 40px 16px; color: #6c757d; }
   </style>
 </head>
 <body>
