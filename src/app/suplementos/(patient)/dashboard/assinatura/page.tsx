@@ -4,7 +4,7 @@ import imgLogoAzul from '@/../public/logo-azul.png'
 import { AssinaturaClient } from '@/components/patient/AssinaturaClient'
 import { DashboardNav } from '@/components/patient/DashboardNav'
 import { perguntarAoNucleo } from '@/lib/contrato/nucleo'
-import { createClient } from '@/lib/supabase/server'
+import { sessaoAtual } from '@/lib/auth/sessao'
 
 type Assinatura = {
   id: string
@@ -25,11 +25,8 @@ type PagamentosRes = {
 }
 
 export default async function AssinaturaPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) redirect('/suplementos/login')
+  const sessao = await sessaoAtual()
+  if (!sessao) redirect('/suplementos/login')
 
   const [assinaturaRes, pagamentosRes] = await Promise.all([
     perguntarAoNucleo<Assinatura | { subscription: null }>('minha-assinatura'),

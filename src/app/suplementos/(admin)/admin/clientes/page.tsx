@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { RFM_TIER_BADGE, RFM_TIER_LABEL } from '@/lib/admin/rfm-tier'
 import { getUserProfile } from '@/lib/auth/profile'
 import { asNumber, getSql } from '@/lib/db'
-import { createClient } from '@/lib/supabase/server'
+import { sessaoAtual } from '@/lib/auth/sessao'
 
 const PAGE_SIZE = 20
 
@@ -29,13 +29,10 @@ export default async function AdminClientesPage({
 }: {
   searchParams: Promise<{ q?: string; page?: string }>
 }) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) redirect('/suplementos/login')
+  const sessao = await sessaoAtual()
+  if (!sessao) redirect('/suplementos/login')
 
-  const profile = await getUserProfile(user.id)
+  const profile = await getUserProfile(sessao.userId)
 
   if (profile?.role !== 'admin') redirect('/suplementos/dashboard')
 

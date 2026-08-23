@@ -1,22 +1,19 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { sessaoAtual } from '@/lib/auth/sessao'
 
 /** Sessão validada no núcleo — o dono nunca vem do request. */
 export async function requirePacienteSession(): Promise<
   { userId: string } | { response: NextResponse }
 > {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const sessao = await sessaoAtual()
 
-  if (!user) {
+  if (!sessao) {
     return {
       response: NextResponse.json({ error: 'Não autenticado' }, { status: 401 }),
     }
   }
 
-  return { userId: user.id }
+  return { userId: sessao.userId }
 }
 
 export function isoDate(

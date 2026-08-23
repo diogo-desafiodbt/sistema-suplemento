@@ -14,7 +14,7 @@ import {
   addBusinessDays,
   estimateCustomerDeliveryDays,
 } from '@/lib/shipping/estimate'
-import { createClient } from '@/lib/supabase/server'
+import { sessaoAtual } from '@/lib/auth/sessao'
 import { findSupplementImageByProductName } from '@/lib/supplements-content'
 
 type OrderItem = {
@@ -74,11 +74,8 @@ export default async function PedidoDetalhePage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) redirect('/suplementos/login')
+  const sessao = await sessaoAtual()
+  if (!sessao) redirect('/suplementos/login')
 
   const { id } = await params
 

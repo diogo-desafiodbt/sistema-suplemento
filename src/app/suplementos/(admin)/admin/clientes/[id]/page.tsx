@@ -8,7 +8,7 @@ import { PLAN_LABELS } from '@/lib/plans'
 import { getProductDisplayName } from '@/lib/product-display-names'
 import { isNorteNordeste } from '@/lib/shipping/sender-region'
 import { getUserProfile } from '@/lib/auth/profile'
-import { createClient } from '@/lib/supabase/server'
+import { sessaoAtual } from '@/lib/auth/sessao'
 
 type AddressRow = {
   id?: string
@@ -224,13 +224,10 @@ export default async function AdminClienteDetalhePage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) redirect('/suplementos/login')
+  const sessao = await sessaoAtual()
+  if (!sessao) redirect('/suplementos/login')
 
-  const profile = await getUserProfile(user.id)
+  const profile = await getUserProfile(sessao.userId)
 
   if (profile?.role !== 'admin') redirect('/suplementos/dashboard')
 

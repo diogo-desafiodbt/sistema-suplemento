@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
+import { sessaoAtual } from '@/lib/auth/sessao'
 import { quizSchema } from '@/lib/quiz/schema'
-import { createClient } from '@/lib/supabase/server'
 
 /**
  * Legacy endpoint. Protocols are created only after payment confirmation
@@ -8,12 +8,9 @@ import { createClient } from '@/lib/supabase/server'
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const sessao = await sessaoAtual()
 
-    if (!user) {
+    if (!sessao) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
 

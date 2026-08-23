@@ -5,7 +5,7 @@ import imgLogoBranca from '@/../public/logo-branca.png'
 import { ProfessionalNav } from '@/components/professional/ProfessionalNav'
 import { getUserProfile } from '@/lib/auth/profile'
 import { getSql } from '@/lib/db'
-import { createClient } from '@/lib/supabase/server'
+import { sessaoAtual } from '@/lib/auth/sessao'
 
 type ProtocolItem = {
   is_required: boolean
@@ -26,14 +26,11 @@ type SignedProtocol = {
 }
 
 export default async function AssinadosPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const sessao = await sessaoAtual()
 
-  if (!user) redirect('/suplementos/login')
+  if (!sessao) redirect('/suplementos/login')
 
-  const profile = await getUserProfile(user.id)
+  const profile = await getUserProfile(sessao.userId)
 
   if (profile?.role !== 'professional' && profile?.role !== 'admin') {
     redirect('/suplementos/dashboard')
@@ -62,7 +59,7 @@ export default async function AssinadosPage() {
       WHERE pi.protocol_id = p.id) items ON true
     WHERE p.status = 'signed'
       AND (${isAdmin}::boolean OR p.signed_by = (
-            SELECT pf.id FROM professionals pf WHERE pf.user_id = ${user.id}::uuid))
+            SELECT pf.id FROM professionals pf WHERE pf.user_id = ${sessao.userId}::uuid))
     ORDER BY p.signed_at DESC
   `
 

@@ -7,7 +7,7 @@ import {
   type PackageItem,
 } from '@/lib/shipping/package'
 import { escolherTiers } from '@/lib/shipping/tiers'
-import { createClient } from '@/lib/supabase/server'
+import { sessaoAtual } from '@/lib/auth/sessao'
 import type { ShippingOptionPublic } from '@/types/shipping'
 
 const bodySchema = z.object({
@@ -26,11 +26,8 @@ const bodySchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) {
+    const sessao = await sessaoAtual()
+    if (!sessao) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
 

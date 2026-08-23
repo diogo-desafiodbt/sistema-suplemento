@@ -19,7 +19,7 @@ import {
   verifyTriageSessionToken,
 } from '@/lib/quiz/triage-session'
 import { summarizePagarmePayload } from '@/lib/security/pagarme'
-import { createClient } from '@/lib/supabase/server'
+import { sessaoAtual } from '@/lib/auth/sessao'
 import { TERMS_CONTENT, TERMS_VERSION } from '@/lib/terms/content'
 
 const protocolItemSchema = z.object({
@@ -642,12 +642,9 @@ async function replacePendingPixSubscription(opts: {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const sessao = await sessaoAtual()
 
-    if (!user) {
+    if (!sessao) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
 
@@ -744,18 +741,17 @@ export async function POST(request: NextRequest) {
 
     const sql = getSql()
 
-    const metaName = user.user_metadata?.full_name
     await garantirPerfil({
-      id: user.id,
-      email: user.email ?? '',
-      fullName: typeof metaName === 'string' ? metaName : null,
+      id: sessao.userId,
+      email: sessao.email ?? '',
+      fullName: data.quiz.full_name,
     })
 
     const profileRows = await sql<
       { full_name: string; email: string; client_code: string }[]
     >`
       SELECT full_name, email, client_code FROM users
-      WHERE id = ${user.id}::uuid
+      WHERE id = ${sessao.userId}::uuid
       LIMIT 1
     `
     const profile = profileRows[0]
@@ -770,7 +766,7 @@ export async function POST(request: NextRequest) {
     try {
       await sql`
         INSERT INTO addresses ${sql({
-          user_id: user.id,
+          user_id: sessao.userId,
           zip_code: data.address.zip_code,
           street: data.address.street,
           number: data.address.number,
@@ -806,7 +802,7 @@ export async function POST(request: NextRequest) {
 
     if (data.replace_subscription_id) {
       const replaced = await replacePendingPixSubscription({
-        userId: user.id,
+        userId: sessao.userId,
         replaceSubscriptionId: data.replace_subscription_id,
         pagarmeHeaders,
       })
@@ -880,7 +876,7 @@ export async function POST(request: NextRequest) {
     }
 
     const subscription = await createSubscriptionRow({
-      userId: user.id,
+      userId: sessao.userId,
       planType,
       pendingCheckout,
       expiresAt,
@@ -894,14 +890,14 @@ export async function POST(request: NextRequest) {
     }
 
     await recordTermsAcceptance({
-      userId: user.id,
+      userId: sessao.userId,
       subscriptionId: subscription.id,
       ipAddress,
     })
 
     const metadata = {
       subscription_id: subscription.id,
-      user_id: user.id,
+      user_id: sessao.userId,
       plan_type: planType,
       client_code: profile.client_code,
     }
@@ -958,7 +954,7 @@ export async function POST(request: NextRequest) {
     if (result.paid) {
       await finalizePaidSubscription({
         subscriptionId: subscription.id,
-        userId: user.id,
+        userId: sessao.userId,
         expiresAt,
       })
       try {
@@ -966,7 +962,7 @@ export async function POST(request: NextRequest) {
           name: 'pagamento/confirmado',
           data: {
             subscription_id: subscription.id,
-            user_id: user.id,
+            user_id: sessao.userId,
             payment_id: result.paymentId,
           },
         })

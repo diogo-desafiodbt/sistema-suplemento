@@ -1,11 +1,11 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { getUserProfile } from '@/lib/auth/profile'
+import { sessaoAtual } from '@/lib/auth/sessao'
 import { getSql, withTransaction } from '@/lib/db'
 import { generatePrescriptionPdf } from '@/lib/pdf/generator'
 import { createPrescriptionPdfSignedUrl } from '@/lib/pdf/signed-url'
 import { sendToPharmacyWithPdf } from '@/lib/pharmacy/sender'
 import { enviarPdf } from '@/lib/s3/prescricoes'
-import { createClient } from '@/lib/supabase/server'
 import type { PharmacyOrder } from '@/types/pharmacy'
 
 type ProtocolRow = {
@@ -47,16 +47,13 @@ type ProfessionalRow = {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const sessao = await sessaoAtual()
 
-    if (!user) {
+    if (!sessao) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
 
-    const profile = await getUserProfile(user.id)
+    const profile = await getUserProfile(sessao.userId)
 
     if (profile?.role !== 'professional' && profile?.role !== 'admin') {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
@@ -114,7 +111,7 @@ export async function POST(request: NextRequest) {
           ELSE jsonb_build_object('full_name', u.full_name) END AS users
       FROM professionals pf
       LEFT JOIN users u ON u.id = pf.user_id
-      WHERE pf.user_id = ${user.id}::uuid
+      WHERE pf.user_id = ${sessao.userId}::uuid
         AND pf.is_active = true
       LIMIT 1
     `

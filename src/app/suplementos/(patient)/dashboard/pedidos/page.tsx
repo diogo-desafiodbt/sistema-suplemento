@@ -9,7 +9,7 @@ import {
   getPatientOrderStatusColor,
 } from '@/lib/order-status'
 import { getProductDisplayName } from '@/lib/product-display-names'
-import { createClient } from '@/lib/supabase/server'
+import { sessaoAtual } from '@/lib/auth/sessao'
 import { findSupplementImageByProductName } from '@/lib/supplements-content'
 
 type OrderItem = {
@@ -30,11 +30,8 @@ type Pedido = {
 }
 
 export default async function PedidosPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) redirect('/suplementos/login')
+  const sessao = await sessaoAtual()
+  if (!sessao) redirect('/suplementos/login')
 
   const res = await perguntarAoNucleo<{ pedidos: Pedido[] }>('meus-pedidos')
   if (!res) redirect('/suplementos/login')

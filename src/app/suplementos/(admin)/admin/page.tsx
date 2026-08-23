@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getUserProfile } from '@/lib/auth/profile'
 import { asNumber, getSql } from '@/lib/db'
-import { createClient } from '@/lib/supabase/server'
+import { sessaoAtual } from '@/lib/auth/sessao'
 
 type PeriodKey = '7' | '30' | '90' | 'all'
 
@@ -102,13 +102,10 @@ export default async function AdminVisaoGeralPage({
 }: {
   searchParams: Promise<{ periodo?: string }>
 }) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) redirect('/suplementos/login')
+  const sessao = await sessaoAtual()
+  if (!sessao) redirect('/suplementos/login')
 
-  const profile = await getUserProfile(user.id)
+  const profile = await getUserProfile(sessao.userId)
 
   if (profile?.role !== 'admin') redirect('/suplementos/dashboard')
 

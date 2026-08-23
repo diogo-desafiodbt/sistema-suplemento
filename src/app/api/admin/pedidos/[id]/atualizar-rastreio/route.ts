@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { getUserProfile } from '@/lib/auth/profile'
+import { sessaoAtual } from '@/lib/auth/sessao'
 import { getSql } from '@/lib/db'
 import { mergeTrackingEvents } from '@/lib/shipping/tracking-events'
 import { getRastreamento } from '@/lib/shipping/envie-agora/rastreamento'
@@ -7,15 +8,11 @@ import {
   getNewTrackingEvents,
   notifyNewTrackingEvents,
 } from '@/lib/shipping/notify'
-import { createClient } from '@/lib/supabase/server'
 
 async function requireAdmin() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return null
-  const profile = await getUserProfile(user.id)
+  const sessao = await sessaoAtual()
+  if (!sessao) return null
+  const profile = await getUserProfile(sessao.userId)
   if (profile?.role !== 'admin') return null
   return true
 }

@@ -1,19 +1,16 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { getUserProfile } from '@/lib/auth/profile'
+import { sessaoAtual } from '@/lib/auth/sessao'
 import { getSql } from '@/lib/db'
-import { createClient } from '@/lib/supabase/server'
 import { getThreadReplyHeaders, sendSupportEmail } from '@/lib/support/mailer'
 
 async function requireAdmin() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return null
+  const sessao = await sessaoAtual()
+  if (!sessao) return null
 
-  const profile = await getUserProfile(user.id)
+  const profile = await getUserProfile(sessao.userId)
   if (profile?.role !== 'admin') return null
-  return { userId: user.id }
+  return { userId: sessao.userId }
 }
 
 export async function POST(

@@ -1,15 +1,12 @@
 import { type NextRequest, NextResponse } from 'next/server'
+import { sessaoAtual } from '@/lib/auth/sessao'
 import { getSql } from '@/lib/db'
-import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const sessao = await sessaoAtual()
 
-    if (!user) {
+    if (!sessao) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
 
@@ -24,7 +21,7 @@ export async function GET(request: NextRequest) {
     const sql = getSql()
     const subRows = await sql<{ id: string }[]>`
       SELECT id FROM subscriptions
-      WHERE id = ${subscriptionId}::uuid AND user_id = ${user.id}::uuid
+      WHERE id = ${subscriptionId}::uuid AND user_id = ${sessao.userId}::uuid
       LIMIT 1
     `
     const subscription = subRows[0] ?? null

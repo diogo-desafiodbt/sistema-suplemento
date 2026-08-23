@@ -5,7 +5,7 @@ import {
   type IntegridadePdf,
   verificarIntegridadePdf,
 } from '@/lib/pdf/verificar-integridade'
-import { createClient } from '@/lib/supabase/server'
+import { sessaoAtual } from '@/lib/auth/sessao'
 
 type AuditLogRow = {
   id: string
@@ -36,13 +36,10 @@ const INTEGRIDADE_BADGE: Record<IntegridadePdf, string> = {
 }
 
 export default async function AdminAuditoriaPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) redirect('/suplementos/login')
+  const sessao = await sessaoAtual()
+  if (!sessao) redirect('/suplementos/login')
 
-  const profile = await getUserProfile(user.id)
+  const profile = await getUserProfile(sessao.userId)
 
   if (profile?.role !== 'admin') redirect('/suplementos/dashboard')
 

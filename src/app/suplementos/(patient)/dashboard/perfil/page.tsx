@@ -4,7 +4,7 @@ import imgLogoAzul from '@/../public/logo-azul.png'
 import { DashboardNav } from '@/components/patient/DashboardNav'
 import { ProfileForm } from '@/components/patient/ProfileForm'
 import { perguntarAoNucleo } from '@/lib/contrato/nucleo'
-import { createClient } from '@/lib/supabase/server'
+import { sessaoAtual } from '@/lib/auth/sessao'
 
 type Perfil = {
   full_name: string | null
@@ -25,11 +25,8 @@ type Endereco = {
 }
 
 export default async function PerfilPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) redirect('/suplementos/login')
+  const sessao = await sessaoAtual()
+  if (!sessao) redirect('/suplementos/login')
 
   const [profile, enderecoRes] = await Promise.all([
     perguntarAoNucleo<Perfil>('meu-perfil'),
@@ -76,7 +73,7 @@ export default async function PerfilPage() {
         <ProfileForm
           initialData={{
             full_name: profile.full_name ?? '',
-            email: profile.email ?? user.email ?? '',
+            email: profile.email ?? sessao.email ?? '',
             phone: profile.phone ?? '',
             cpf: profile.cpf ?? '',
             birth_date: profile.birth_date ?? '',

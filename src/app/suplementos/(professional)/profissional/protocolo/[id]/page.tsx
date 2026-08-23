@@ -10,7 +10,7 @@ import {
   HEPATIC_LABELS,
   RENAL_LABELS,
 } from '@/lib/protocol/triage'
-import { createClient } from '@/lib/supabase/server'
+import { sessaoAtual } from '@/lib/auth/sessao'
 import { AssinarButton } from './AssinarButton'
 
 type ProtocolItem = {
@@ -60,14 +60,11 @@ export default async function ProtocoloPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const sessao = await sessaoAtual()
 
-  if (!user) redirect('/suplementos/login')
+  if (!sessao) redirect('/suplementos/login')
 
-  const profile = await getUserProfile(user.id)
+  const profile = await getUserProfile(sessao.userId)
 
   if (profile?.role !== 'professional' && profile?.role !== 'admin') {
     redirect('/suplementos/dashboard')
@@ -147,7 +144,7 @@ export default async function ProtocoloPage({
         ${isAdmin}::boolean
         OR p.status = 'pending_signature'
         OR p.signed_by = (
-          SELECT pf.id FROM professionals pf WHERE pf.user_id = ${user.id}::uuid
+          SELECT pf.id FROM professionals pf WHERE pf.user_id = ${sessao.userId}::uuid
         )
       )
     LIMIT 1

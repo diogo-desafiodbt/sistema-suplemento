@@ -1,14 +1,10 @@
 import { redirect } from 'next/navigation'
+import { sessaoAtual } from '@/lib/auth/sessao'
 import { perguntarAoNucleo } from '@/lib/contrato/nucleo'
-import { createClient } from '@/lib/supabase/server'
 
 export default async function DashboardPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) redirect('/suplementos/login')
+  const sessao = await sessaoAtual()
+  if (!sessao) redirect('/suplementos/login')
 
   const papel = await perguntarAoNucleo<{
     role: string

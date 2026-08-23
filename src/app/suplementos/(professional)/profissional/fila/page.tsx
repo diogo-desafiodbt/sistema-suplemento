@@ -5,7 +5,7 @@ import imgLogoBranca from '@/../public/logo-branca.png'
 import { ProfessionalNav } from '@/components/professional/ProfessionalNav'
 import { getUserProfile } from '@/lib/auth/profile'
 import { getSql } from '@/lib/db'
-import { createClient } from '@/lib/supabase/server'
+import { sessaoAtual } from '@/lib/auth/sessao'
 
 type ProtocolItem = {
   is_required: boolean
@@ -35,14 +35,11 @@ type PendingProtocol = {
 }
 
 export default async function FilaPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const sessao = await sessaoAtual()
 
-  if (!user) redirect('/suplementos/login')
+  if (!sessao) redirect('/suplementos/login')
 
-  const profile = await getUserProfile(user.id)
+  const profile = await getUserProfile(sessao.userId)
 
   if (profile?.role !== 'professional' && profile?.role !== 'admin') {
     redirect('/suplementos/dashboard')
