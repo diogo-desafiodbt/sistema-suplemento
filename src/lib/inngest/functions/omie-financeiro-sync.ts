@@ -5,11 +5,11 @@ import {
   mapCategoriaRow,
   mapMovimentoRow,
 } from '@/lib/omie/client'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { createConteudoClient } from '@/lib/conteudo/rest'
 import { registrarFim, registrarInicio } from '@/lib/jobs/registro'
 import { inngest } from '../client'
 
-// As tabelas de conteúdo ainda vivem na Supabase; só o registro do job vai
+// As tabelas de conteúdo ainda vivem fora do RDS clínico; só o registro do job vai
 // para o RDS. Some quando o banco `conteudo` for migrado.
 
 const SP_OFFSET = '-03:00'
@@ -43,7 +43,7 @@ export const omieFinanceiroSync = inngest.createFunction(
   },
   async ({ step }) => {
     const result = await step.run('sync-omie-financeiro', async () => {
-      const admin = createAdminClient()
+      const admin = createConteudoClient()
       const now = new Date()
       const window = lastThreeCalendarDaysWindow(now)
       const jobId = await registrarInicio('omie_financeiro_sync')

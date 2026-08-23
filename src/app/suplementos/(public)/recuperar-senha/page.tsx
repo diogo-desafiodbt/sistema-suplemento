@@ -12,10 +12,8 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { createClient } from '@/lib/supabase/client'
 
 export default function RecuperarSenhaPage() {
-  const supabase = createClient()
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
@@ -24,15 +22,13 @@ export default function RecuperarSenhaPage() {
     e.preventDefault()
     setLoading(true)
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/nova-senha`,
+    await fetch('/api/auth/esqueci-senha', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
     })
 
-    if (error) {
-      toast.error('Erro ao enviar email. Tente novamente.')
-    } else {
-      setSent(true)
-    }
+    setSent(true)
     setLoading(false)
   }
 
@@ -43,12 +39,18 @@ export default function RecuperarSenhaPage() {
           <CardContent className="pt-6">
             <p className="text-lg font-medium">Email enviado</p>
             <p className="text-gray-500 mt-2">
-              Verifique sua caixa de entrada e siga as instruções para redefinir
-              sua senha.
+              Se existir uma conta com esse e-mail, você receberá um código para
+              redefinir a senha.
             </p>
             <a
+              href="/suplementos/nova-senha"
+              className="text-sm text-[#f4001e] font-semibold hover:underline mt-4 block"
+            >
+              Já tenho o código
+            </a>
+            <a
               href="/suplementos/login"
-              className="text-sm text-gray-500 hover:text-gray-700 mt-4 block"
+              className="text-sm text-gray-500 hover:text-gray-700 mt-2 block"
             >
               Voltar para o login
             </a>
@@ -64,7 +66,7 @@ export default function RecuperarSenhaPage() {
         <CardHeader className="text-center">
           <CardTitle>Recuperar senha</CardTitle>
           <CardDescription>
-            Digite seu email e enviaremos um link para redefinir sua senha
+            Digite seu e-mail e enviaremos um código para redefinir sua senha
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -81,7 +83,7 @@ export default function RecuperarSenhaPage() {
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Enviando...' : 'Enviar link de recuperação'}
+              {loading ? 'Enviando...' : 'Enviar código'}
             </Button>
           </form>
           <div className="mt-4 text-center">

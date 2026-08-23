@@ -16,7 +16,6 @@ import {
 } from '@/lib/plans'
 import { getProductDisplayName } from '@/lib/product-display-names'
 import { estimateCustomerDeliveryDays } from '@/lib/shipping/estimate'
-import { createClient } from '@/lib/supabase/client'
 import { fetchCheckoutProfile } from './actions'
 import {
   type ShippingOptionPublic,
@@ -256,19 +255,18 @@ export default function CheckoutPage() {
       setPlan(nextPlan)
       setItems(parsed)
 
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user || cancelled) return
+      const profileRes = await fetch('/api/auth/profile')
+      if (!profileRes.ok || cancelled) return
 
       const profile = await waitForProfile()
       if (cancelled) return
 
+      const { profile: papel } = await profileRes.json()
+
       if (profile) {
         setAccountSummary({
           name: profile.full_name ?? '',
-          email: profile.email ?? user.email ?? '',
+          email: profile.email ?? papel?.email ?? '',
         })
       } else {
         toast.warning(
@@ -276,7 +274,7 @@ export default function CheckoutPage() {
         )
         setAccountSummary({
           name: '',
-          email: user.email ?? '',
+          email: papel?.email ?? '',
         })
       }
       setStep(3)
@@ -320,26 +318,18 @@ export default function CheckoutPage() {
     e.preventDefault()
     setLoading(true)
 
-    const supabase = createClient()
-
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { full_name: fullName },
-        },
+      const res = await fetch('/api/auth/cadastrar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, full_name: fullName }),
       })
 
-      if (error) {
-        console.error('SignUp error completo:', error)
-        toast.error(error.message)
-        return
-      }
-
-      if (!data.user) {
+      if (!res.ok) {
+        const data = await res.json()
         toast.error(
-          'Este email já está cadastrado. Faça login ou use outro email.',
+          data.error ??
+            'Este email já está cadastrado. Faça login ou use outro email.',
         )
         return
       }
@@ -355,7 +345,7 @@ export default function CheckoutPage() {
       setStep(3)
       toast.success('Conta criada com sucesso!')
     } catch (err) {
-      console.error('SignUp catch:', err)
+      console.error('Cadastro catch:', err)
       const message = err instanceof Error ? err.message : String(err)
       toast.error(message || 'Erro desconhecido')
     } finally {

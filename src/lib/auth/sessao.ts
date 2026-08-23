@@ -1,22 +1,55 @@
-// Ponto único de leitura de sessão — hoje Supabase, amanhã Cognito.
+// Ponto único de leitura de sessão — Cognito por baixo, users.id por cima.
 // Quem precisar saber quem está logado importa daqui; o resto do sistema
-// não fica sabendo quando o motor trocar.
+// não fica sabendo quando o motor trocar de novo.
 
-import { createClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
+import { COOKIE_ID } from '@/lib/auth/cookies'
+import { verificarIdToken } from '@/lib/auth/verificador-jwt'
+import { getSql } from '@/lib/db'
 
 export type Sessao = { userId: string; email: string | null }
 
 /** Quem está logado nesta requisição, ou null. */
 export async function sessaoAtual(): Promise<Sessao | null> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const cookieStore = await cookies()
+  const idToken = cookieStore.get(COOKIE_ID)?.value
+  if (!idToken) return null
 
+  let sub: string
+  let emailToken: string | null
+  try {
+    const payload = await verificarIdToken(idToken)
+    sub = payload.sub
+    emailToken = typeof payload.email === 'string' ? payload.email : null
+  } catch {
+    return null
+  }
+
+  const sql = getSql()
+  const rows = await sql<{ id: string; email: string | null }[]>`
+    SELECT id, email FROM users WHERE cognito_sub = ${sub} LIMIT 1
+  `
+  const user = rows[0]
   if (!user) return null
 
   return {
     userId: user.id,
-    email: user.email ?? null,
+    email: user.email ?? emailToken,
   }
+}
+
+export async function userIdDoToken(idToken: string): Promise<string | null> {
+  let sub: string
+  try {
+    const payload = await verificarIdToken(idToken)
+    sub = payload.sub
+  } catch {
+    return null
+  }
+
+  const sql = getSql()
+  const rows = await sql<{ id: string }[]>`
+    SELECT id FROM users WHERE cognito_sub = ${sub} LIMIT 1
+  `
+  return rows[0]?.id ?? null
 }

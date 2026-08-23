@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/admin'
+import { createConteudoClient } from '@/lib/conteudo/rest'
 import {
   addDaysIso,
   currentMonthStart,
@@ -17,7 +17,7 @@ import {
 import { registrarFim, registrarInicio } from '@/lib/jobs/registro'
 import { inngest } from '../client'
 
-// As tabelas de conteúdo ainda vivem na Supabase; só o registro do job vai
+// As tabelas de conteúdo ainda vivem fora do RDS clínico; só o registro do job vai
 // para o RDS. Some quando o banco `conteudo` for migrado.
 
 function sleep(ms: number) {
@@ -60,7 +60,7 @@ export const youtubeAnalyticsSync = inngest.createFunction(
     })
 
     const canalRows = await step.run('canal-diario', async () => {
-      const admin = createAdminClient()
+      const admin = createConteudoClient()
       const rows = await fetchCanalDiario(janela.start, janela.end)
       if (rows.length > 0) {
         const { error } = await admin
@@ -72,7 +72,7 @@ export const youtubeAnalyticsSync = inngest.createFunction(
     })
 
     const trafegoRows = await step.run('trafego-diario', async () => {
-      const admin = createAdminClient()
+      const admin = createConteudoClient()
       const rows = await fetchTrafegoDiario(janela.start, janela.end)
       if (rows.length > 0) {
         const { error } = await admin
@@ -84,7 +84,7 @@ export const youtubeAnalyticsSync = inngest.createFunction(
     })
 
     const videoDiarioRows = await step.run('video-diario', async () => {
-      const admin = createAdminClient()
+      const admin = createConteudoClient()
       let count = 0
       for (const day of eachDayInclusive(janela.start, janela.end)) {
         const rows = await fetchVideoDiarioForDay(day)
@@ -105,7 +105,7 @@ export const youtubeAnalyticsSync = inngest.createFunction(
     const videosMetadata = await step.run(
       'metadata-e-snapshot',
       async () => {
-        const admin = createAdminClient()
+        const admin = createConteudoClient()
         const metas = dedupeByVideoId(await fetchAllVideoMetadata())
         if (metas.length === 0) return 0
 
@@ -133,7 +133,7 @@ export const youtubeAnalyticsSync = inngest.createFunction(
     )
 
     const recortes = await step.run('recortes-mensais', async () => {
-      const admin = createAdminClient()
+      const admin = createConteudoClient()
       const bounds = monthBounds(janela.mes)
       const recortesEnd =
         janela.end < bounds.end ? janela.end : bounds.end
@@ -180,7 +180,7 @@ export const youtubeAnalyticsSync = inngest.createFunction(
     const recentVideoIds = await step.run(
       'listar-videos-recentes',
       async () => {
-        const admin = createAdminClient()
+        const admin = createConteudoClient()
         const { data, error } = await admin
           .from('youtube_videos')
           .select('video_id')
@@ -198,7 +198,7 @@ export const youtubeAnalyticsSync = inngest.createFunction(
         (i + 1) * RETENCAO_LOTE,
       )
       const loteRows = await step.run(`retencao-lote-${i}`, async () => {
-        const admin = createAdminClient()
+        const admin = createConteudoClient()
         let count = 0
         for (const id of batch) {
           try {

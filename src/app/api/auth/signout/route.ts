@@ -1,5 +1,9 @@
-import { createServerClient } from '@supabase/ssr'
 import { type NextRequest, NextResponse } from 'next/server'
+import { renovar, sair, subDoTokenJwt } from '@/lib/auth/cognito'
+import {
+  COOKIE_ACCESS,
+  limparTokens,
+} from '@/lib/auth/cookies'
 
 export async function POST(request: NextRequest) {
   const response = new NextResponse(null, {
@@ -7,28 +11,12 @@ export async function POST(request: NextRequest) {
     headers: { Location: '/suplementos/login' },
   })
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!url || !anonKey) {
-    throw new Error(
-      'signout: NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY precisam estar definidas.',
-    )
+  const accessToken = request.cookies.get(COOKIE_ACCESS)?.value
+  if (accessToken) {
+    await sair(accessToken)
   }
 
-  const supabase = createServerClient(url, anonKey, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll()
-      },
-      setAll(cookiesToSet) {
-        for (const { name, value, options } of cookiesToSet) {
-          response.cookies.set(name, value, options)
-        }
-      },
-    },
-  })
-
-  await supabase.auth.signOut()
+  limparTokens(response)
   response.cookies.set('sessao_satelite', '', {
     httpOnly: true,
     secure: true,
