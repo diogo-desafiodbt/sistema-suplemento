@@ -13,8 +13,16 @@ const tabs = [
   { label: 'Pedidos', href: '/suplementos/admin/pedidos' },
   { label: 'Suporte', href: '/suplementos/admin/suporte' },
   { label: 'Usuários', href: '/suplementos/admin/usuarios' },
-  { label: 'Cupons', href: '/suplementos/admin/cupons' },
-  { label: 'Config', href: '/suplementos/admin/config' },
+  {
+    label: 'Cupons',
+    href: '/suplementos/admin/ajustes/cupons',
+    externa: true,
+  },
+  {
+    label: 'Config',
+    href: '/suplementos/admin/ajustes/config',
+    externa: true,
+  },
   { label: 'Auditoria', href: '/suplementos/admin/auditoria' },
   { label: 'Alertas', href: '/suplementos/admin/alertas', externa: true },
 ]

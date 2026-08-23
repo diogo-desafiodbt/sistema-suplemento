@@ -71,6 +71,15 @@
       "porque": "Primeiro satélite da Fase 6. Alvo do tipo lambda — sem contêiner, sem NAT, sem API Gateway.",
       "nos_dois_listeners": true,
       "por_que_debaixo_de_suplementos": "/alertas não existe na CloudFront: cairia na regra padrão, que vai para o S3, e devolvia 404. Abrir comportamento novo lá gastaria a quinta e última vaga do plano gratuito. /suplementos* já vai para o ALB."
+    },
+    {
+      "prioridade": 9,
+      "caminhos": [
+        "/suplementos/admin/ajustes*"
+      ],
+      "destino": "tg-satelite-ajustes (Lambda)",
+      "porque": "Satélite 2 da Fase 6: cupons e configuração. Primeiro que escreve.",
+      "nos_dois_listeners": true
     }
   ],
   "reverter": "aws elbv2 modify-rule --rule-arn <arn> --conditions 'Field=path-pattern,Values=/api/__desligado'",
@@ -91,6 +100,15 @@
         "porque": "Primeiro satélite da Fase 6. Alvo do tipo lambda — sem contêiner, sem NAT, sem API Gateway.",
         "nos_dois_listeners": true,
         "por_que_debaixo_de_suplementos": "/alertas não existe na CloudFront: cairia na regra padrão, que vai para o S3, e devolvia 404. Abrir comportamento novo lá gastaria a quinta e última vaga do plano gratuito. /suplementos* já vai para o ALB."
+      },
+      {
+        "prioridade": 9,
+        "caminhos": [
+          "/suplementos/admin/ajustes*"
+        ],
+        "destino": "tg-satelite-ajustes (Lambda)",
+        "porque": "Satélite 2 da Fase 6: cupons e configuração. Primeiro que escreve.",
+        "nos_dois_listeners": true
       },
       {
         "prioridade": 1,
