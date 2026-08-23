@@ -12,7 +12,7 @@ const DB = 'clinico'
 const USER = 'satelite_pedidos'
 
 const ORIGEM = 'https://desafiodiabetes.com'
-const LISTA = '/suplementos/admin/pedidos-lista'
+const LISTA = '/suplementos/admin/painel/pedidos'
 
 const statusLabel = {
   pending: 'Aguardando',
@@ -185,19 +185,13 @@ function pagina(pedidos) {
     * { box-sizing: border-box; }
     body {
       margin: 0;
+      padding: 12px 16px;
       font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
-      background: #fafbfe;
       color: #212529;
       line-height: 1.45;
+      background: transparent;
     }
-    header {
-      background: #13244f;
-      color: #fff;
-      padding: 18px 24px;
-    }
-    header strong { font-size: 15px; letter-spacing: .04em; }
-    header span { opacity: .55; margin-left: 10px; font-size: 13px; }
-    main { max-width: 1080px; margin: 0 auto; padding: 24px 16px 48px; }
+    main { max-width: 1080px; margin: 0 auto; padding: 0 0 24px; }
     .topo { margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
     .topo .secao {
       font-size: 11px;
@@ -281,9 +275,6 @@ function pagina(pedidos) {
   </style>
 </head>
 <body>
-  <header>
-    <strong>Desafio Diabetes</strong><span>Pedidos</span>
-  </header>
   <main>
     <div class="topo">
       <div>

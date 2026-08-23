@@ -11,5 +11,5 @@ endereço nem entram no privilégio.
 Os três botões (etiqueta, rastreio, PDF) continuam no núcleo — é lá que moram
 CPF e endereço. Esta tela só mostra a lista e aponta para lá.
 
-Rota própria: `/suplementos/admin/pedidos-lista`. A aba velha convive até a
-troca no ALB.
+Rota: `/suplementos/admin/painel/pedidos`. A moldura do núcleo embute esta
+tela em `/suplementos/admin/pedidos`.

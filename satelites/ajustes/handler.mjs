@@ -11,7 +11,7 @@ const PORT = 5432
 const DB = 'clinico'
 const USER = 'satelite_ajustes'
 
-const BASE = '/suplementos/admin/ajustes'
+const BASE = '/suplementos/admin/painel/ajustes'
 // Location precisa ser ABSOLUTO e https. Devolvendo caminho relativo, alguma
 // camada entre nós e o navegador completa com o protocolo que ELA recebeu — e
 // a CloudFront fala http com o ALB. O resultado era um 302 mandando o
@@ -217,18 +217,12 @@ function estilos() {
     * { box-sizing: border-box; }
     body {
       margin: 0;
+      padding: 12px 16px;
       font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
-      background: #fafbfe;
       color: #212529;
       line-height: 1.45;
+      background: transparent;
     }
-    header {
-      background: #13244f;
-      color: #fff;
-      padding: 18px 24px;
-    }
-    header strong { font-size: 15px; letter-spacing: .04em; }
-    header span { opacity: .55; margin-left: 10px; font-size: 13px; }
     .tabs {
       background: #fff;
       border-bottom: 1px solid #e8ecf3;
@@ -248,7 +242,7 @@ function estilos() {
     }
     .tabs a:hover { background: rgba(19, 36, 79, .08); color: #13244f; }
     .tabs a.ativa { background: #13244f; color: #fff; }
-    main { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+    main { max-width: 960px; margin: 0 auto; padding: 0 0 24px; }
     main.estreito { max-width: 640px; }
     .topo { margin-bottom: 20px; }
     .topo .secao {
@@ -394,9 +388,6 @@ function layout({ titulo, aba, estreito, conteudo }) {
   <style>${estilos()}</style>
 </head>
 <body>
-  <header>
-    <strong>Desafio Diabetes</strong><span>Ajustes</span>
-  </header>
   ${nav(aba)}
   <main class="${estreito ? 'estreito' : ''}">
     ${conteudo}

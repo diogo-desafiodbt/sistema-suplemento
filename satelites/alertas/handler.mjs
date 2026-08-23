@@ -215,19 +215,13 @@ function pagina({ ultimaPassagem, abertos, resolvidos }) {
     * { box-sizing: border-box; }
     body {
       margin: 0;
+      padding: 12px 16px;
       font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
-      background: #fafbfe;
       color: #212529;
       line-height: 1.45;
+      background: transparent;
     }
-    header {
-      background: #13244f;
-      color: #fff;
-      padding: 18px 24px;
-    }
-    header strong { font-size: 15px; letter-spacing: .04em; }
-    header span { opacity: .55; margin-left: 10px; font-size: 13px; }
-    main { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+    main { max-width: 760px; margin: 0 auto; padding: 0 0 24px; }
     .card {
       background: #fff;
       border: 1px solid #e8ecf3;
@@ -279,9 +273,6 @@ function pagina({ ultimaPassagem, abertos, resolvidos }) {
   </style>
 </head>
 <body>
-  <header>
-    <strong>Desafio Diabetes</strong><span>Alertas</span>
-  </header>
   <main>
     <section class="card">
       <h2>Quando o vigia passou por aqui</h2>
