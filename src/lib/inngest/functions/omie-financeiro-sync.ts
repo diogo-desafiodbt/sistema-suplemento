@@ -55,10 +55,11 @@ export const omieFinanceiroSync = inngest.createFunction(
           await upsertConteudo(sql, 'omie_categorias', categoriaRows)
         }
 
-        const movimentos = await fetchAllMovimentosLiquidados({
-          dDtPagtoDe: window.dDtPagtoDe,
-          dDtPagtoAte: window.dDtPagtoAte,
-        })
+        const { items: movimentos, nTotRegistros } =
+          await fetchAllMovimentosLiquidados({
+            dDtPagtoDe: window.dDtPagtoDe,
+            dDtPagtoAte: window.dDtPagtoAte,
+          })
 
         const movimentoRows = movimentos
           .map(mapMovimentoRow)
@@ -77,6 +78,7 @@ export const omieFinanceiroSync = inngest.createFunction(
           totalCategorias: categoriaRows.length,
           totalMovimentosFetched: movimentos.length,
           totalMovimentosUpserted,
+          nTotRegistros,
           windowStart: window.windowStart,
           windowEnd: window.windowEnd,
         }

@@ -2,8 +2,16 @@ const CATEGORIAS_URL =
   'https://app.omie.com.br/api/v1/geral/categorias/'
 const MOVIMENTOS_URL = 'https://app.omie.com.br/api/v1/financas/mf/'
 
-/** ~3–4 req/s — rate limit Omie é 4 req/s. */
-const PAGE_DELAY_MS = 300
+/** Pausa entre páginas e entre fatias — evita o guarda de simultaneidade. */
+export const OMIE_PAUSE_MS = 1_500
+
+const MAX_TENTATIVAS = 3
+const AGUARDE_PADRAO_S = 60
+const AGUARDE_FOLGA_S = 2
+
+/** Página padrão; no retry após "consumo redundante" vira 50 (consulta diferente). */
+const REGISTROS_PADRAO = 100
+const REGISTROS_RETRY = 50
 
 function requireEnv(name: string): string {
   const value = process.env[name]
@@ -11,7 +19,7 @@ function requireEnv(name: string): string {
   return value
 }
 
-function sleep(ms: number): Promise<void> {
+export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
@@ -46,51 +54,134 @@ type OmieEnvelope = {
   param: [Record<string, unknown>]
 }
 
+function faultMessage(parsed: unknown, httpStatus?: number): string | null {
+  if (typeof parsed === 'object' && parsed !== null) {
+    const obj = parsed as Record<string, unknown>
+    if (typeof obj.faultstring === 'string') return obj.faultstring
+    if (typeof obj.message === 'string') return obj.message
+  }
+  if (httpStatus && httpStatus >= 400) {
+    return typeof parsed === 'string'
+      ? parsed
+      : `HTTP ${httpStatus}: ${JSON.stringify(parsed)}`
+  }
+  return null
+}
+
+/** Extrai "Aguarde N segundos" da mensagem Omie; sem número → 60s. */
+export function segundosDeAguardo(mensagem: string): number {
+  const m = /aguarde\s+(\d+)\s+segundos?/i.exec(mensagem)
+  if (m) return Number(m[1])
+  return AGUARDE_PADRAO_S
+}
+
+function isBloqueioOmie(mensagem: string): boolean {
+  const lower = mensagem.toLowerCase()
+  return (
+    lower.includes('consumo redundante') ||
+    lower.includes('já existe uma requisição') ||
+    lower.includes('ja existe uma requisicao') ||
+    lower.includes('aguarde')
+  )
+}
+
+function isConsumoRedundante(mensagem: string): boolean {
+  return mensagem.toLowerCase().includes('consumo redundante')
+}
+
+/**
+ * Depois de "consumo redundante", a mesma consulta byte a byte cai de novo.
+ * Trocar o tamanho da página muda o payload sem mudar o conteúdo útil.
+ */
+function variarTamanhoPagina(param: Record<string, unknown>): void {
+  if ('nRegPorPagina' in param) {
+    const atual = Number(param.nRegPorPagina) || REGISTROS_PADRAO
+    param.nRegPorPagina =
+      atual === REGISTROS_PADRAO ? REGISTROS_RETRY : REGISTROS_PADRAO
+    return
+  }
+  if ('registros_por_pagina' in param) {
+    const atual = Number(param.registros_por_pagina) || REGISTROS_PADRAO
+    param.registros_por_pagina =
+      atual === REGISTROS_PADRAO ? REGISTROS_RETRY : REGISTROS_PADRAO
+  }
+}
+
+/**
+ * POST Omie com pausa implícita no caller, leitura do tempo pedido na recusa
+ * e no máximo 3 tentativas. Bloqueio que persiste depois disso falha visível.
+ */
 async function omiePost(
   url: string,
   call: string,
   param: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  const body: OmieEnvelope = {
-    call,
-    app_key: requireEnv('OMIE_APP_KEY'),
-    app_secret: requireEnv('OMIE_APP_SECRET'),
-    param: [param],
+  let lastError: Error | null = null
+
+  for (let tentativa = 1; tentativa <= MAX_TENTATIVAS; tentativa++) {
+    const body: OmieEnvelope = {
+      call,
+      app_key: requireEnv('OMIE_APP_KEY'),
+      app_secret: requireEnv('OMIE_APP_SECRET'),
+      param: [param],
+    }
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+
+    const text = await res.text()
+    let parsed: unknown = text
+    try {
+      parsed = text ? JSON.parse(text) : null
+    } catch {
+      /* keep raw */
+    }
+
+    const fault = faultMessage(parsed, res.ok ? undefined : res.status)
+
+    if (fault && isBloqueioOmie(fault)) {
+      lastError = new Error(`Omie ${call}: ${fault}`)
+      if (tentativa >= MAX_TENTATIVAS) break
+
+      const esperarS = segundosDeAguardo(fault) + AGUARDE_FOLGA_S
+      console.warn(
+        `Omie ${call}: bloqueio (tentativa ${tentativa}/${MAX_TENTATIVAS}) — aguardando ${esperarS}s`,
+      )
+      await sleep(esperarS * 1000)
+
+      // Consulta idêntica após "consumo redundante" é recusada de novo.
+      if (isConsumoRedundante(fault)) {
+        variarTamanhoPagina(param)
+      }
+      continue
+    }
+
+    if (!res.ok) {
+      const detail =
+        typeof parsed === 'object' && parsed !== null
+          ? JSON.stringify(parsed)
+          : String(parsed)
+      throw new Error(`Omie ${call} → ${res.status}: ${detail}`)
+    }
+
+    if (typeof parsed !== 'object' || parsed === null) {
+      throw new Error(`Omie ${call}: resposta inválida`)
+    }
+
+    if (fault) {
+      throw new Error(`Omie ${call}: ${fault}`)
+    }
+
+    return parsed as Record<string, unknown>
   }
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-
-  const text = await res.text()
-  let parsed: unknown = text
-  try {
-    parsed = text ? JSON.parse(text) : null
-  } catch {
-    /* keep raw */
-  }
-
-  if (!res.ok) {
-    const detail =
-      typeof parsed === 'object' && parsed !== null
-        ? JSON.stringify(parsed)
-        : String(parsed)
-    throw new Error(`Omie ${call} → ${res.status}: ${detail}`)
-  }
-
-  if (typeof parsed !== 'object' || parsed === null) {
-    throw new Error(`Omie ${call}: resposta inválida`)
-  }
-
-  // Erros de negócio Omie às vezes vêm com HTTP 200 + faultstring.
-  const obj = parsed as Record<string, unknown>
-  if (typeof obj.faultstring === 'string') {
-    throw new Error(`Omie ${call}: ${obj.faultstring}`)
-  }
-
-  return obj
+  throw (
+    lastError ??
+    new Error(`Omie ${call}: bloqueio persistiu após ${MAX_TENTATIVAS} tentativas`)
+  )
 }
 
 export type OmieCategoriaItem = {
@@ -204,11 +295,11 @@ export async function fetchAllCategorias(): Promise<OmieCategoriaItem[]> {
   let totalPaginas = 1
 
   while (pagina <= totalPaginas) {
-    if (pagina > 1) await sleep(PAGE_DELAY_MS)
+    if (pagina > 1) await sleep(OMIE_PAUSE_MS)
 
     const data = await omiePost(CATEGORIAS_URL, 'ListarCategorias', {
       pagina,
-      registros_por_pagina: 50,
+      registros_por_pagina: REGISTROS_PADRAO,
       apenas_importado_api: 'N',
     })
 
@@ -231,20 +322,27 @@ export type FetchMovimentosParams = {
   dDtPagtoAte: string
 }
 
+export type MovimentosResult = {
+  items: OmieMovimentoItem[]
+  /** Total declarado pela Omie (`nTotRegistros`); null se a API não mandou. */
+  nTotRegistros: number | null
+}
+
 /** Pagina ListarMovimentos (LIQUIDADO) até acabar. */
 export async function fetchAllMovimentosLiquidados(
   params: FetchMovimentosParams,
-): Promise<OmieMovimentoItem[]> {
+): Promise<MovimentosResult> {
   const all: OmieMovimentoItem[] = []
   let nPagina = 1
   let nTotPaginas = 1
+  let nTotRegistros: number | null = null
 
   while (nPagina <= nTotPaginas) {
-    if (nPagina > 1) await sleep(PAGE_DELAY_MS)
+    if (nPagina > 1) await sleep(OMIE_PAUSE_MS)
 
     const data = await omiePost(MOVIMENTOS_URL, 'ListarMovimentos', {
       nPagina,
-      nRegPorPagina: 50,
+      nRegPorPagina: REGISTROS_PADRAO,
       cStatus: 'LIQUIDADO',
       dDtPagtoDe: params.dDtPagtoDe,
       dDtPagtoAte: params.dDtPagtoAte,
@@ -255,9 +353,19 @@ export async function fetchAllMovimentosLiquidados(
       all.push(...(items as OmieMovimentoItem[]))
     }
 
+    if (data.nTotRegistros != null && Number.isFinite(Number(data.nTotRegistros))) {
+      nTotRegistros = Number(data.nTotRegistros)
+    }
+
     nTotPaginas = Number(data.nTotPaginas) || 1
     nPagina += 1
   }
 
-  return all
+  if (nTotRegistros != null && all.length !== nTotRegistros) {
+    console.warn(
+      `Omie ListarMovimentos: juntamos ${all.length}, API declarou nTotRegistros=${nTotRegistros}`,
+    )
+  }
+
+  return { items: all, nTotRegistros }
 }
