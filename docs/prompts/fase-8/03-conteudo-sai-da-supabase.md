@@ -6,6 +6,12 @@
 O passo 2 tirou a autenticação da Supabase, mas **não tirou a Supabase**. Três
 jobs continuam gravando lá pela API REST: Hotmart, Omie e YouTube.
 
+> **Recorte decidido pelo Diogo em 23/08/2026:** migram **Omie e Hotmart**. O
+> **YouTube Analytics é desligado** — ele não vai usar esse dado por enquanto.
+> As 10 tabelas dele ficam prontas e vazias no RDS; religar depois é apontar o
+> job para o banco novo. O dado é todo re-sincronizável da origem, então nada
+> se perde ao desligar.
+
 Saiu a biblioteca, ficou a dependência. Este passo fecha isso — e depois dele o
 projeto da Supabase pode ser apagado sem que nada pare, que é o critério do
 plano para esta fase.
@@ -37,13 +43,22 @@ usuário  job_conteudo
 host     o mesmo do clinico
 ```
 
-Os três jobs passam a usar SQL direto:
+**Dois** jobs passam a usar SQL direto:
 
 ```
 src/lib/inngest/functions/hotmart-sales-sync.ts
 src/lib/inngest/functions/omie-financeiro-sync.ts
-src/lib/inngest/functions/youtube-analytics-sync.ts
 ```
+
+### O terceiro sai do ar
+
+`youtube-analytics-sync` **sai da lista servida em `src/app/api/inngest/route.ts`**,
+como o `create-shipping-label` saiu. O arquivo **fica no repositório** — não
+apague. Ele volta quando o Diogo quiser o canal de novo, e aí é reescrever a
+gravação como nos outros dois.
+
+Deixe um comentário no topo dele dizendo que está desligado desde 23/08/2026 e
+que a gravação ainda é a antiga.
 
 ## As armadilhas desta tradução, que já custaram caro antes
 
@@ -58,16 +73,6 @@ isso sozinho. Em SQL cru, use as chaves que já existem:
 | `hotmart_sales` | `(transaction_code)` |
 | `omie_categorias` | `(codigo)` |
 | `omie_movimentos_financeiros` | `(codigo_titulo)` |
-| `youtube_videos` | `(video_id)` |
-| `youtube_canal_diario` | `(dia)` |
-| `youtube_video_diario` | `(video_id, dia)` |
-| `youtube_video_snapshot` | `(video_id, dia)` |
-| `youtube_retencao` | `(video_id, ponto, periodo_fim)` |
-| `youtube_demografia` | `(mes, faixa_etaria, genero)` |
-| `youtube_geografia` | `(mes, pais)` |
-| `youtube_trafego_diario` | `(dia, fonte)` |
-| `youtube_termos_busca` | `(mes, termo)` |
-| `youtube_audiencia_recortes` | `(mes, tipo, valor)` |
 
 **2. `numeric` volta como texto**, não número. O PostgREST convertia. Se algum
 lugar somar ou comparar, converta antes — há `asNumber` em `src/lib/db.ts`.
@@ -103,10 +108,15 @@ para saber o que a própria escrita já respondeu.
 1. `npm run build` e `npx tsc --noEmit` passam.
 2. `src/lib/conteudo/rest.ts` não existe mais.
 3. `grep -rniE "postgrest|rest/v1|apikey" src/` volta vazio.
-4. Os três jobs importam de `src/lib/conteudo/db.ts` e usam SQL direto.
+4. Os **dois** jobs importam de `src/lib/conteudo/db.ts` e usam SQL direto.
 5. Todo `ON CONFLICT` bate com a tabela acima.
 6. Nenhum job chama o banco com lote vazio.
+7. `youtube-analytics-sync` **não aparece** na lista de funções do Inngest, e o
+   arquivo dele **continua existindo**.
 
 Quando terminar, me chame antes de mexer em outra coisa. Eu troco os segredos,
-subo, e **disparo os três jobs à mão** — só ver a tabela encher prova que
-funcionou. Aí a Supabase pode ser desligada.
+subo, e **disparo os dois jobs à mão** — só ver a tabela encher prova que
+funcionou.
+
+Aí eu tiro o YouTube da lista que o vigia cobra (senão ele acusa cron atrasado
+todo dia) e **apago o projeto da Supabase**.
