@@ -106,7 +106,7 @@ aqui, onde o texto é muito maior.
 
 ---
 
-## Parte D — as sete travas
+## Parte D — as nove travas
 
 **A decisão da IA não é final.** É condição necessária, não suficiente. O
 envio automático só pode acontecer se **todas** forem verdadeiras, checadas em
@@ -116,11 +116,41 @@ código, uma por uma, com o motivo da reprovação registrado:
 2. `triagem.categoria` está na lista liberada:
    `['guia','pedido','financeiro','assinatura','produto','conta','institucional']`
 3. `thread.user_id` não é nulo
-4. `decisao.dados_usados.length > 0`
+4. `decisao.dados_usados` **bate com o registro de acesso** — ver abaixo
 5. **Nenhum humano respondeu ainda nesta conversa** — ver abaixo
 6. `triagem.tom !== 'hostil'`
 7. Passou na verificação de saída (Parte F)
 8. **`investigacao.truncada === false`** — ver abaixo
+9. **`video_sugerido` é nulo ou aponta para URL que existe no acervo**
+
+### A trava 4 mudou na verificação da Parte C
+
+A especificação dizia `dados_usados.length > 0`. **Isso não prova nada:** o
+array é escrito pela própria IA. Ela pode listar "pedido 48231, status de
+entrega" sem ter chamado ferramenta nenhuma, e a trava passa.
+
+Quem tem a prova é o `support_access_log`, que é escrito **dentro** das
+ferramentas, por código, e não pela IA. Então a trava é:
+
+> Existe pelo menos uma linha em `support_access_log` para esta `thread_id`
+> nesta rodada, **e** `dados_usados` não está vazio.
+
+O array continua útil para auditoria e para o painel do Pedro. Só não serve
+como prova de si mesmo.
+
+### A trava 9 — o link tem que existir
+
+`video_sugerido.url` é hoje só uma string com limite de tamanho. O prompt pede
+"nunca invente URL", mas instrução para a IA é condição necessária, não
+suficiente — é a regra desta entrega inteira.
+
+Antes de qualquer envio, **confirme que a URL existe no acervo**: consulte
+`aulas_trecho` no banco `conteudo`. Não achou → zere o `video_sugerido` e siga
+sem vídeo. Nunca escale só por causa disso.
+
+Isto já é regra da casa: em agosto o casamento de link por palavra-chave foi
+descartado porque quatro podcasts diferentes casaram com o mesmo link. **Link
+errado é pior que link nenhum.**
 
 ### A trava 8 nasceu na verificação da Parte B
 
