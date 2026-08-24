@@ -120,6 +120,18 @@ código, uma por uma, com o motivo da reprovação registrado:
 5. **Nenhum humano respondeu ainda nesta conversa** — ver abaixo
 6. `triagem.tom !== 'hostil'`
 7. Passou na verificação de saída (Parte F)
+8. **`investigacao.truncada === false`** — ver abaixo
+
+### A trava 8 nasceu na verificação da Parte B
+
+`max_iterations: 8` não é um limite educado: o SDK diz, na própria
+documentação, *"the loop will terminate even if tools are still being
+requested"*. Se a investigação bater no teto no meio do caminho, ela **para
+calada** e o texto que sobra é um retrato pela metade.
+
+`investigar()` agora devolve `truncada: boolean` e avisa no log. **Investigação
+truncada nunca vira resposta automática** — responder com confiança em cima de
+dado incompleto é pior que não responder.
 
 Falhou qualquer uma → `aguardando_revisao`, com o rascunho pronto na tela e o
 motivo escrito.
