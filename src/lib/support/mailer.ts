@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer'
 import { getSql } from '@/lib/db'
 import { normalizeMessageId, wrapMessageId } from '@/lib/support/message-id'
+import { aplicarRodape } from '@/lib/support/rodape'
 
 function requireSmtpEnv(): {
   host: string
@@ -60,6 +61,7 @@ export async function sendSupportEmail(params: {
     .filter((id): id is string => Boolean(id))
 
   const uniqueRefs = Array.from(new Set(references))
+  const bodyText = aplicarRodape(params.bodyText)
 
   const transporter = nodemailer.createTransport({
     host: smtp.host,
@@ -72,7 +74,11 @@ export async function sendSupportEmail(params: {
     from: `Desafio Diabetes <${smtp.user}>`,
     to: params.toEmail,
     subject,
-    text: params.bodyText,
+    text: bodyText,
+    headers: {
+      'Auto-Submitted': 'auto-replied',
+      'X-Auto-Response-Suppress': 'All',
+    },
     inReplyTo: params.inReplyToMessageId
       ? wrapMessageId(params.inReplyToMessageId)
       : undefined,
@@ -97,7 +103,7 @@ export async function sendSupportEmail(params: {
       ${normalizeMessageId(params.inReplyToMessageId)},
       ${smtp.user},
       ${params.toEmail},
-      ${params.bodyText}
+      ${bodyText}
     )
   `
 

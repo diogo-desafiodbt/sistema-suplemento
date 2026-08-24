@@ -1,9 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { SupportCategory, SupportDbFacts } from '@/lib/support/facts'
 
-const MODEL = process.env.ANTHROPIC_SUPPORT_MODEL ?? 'claude-sonnet-4-20250514'
+export const MODELO_SUPORTE =
+  process.env.ANTHROPIC_SUPPORT_MODEL ?? 'claude-opus-5'
 
-function getClient(): Anthropic | null {
+export function getSupportClient(): Anthropic | null {
   if (!process.env.ANTHROPIC_API_KEY) return null
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 }
@@ -19,7 +20,7 @@ function extractText(content: Anthropic.Message['content']): string {
 export async function classifySupportThread(
   threadText: string,
 ): Promise<SupportCategory> {
-  const client = getClient()
+  const client = getSupportClient()
   if (!client) {
     console.warn(
       'ANTHROPIC_API_KEY ausente — classificação padrão fora_de_escopo',
@@ -28,8 +29,9 @@ export async function classifySupportThread(
   }
 
   const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 64,
+    model: MODELO_SUPORTE,
+    max_tokens: 2000,
+    output_config: { effort: 'medium' },
     messages: [
       {
         role: 'user',
@@ -57,7 +59,7 @@ export async function draftSupportReply(params: {
   facts: SupportDbFacts
   customerName?: string | null
 }): Promise<string | null> {
-  const client = getClient()
+  const client = getSupportClient()
   if (!client) {
     console.warn('ANTHROPIC_API_KEY ausente — sem sugestão de resposta')
     return null
@@ -66,8 +68,9 @@ export async function draftSupportReply(params: {
   const name = params.customerName?.split(' ')[0] ?? 'cliente'
 
   const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 800,
+    model: MODELO_SUPORTE,
+    max_tokens: 4000,
+    output_config: { effort: 'medium' },
     messages: [
       {
         role: 'user',

@@ -1,11 +1,24 @@
 import { ImapFlow } from 'imapflow'
-import { simpleParser } from 'mailparser'
+import { simpleParser, type ParsedMail } from 'mailparser'
 import postgres from 'postgres'
 import { getSql } from '@/lib/db'
 import { claimOnce, markClaimCompleted, releaseClaim } from '@/lib/idempotency'
 import { registrarFim, registrarInicio } from '@/lib/jobs/registro'
+import {
+  eAutomaticoDeclarado,
+  eRemetenteSistema,
+} from '@/lib/support/higiene'
 import { normalizeMessageId } from '@/lib/support/message-id'
 import { inngest } from '../client'
+
+const IMAP_UID_KEY = 'support_imap_last_uid'
+
+function uidNextDaCaixa(
+  mailbox: { uidNext: number } | false | undefined | null,
+): number {
+  if (!mailbox) return 1
+  return mailbox.uidNext ?? 1
+}
 
 function imapConfigured(): boolean {
   return Boolean(
@@ -13,6 +26,44 @@ function imapConfigured(): boolean {
       process.env.SUPPORT_IMAP_USER &&
       process.env.SUPPORT_IMAP_PASSWORD,
   )
+}
+
+function lerCabecalho(parsed: ParsedMail, nome: string): string | null {
+  const valor = parsed.headers?.get(nome)
+  if (valor == null) return null
+  if (typeof valor === 'string') return valor
+  if (Array.isArray(valor)) {
+    const primeiro = valor[0]
+    return primeiro == null ? null : String(primeiro)
+  }
+  return String(valor)
+}
+
+async function lerUltimoUid(): Promise<number> {
+  const sql = getSql()
+  const rows = await sql<{ value: string }[]>`
+    SELECT value FROM system_config WHERE key = ${IMAP_UID_KEY} LIMIT 1
+  `
+  const n = Number.parseInt(rows[0]?.value ?? '0', 10)
+  return Number.isFinite(n) && n > 0 ? n : 0
+}
+
+async function gravarUltimoUid(uid: number): Promise<void> {
+  const sql = getSql()
+  const valor = String(uid)
+  const updated = await sql`
+    UPDATE system_config SET value = ${valor} WHERE key = ${IMAP_UID_KEY}
+  `
+  if (updated.count === 0) {
+    await sql`
+      INSERT INTO system_config (key, value, description)
+      VALUES (
+        ${IMAP_UID_KEY},
+        ${valor},
+        ${'Maior UID IMAP já processado pelo poll de suporte'}
+      )
+    `
+  }
 }
 
 async function resolveThreadId(params: {
@@ -37,10 +88,19 @@ async function resolveThreadId(params: {
     if (existing[0]?.thread_id) return existing[0].thread_id
   }
 
+  const aberta = await sql<{ id: string }[]>`
+    SELECT id FROM support_threads
+    WHERE lower(from_email) = ${params.fromEmail}
+      AND status::text NOT IN ('encerrada', 'respondido')
+    ORDER BY last_message_at DESC
+    LIMIT 1
+  `
+  if (aberta[0]?.id) return aberta[0].id
+
   try {
     const threadRows = await sql<{ id: string }[]>`
       INSERT INTO support_threads (thread_key, from_email, subject, status)
-      VALUES (${params.messageId}, ${params.fromEmail}, ${params.subject}, 'novo')
+      VALUES (${params.messageId}, ${params.fromEmail}, ${params.subject}, 'nova')
       RETURNING id
     `
     const thread = threadRows[0]
@@ -93,19 +153,50 @@ export const supportInboxPoll = inngest.createFunction(
     await client.connect()
     const lock = await client.getMailboxLock('INBOX')
     let processed = 0
+    let maxUid = await lerUltimoUid()
+    const primeiraVez = maxUid === 0
 
     try {
+      const uidNext = uidNextDaCaixa(client.mailbox)
+      if (!primeiraVez && maxUid + 1 >= uidNext) {
+        await registrarFim(jobId, {
+          status: 'completed',
+          affectedRows: 0,
+        })
+        return { ok: true, processed: 0 }
+      }
+
+      const range = primeiraVez
+        ? { since: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+        : `${maxUid + 1}:*`
+      const fetchOpts = primeiraVez ? undefined : { uid: true }
+
+      const uidInicial = maxUid
       for await (const message of client.fetch(
-        { seen: false },
+        range,
         { uid: true, source: true },
+        fetchOpts,
       )) {
+        if (message.uid > maxUid) maxUid = message.uid
+
         if (!message.source) continue
 
         const parsed = await simpleParser(message.source)
+        const autoSubmitted = lerCabecalho(parsed, 'auto-submitted')
+        if (eAutomaticoDeclarado(autoSubmitted)) continue
+
+        const fromAddress = Array.isArray(parsed.from)
+          ? parsed.from[0]
+          : parsed.from
+        const fromEmail =
+          fromAddress?.value?.[0]?.address?.toLowerCase() ??
+          'desconhecido@invalid'
+
+        if (eRemetenteSistema(fromEmail)) continue
+
         const messageId = normalizeMessageId(parsed.messageId)
         if (!messageId) {
           console.error('E-mail sem Message-ID — pulando uid', message.uid)
-          await client.messageFlagsAdd(message.uid, ['\\Seen'], { uid: true })
           continue
         }
 
@@ -118,19 +209,7 @@ export const supportInboxPoll = inngest.createFunction(
         `
         const already = alreadyRows[0] ?? null
 
-        // Só marca lida se o processamento realmente terminou.
-        // Row sem completed_at = em andamento ou claim liberada — não pular.
-        if (already?.completed_at) {
-          await client.messageFlagsAdd(message.uid, ['\\Seen'], { uid: true })
-          continue
-        }
-
-        const fromAddress = Array.isArray(parsed.from)
-          ? parsed.from[0]
-          : parsed.from
-        const fromEmail =
-          fromAddress?.value?.[0]?.address?.toLowerCase() ??
-          'desconhecido@invalid'
+        if (already?.completed_at) continue
 
         const inReplyTo = normalizeMessageId(
           typeof parsed.inReplyTo === 'string'
@@ -206,7 +285,6 @@ export const supportInboxPoll = inngest.createFunction(
               data: { thread_id: threadId },
             })
             eventSent = true
-            // Evidência antes do stamp — heal stale não reenvia nem dropa.
             try {
               await sql`
                 UPDATE support_messages
@@ -229,7 +307,6 @@ export const supportInboxPoll = inngest.createFunction(
               'message_id',
               messageId,
             )
-            // Não marca \\Seen — próximo poll tenta de novo.
           }
 
           if (eventSent) {
@@ -253,12 +330,7 @@ export const supportInboxPoll = inngest.createFunction(
                 }
               }
             }
-            if (stamped) {
-              processed += 1
-              await client.messageFlagsAdd(message.uid, ['\\Seen'], {
-                uid: true,
-              })
-            }
+            if (stamped) processed += 1
           }
         } else {
           const existingRows = await sql<
@@ -275,10 +347,9 @@ export const supportInboxPoll = inngest.createFunction(
           `
           const existing = existingRows[0] ?? null
           if (existing?.completed_at) {
-            await client.messageFlagsAdd(message.uid, ['\\Seen'], { uid: true })
-          } else if (existing) {
-            // Claim parcial: jovem = outro poll ativo. Stale: reenvia só se
-            // ainda não há evidência de dispatch; senão só completa o stamp.
+            continue
+          }
+          if (existing) {
             try {
               const ageMs = existing.created_at
                 ? Date.now() - new Date(existing.created_at).getTime()
@@ -288,9 +359,6 @@ export const supportInboxPoll = inngest.createFunction(
                 continue
               }
 
-              // Stale: sempre reenvia. Auto-ack é idempotente; replies em
-              // threads já avançadas precisam de nova análise se o Inngest
-              // falhou após o dispatch.
               await inngest.send({
                 name: 'suporte/email-recebido',
                 data: { thread_id: threadId },
@@ -307,9 +375,6 @@ export const supportInboxPoll = inngest.createFunction(
                 messageId,
                 'completed_at',
               )
-              await client.messageFlagsAdd(message.uid, ['\\Seen'], {
-                uid: true,
-              })
             } catch (healError) {
               console.error(
                 'support-inbox-poll: falha ao curar mensagem parcial:',
@@ -319,13 +384,18 @@ export const supportInboxPoll = inngest.createFunction(
           }
         }
       }
+
+      if (maxUid > uidInicial) {
+        await gravarUltimoUid(maxUid)
+      } else if (primeiraVez) {
+        const uidNextApos = uidNextDaCaixa(client.mailbox)
+        if (uidNextApos > 1) await gravarUltimoUid(uidNextApos - 1)
+      }
     } finally {
       lock.release()
       try {
         await client.logout()
       } catch (logoutError) {
-        // A conexão já pode ter morrido (socket timeout do IMAP). O trabalho
-        // desta run já terminou; encerrar mal não deve reprovar a run.
         console.warn('support-inbox-poll: logout do IMAP falhou:', logoutError)
       }
     }

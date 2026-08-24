@@ -20,7 +20,7 @@ export default async function AdminSuportePage() {
   const [pendingRows, historyRows] = await Promise.all([
     sql<SupportThreadView[]>`
       SELECT t.id, t.from_email, t.subject, t.status, t.user_id, t.db_facts,
-             t.suggested_reply, t.last_message_at, t.created_at,
+             t.suggested_reply, t.triagem_ia, t.last_message_at, t.created_at,
         CASE WHEN u.id IS NULL THEN NULL ELSE jsonb_build_object(
           'full_name', u.full_name, 'email', u.email) END AS users,
         COALESCE(msgs.list, '[]'::jsonb) AS support_messages
@@ -33,13 +33,13 @@ export default async function AdminSuportePage() {
         ) ORDER BY m.created_at) AS list
         FROM support_messages m WHERE m.thread_id = t.id
       ) msgs ON true
-      WHERE t.status = ANY(${sql.array(['aguardando_revisao', 'aguardando_dados', 'novo'])}::support_thread_status[])
+      WHERE t.status = ANY(${sql.array(['nova', 'com_ia', 'aguardando_revisao', 'aguardando_dados', 'novo'])}::support_thread_status[])
       ORDER BY t.last_message_at DESC
       LIMIT 500
     `,
     sql<SupportThreadView[]>`
       SELECT t.id, t.from_email, t.subject, t.status, t.user_id, t.db_facts,
-             t.suggested_reply, t.last_message_at, t.created_at,
+             t.suggested_reply, t.triagem_ia, t.last_message_at, t.created_at,
         CASE WHEN u.id IS NULL THEN NULL ELSE jsonb_build_object(
           'full_name', u.full_name, 'email', u.email) END AS users,
         COALESCE(msgs.list, '[]'::jsonb) AS support_messages
@@ -52,7 +52,7 @@ export default async function AdminSuportePage() {
         ) ORDER BY m.created_at) AS list
         FROM support_messages m WHERE m.thread_id = t.id
       ) msgs ON true
-      WHERE t.status = 'respondido'
+      WHERE t.status = ANY(${sql.array(['com_suporte', 'encerrada', 'respondido'])}::support_thread_status[])
       ORDER BY t.last_message_at DESC
       LIMIT 100
     `,
@@ -62,7 +62,7 @@ export default async function AdminSuportePage() {
     <div style={{ maxWidth: 896 }}>
       <CabecaDePagina trilha="Operação / Suporte" titulo="Suporte" />
       <p className="admin-sub" style={{ marginTop: -12, marginBottom: 20 }}>
-        Revise sugestões antes de enviar. Só o aviso genérico sai sozinho.
+        Revise o que chegou. Nesta etapa a IA só classifica — nada sai sozinho.
       </p>
       <SupportThreadPanel pending={pendingRows} history={historyRows} />
     </div>

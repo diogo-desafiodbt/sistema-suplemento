@@ -6,6 +6,7 @@ import { Card } from '@/components/admin/ui/Card'
 import { Selo } from '@/components/admin/ui/Selo'
 import { Vazio } from '@/components/admin/ui/Vazio'
 import type { SupportDbFacts } from '@/lib/support/facts'
+import type { Triagem } from '@/lib/support/triage'
 
 type SupportMessageView = {
   id: string
@@ -23,6 +24,7 @@ export type SupportThreadView = {
   user_id: string | null
   db_facts: SupportDbFacts | null
   suggested_reply: string | null
+  triagem_ia: Triagem | null
   last_message_at: string
   created_at: string
   users: { full_name: string | null; email: string | null } | null
@@ -115,15 +117,28 @@ function statusLabel(status: string): string {
     case 'respondido':
       return 'Respondido'
     case 'novo':
-      return 'Novo'
+    case 'nova':
+      return 'Nova'
+    case 'com_ia':
+      return 'Com a IA'
+    case 'com_suporte':
+      return 'Com o suporte'
+    case 'encerrada':
+      return 'Encerrada'
     default:
       return status
   }
 }
 
 function tomStatus(status: string): 'ok' | 'atencao' | 'neutro' {
-  if (status === 'respondido') return 'ok'
-  if (status === 'aguardando_revisao' || status === 'novo') return 'atencao'
+  if (status === 'respondido' || status === 'encerrada' || status === 'com_suporte')
+    return 'ok'
+  if (
+    status === 'aguardando_revisao' ||
+    status === 'novo' ||
+    status === 'nova'
+  )
+    return 'atencao'
   return 'neutro'
 }
 
@@ -231,7 +246,34 @@ function ThreadCard({
         ))}
       </ul>
 
-      {thread.status !== 'respondido' && (
+      <p className="admin-card-rotulo">Triagem</p>
+      <ul
+        style={{
+          margin: '0 0 16px',
+          padding: '10px 12px',
+          listStyle: 'none',
+          border: '1px solid var(--admin-borda)',
+          borderRadius: 'var(--admin-raio)',
+          fontSize: 14,
+        }}
+      >
+        {thread.triagem_ia ? (
+          <>
+            <li>Categoria: {thread.triagem_ia.categoria}</li>
+            <li>Pergunta: {thread.triagem_ia.pergunta_resumida}</li>
+            <li>Referência: {thread.triagem_ia.referencia_citada ?? '—'}</li>
+            <li>
+              Tom: {thread.triagem_ia.tom} · Urgência:{' '}
+              {thread.triagem_ia.urgencia}
+            </li>
+          </>
+        ) : (
+          <li>Ainda sem classificação — a triagem falhou ou não rodou.</li>
+        )}
+      </ul>
+
+      {thread.status !== 'respondido' &&
+        thread.status !== 'encerrada' && (
         <div>
           <p className="admin-card-rotulo">Mensagem sugerida</p>
           <textarea

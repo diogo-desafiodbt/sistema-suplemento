@@ -56,9 +56,9 @@ export async function POST(
       )
     }
 
-    if (thread.status === 'respondido') {
+    if (thread.status === 'encerrada' || thread.status === 'respondido') {
       return NextResponse.json(
-        { error: 'Thread já respondida' },
+        { error: 'Conversa encerrada' },
         { status: 400 },
       )
     }
@@ -77,7 +77,7 @@ export async function POST(
     await sql`
       UPDATE support_threads
       SET
-        status = 'respondido',
+        status = 'com_suporte',
         reviewed_by = ${auth.userId}::uuid,
         suggested_reply = ${bodyText}
       WHERE id = ${id}::uuid

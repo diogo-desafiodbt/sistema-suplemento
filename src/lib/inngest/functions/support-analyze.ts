@@ -1,20 +1,14 @@
-import { claimByFlag, releaseFlag } from '@/lib/idempotency'
 import { getSql } from '@/lib/db'
 import { registrarFim, registrarInicio } from '@/lib/jobs/registro'
-import { classifySupportThread, draftSupportReply } from '@/lib/support/ai'
-import { fetchSupportFacts, hasRelevantFacts } from '@/lib/support/facts'
+import { passouTetoRespostasAutomaticas } from '@/lib/support/higiene'
 import { identifySupportUser } from '@/lib/support/identify'
-import { getThreadReplyHeaders, sendSupportEmail } from '@/lib/support/mailer'
+import { montarTranscricao, triarConversa } from '@/lib/support/triage'
 import { inngest } from '../client'
-
-const AUTO_ACK_BODY = `Olá! Recebemos sua mensagem e nossa equipe já vai analisar. Se você escreveu de um endereço diferente do que usou na compra, responda deste mesmo e-mail contando qual foi — assim encontramos seu cadastro.
-
-Equipe Desafio Diabetes`
 
 export const supportAnalyze = inngest.createFunction(
   {
     id: 'support-analyze',
-    name: 'Suporte — aviso automático e análise',
+    name: 'Suporte — triagem em quarentena',
     triggers: [{ event: 'suporte/email-recebido' }],
   },
   async ({ event }) => {
@@ -30,13 +24,11 @@ export const supportAnalyze = inngest.createFunction(
       {
         id: string
         from_email: string
-        subject: string | null
         user_id: string | null
-        auto_ack_sent_at: string | Date | null
         status: string
       }[]
     >`
-      SELECT id, from_email, subject, user_id, auto_ack_sent_at, status
+      SELECT id, from_email, user_id, status
       FROM support_threads
       WHERE id = ${threadId}::uuid
       LIMIT 1
@@ -47,59 +39,20 @@ export const supportAnalyze = inngest.createFunction(
       throw new Error(`Thread de suporte não encontrada: ${threadId}`)
     }
 
-    // 4.1 — Aviso automático genérico (uma vez por thread, claim permanente)
-    const claimed = await claimByFlag(
-      'support_threads',
-      threadId,
-      'auto_ack_sent_at',
-      false,
-    )
-
-    if (claimed) {
-      try {
-        const headers = await getThreadReplyHeaders(threadId)
-        await sendSupportEmail({
-          threadId,
-          toEmail: thread.from_email,
-          subject: thread.subject ?? 'Suporte Desafio Diabetes',
-          bodyText: AUTO_ACK_BODY,
-          inReplyToMessageId: headers.inReplyToMessageId,
-          referencesMessageIds: headers.referencesMessageIds,
-          useReplySubject: false,
-        })
-      } catch (error) {
-        console.error('Falha ao enviar auto-ack de suporte:', error)
-        await releaseFlag(
-          'support_threads',
-          threadId,
-          'auto_ack_sent_at',
-        )
-      }
-    }
-
     const messages = await sql<
       {
         direction: string
         body_text: string | null
-        from_email: string | null
-        created_at: string | Date
       }[]
     >`
-      SELECT direction, body_text, from_email, created_at
+      SELECT direction, body_text
       FROM support_messages
       WHERE thread_id = ${threadId}::uuid
       ORDER BY created_at ASC
     `
 
-    const inboundBodies = (messages ?? [])
-      .filter((m) => m.direction === 'inbound')
-      .map((m) => m.body_text ?? '')
-
-    // 4.2 — Identificação
     let userId = thread.user_id
     if (!userId) {
-      // Só o remetente. O corpo da mensagem é texto de estranho — usá-lo
-      // para identificar deixava qualquer um se passar por outro cliente.
       userId = await identifySupportUser(thread.from_email)
       if (userId) {
         await sql`
@@ -109,64 +62,46 @@ export const supportAnalyze = inngest.createFunction(
       }
     }
 
-    if (!userId) {
-      await sql`
-        UPDATE support_threads
-        SET status = 'aguardando_dados', db_facts = NULL, suggested_reply = NULL
-        WHERE id = ${threadId}::uuid
-      `
-      await registrarFim(jobId, {
-        status: 'completed',
-        affectedRows: 1,
-        payload: { thread_id: threadId, status: 'aguardando_dados' },
-      })
-      return { ok: true, status: 'aguardando_dados' }
+    const transcricao = montarTranscricao(messages)
+    const tetoAutomatico = await passouTetoRespostasAutomaticas(
+      thread.from_email,
+    )
+    let triagem = null
+    try {
+      triagem = await triarConversa(transcricao)
+    } catch (error) {
+      console.error('Falha na triagem de suporte:', error)
     }
 
-    const threadText = (messages ?? [])
-      .map((m) =>
-        `[${m.direction}] ${m.from_email ?? ''}\n${m.body_text ?? ''}`.trim(),
-      )
-      .join('\n\n---\n\n')
-
-    // 4.3 — Classificação + fatos
-    const category = await classifySupportThread(threadText)
-    const facts = await fetchSupportFacts(userId, category)
-
-    const userRows = await sql<{ full_name: string | null }[]>`
-      SELECT full_name FROM users WHERE id = ${userId}::uuid LIMIT 1
-    `
-    const user = userRows[0] ?? null
-
-    // 4.4 — Sugestão
-    let suggested: string | null = null
-    if (hasRelevantFacts(facts)) {
-      try {
-        suggested = await draftSupportReply({
-          threadText,
-          facts,
-          customerName: user?.full_name,
-        })
-      } catch (error) {
-        console.error('Falha ao redigir sugestão de suporte:', error)
-      }
-    }
+    const statusAtual = thread.status
+    const deveFicarNova =
+      statusAtual === 'nova' ||
+      statusAtual === 'novo' ||
+      statusAtual === 'aguardando_dados'
 
     await sql`
       UPDATE support_threads
       SET
-        status = 'aguardando_revisao',
-        db_facts = ${sql.json(facts as never)},
-        suggested_reply = ${suggested}
+        triagem_ia = ${triagem ? sql.json(triagem as never) : null},
+        status = ${deveFicarNova ? 'nova' : statusAtual}::support_thread_status
       WHERE id = ${threadId}::uuid
     `
 
     await registrarFim(jobId, {
       status: 'completed',
       affectedRows: 1,
-      payload: { thread_id: threadId, status: 'aguardando_revisao' },
+      payload: {
+        thread_id: threadId,
+        status: deveFicarNova ? 'nova' : statusAtual,
+        triagem: triagem?.categoria ?? null,
+        teto_automatico: tetoAutomatico,
+      },
     })
-    return { ok: true, status: 'aguardando_revisao', category }
+    return {
+      ok: true,
+      status: deveFicarNova ? 'nova' : statusAtual,
+      triagem: triagem?.categoria ?? null,
+    }
     } catch (error) {
       await registrarFim(jobId, {
         status: 'failed',
