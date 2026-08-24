@@ -6,6 +6,12 @@
 --
 -- Imprime SÓ o que é novo. O que persiste fica registrado em `alertas` e não
 -- grita de novo. O que some é fechado sozinho.
+--
+-- ATENÇÃO: este arquivo é a versão de MÃO. Quem roda de hora em hora é a função
+-- `vigia_rodar()`, definida em `03-funcao.sql` — o EventBridge chama
+-- `SELECT * FROM vigia_rodar()`, não este arquivo. As regras estão duplicadas
+-- nos dois. Mexeu aqui, mexa lá e RECRIE a função no banco, senão a produção
+-- continua com a regra velha e o teste de mão diz que está tudo certo.
 
 BEGIN;
 
@@ -91,7 +97,12 @@ SELECT 'suporte-sem-resposta:' || t.id, 'suporte-sem-resposta',
        jsonb_build_object('email', t.from_email, 'situacao', t.status,
          'horas', round(extract(epoch FROM (now() - t.last_message_at))/3600, 1))
 FROM support_threads t
-WHERE t.status <> 'respondido' AND t.last_message_at < now() - interval '24 hours';
+-- `encerrada` entrou junto com os cinco estados novos e é terminal. Sem ela
+-- aqui, toda conversa fechada volta a gritar 24h depois, para sempre — e
+-- alarme que dispara sobre o que está certo é o que faz alguém desligar o
+-- alarme.
+WHERE t.status NOT IN ('respondido', 'encerrada')
+  AND t.last_message_at < now() - interval '24 hours';
 
 -- 6) A CAMADA ASSINCRONA PAROU
 -- Não pergunta por um job específico: pergunta se ALGUM job rodou. Se nenhum
@@ -114,6 +125,31 @@ SELECT 'assinatura-vencida:' || s.id, 'assinatura-vencida',
        jsonb_build_object('email', u.email, 'venceu_em', s.expires_at)
 FROM subscriptions s JOIN users u ON u.id = s.user_id
 WHERE s.status = 'active' AND s.expires_at < now();
+
+-- 8) JOB QUE SE DECLAROU CONCLUÍDO SEM TER FEITO O TRABALHO
+-- Em 24/08 o poll de suporte rodou de 5 em 5 minutos por DIAS sem ler um único
+-- e-mail: faltava uma das quatro credenciais, o código desistia no começo, e a
+-- saída registrava `completed`. Painel verde, vigia quieto, e-mail de cliente
+-- parado. No mesmo dia apareceram mais três caminhos de fuga iguais — o
+-- lembrete de pendências sem endereço de destino, a triagem que perdia a
+-- validação, e o próprio poll.
+--
+-- A lição: `completed` deixou de ser prova de trabalho feito. Quando o job
+-- registra por que desistiu, isso vira alerta.
+--
+-- Só a ÚLTIMA execução de cada job: pulou uma vez e se recuperou não é
+-- problema; pulando agora é.
+INSERT INTO achados
+SELECT 'job-pulou:' || job_type || ':' || to_char(started_at, 'YYYY-MM-DD'),
+       'job-pulou',
+       jsonb_build_object('job', job_type, 'quando', started_at,
+         'motivo', coalesce(payload->>'skipped',
+                            CASE WHEN payload->>'triagem_falhou' = 'true'
+                                 THEN 'triagem_falhou' END))
+FROM (SELECT DISTINCT ON (job_type) job_type, status, started_at, payload
+      FROM background_jobs ORDER BY job_type, started_at DESC) t
+WHERE status = 'completed'
+  AND (payload->>'skipped' IS NOT NULL OR payload->>'triagem_falhou' = 'true');
 
 -- ---------------------------------------------------------------------------
 -- Contabilidade
