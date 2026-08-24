@@ -7,7 +7,7 @@ import { identifySupportUser } from '@/lib/support/identify'
 import { getThreadReplyHeaders, sendSupportEmail } from '@/lib/support/mailer'
 import { inngest } from '../client'
 
-const AUTO_ACK_BODY = `Olá! Recebemos sua mensagem e nossa equipe já vai analisar. Pra agilizar e garantir que encontramos seu cadastro certinho, pode confirmar seu CPF e o e-mail usado na compra, por favor?
+const AUTO_ACK_BODY = `Olá! Recebemos sua mensagem e nossa equipe já vai analisar. Se você escreveu de um endereço diferente do que usou na compra, responda deste mesmo e-mail contando qual foi — assim encontramos seu cadastro.
 
 Equipe Desafio Diabetes`
 
@@ -98,10 +98,9 @@ export const supportAnalyze = inngest.createFunction(
     // 4.2 — Identificação
     let userId = thread.user_id
     if (!userId) {
-      userId = await identifySupportUser({
-        fromEmail: thread.from_email,
-        bodyTexts: inboundBodies,
-      })
+      // Só o remetente. O corpo da mensagem é texto de estranho — usá-lo
+      // para identificar deixava qualquer um se passar por outro cliente.
+      userId = await identifySupportUser(thread.from_email)
       if (userId) {
         await sql`
           UPDATE support_threads SET user_id = ${userId}::uuid
