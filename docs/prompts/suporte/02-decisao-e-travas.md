@@ -216,6 +216,12 @@ Equipe Desafio Diabetes
 Sem resultado na busca → variante que aponta o canal em geral, sem escolher
 aula. **Nunca invente um link.**
 
+**Decisão do Diogo, 24/08/2026: a resposta técnica vale para qualquer um,
+cliente cadastrado ou não.** O ramo técnico roda antes da checagem de
+identificação, de propósito. O raciocínio: o conteúdo é público — é uma aula
+do canal — e não expõe nenhum dado de ninguém. Negar link de aula a quem
+ainda não comprou seria esconder o que já está no YouTube.
+
 Isto pode ser enviado automaticamente. A IA não escreve texto nenhum aqui,
 então não existe caminho para uma frase de orientação de saúde aparecer. É
 forma, não verificação.

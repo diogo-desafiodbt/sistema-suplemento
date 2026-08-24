@@ -170,6 +170,10 @@
           "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/SUPPORT_IMAP_USER-kPSH9v"
         },
         {
+          "name": "SUPPORT_NOTIFY_EMAIL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/SUPPORT_NOTIFY_EMAIL-rlbjWG"
+        },
+        {
           "name": "SUPPORT_SMTP_HOST",
           "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/SUPPORT_SMTP_HOST-1ftnMt"
         },

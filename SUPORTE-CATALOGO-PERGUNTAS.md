@@ -181,22 +181,49 @@ que toque em `protocols` ou `protocol_items`.
 
 ---
 
-## 8. Clínico — 10 perguntas · **TODAS escalam**
+## 8. Clínico — 10 perguntas · **NENHUMA é respondida — todas viram link**
 
-Nunca respondidas por IA, independentemente de confiança. Risco de dano.
+**Correção do Diogo (13/08/2026):** a equipe, em hipótese alguma, responde
+pergunta técnica. A orientação é única e exclusiva: **responder com um link.**
+Isso vale para a IA e para o Pedro igualmente — não é regra da automação, é
+política da empresa.
+
+Consequência: estas perguntas **deixam de escalar**. Escalar não fazia sentido,
+porque o humano daria a mesma resposta. A IA envia direto um **modelo fixo**:
+saudação + título da aula + link. Ela **não redige texto** nessa categoria —
+por isso não existe caminho para uma frase de orientação de saúde aparecer.
+
+Se nenhum trecho das 91 aulas chegar perto o suficiente da pergunta, a resposta
+aponta o canal em geral, sem escolher aula. Link mal escolhido é pior que
+link nenhum.
 
 | # | Pergunta do cliente | Quem resolve |
 |---|---|---|
-| 8.1 | Posso tomar junto com [medicamento]? | Pedro |
-| 8.2 | Estou sentindo [sintoma] depois de tomar | Pedro |
-| 8.3 | Posso tomar grávida / amamentando? | Pedro |
-| 8.4 | Tenho problema renal, posso tomar? | Pedro |
-| 8.5 | Qual a dosagem certa? | Pedro |
-| 8.6 | Posso dobrar a dose? | Pedro |
-| 8.7 | Substitui meu remédio de diabetes? | Pedro |
-| 8.8 | Minha glicemia não baixou | Pedro |
+| 8.1 | Posso tomar junto com [medicamento]? | IA (link) |
+| 8.2 | Estou sentindo [sintoma] depois de tomar | IA (link) ⚠️ |
+| 8.3 | Posso tomar grávida / amamentando? | IA (link) |
+| 8.4 | Tenho problema renal, posso tomar? | IA (link) |
+| 8.5 | Qual a dosagem certa? | IA (link) |
+| 8.6 | Posso dobrar a dose? | IA (link) |
+| 8.7 | Substitui meu remédio de diabetes? | IA (link) |
+| 8.8 | Minha glicemia não baixou | IA (link) ⚠️ |
 | 8.9 | Meu médico pode ver a fórmula? | Pedro |
-| 8.10 | Tem contraindicação? | Pedro |
+| 8.10 | Tem contraindicação? | IA (link) |
+
+**8.9 fica com o Pedro** porque não é dúvida técnica — é pedido de documento.
+
+### ⚠️ Duas linhas pendentes de decisão do Diogo
+
+**8.2 e 8.8 não são dúvida técnica — são relato.** "Estou sentindo [sintoma]
+depois de tomar" é relato de reação adversa; "minha glicemia não baixou" pode
+ser alguém em quadro agudo. Responder com link de aula a quem está passando mal
+é fraco, e reação adversa costuma ser algo que empresa de suplemento registra,
+não apenas responde.
+
+Ficam marcadas como `IA (link)` conforme a regra, e a alternativa proposta é:
+uma categoria própria de **relato**, com frase fixa orientando procurar
+atendimento médico — o que não é responder pergunta técnica nem dar orientação
+de saúde — e registro interno do caso. Decisão do Diogo.
 
 ---
 
@@ -230,12 +257,17 @@ Nunca respondidas por IA, independentemente de confiança. Risco de dano.
 | 5. Produto | 12 | 7 | 4 | 1 |
 | 6. Conta e acesso | 12 | 6 | 3 | 3 |
 | 7. Prescrição | 6 | 0 | 0 | 6 |
-| 8. Clínico | 10 | 0 | 0 | 10 |
+| 8. Clínico | 10 | 9 (link) | 0 | 1 |
 | 9. Institucional | 12 | 7 | 0 | 5 |
-| **Total** | **123** | **60** | **22** | **41** |
+| **Total** | **123** | **69** | **22** | **32** |
 
-**Leitura:** cerca de **metade** das perguntas a IA resolve sozinha, ~18%
-ela adianta o trabalho e escala, e **um terço** sempre precisa do Pedro.
+**Leitura:** a IA resolve **56%** sozinha, adianta e escala **18%**, e **26%**
+sempre precisa do Pedro.
+
+As 9 do domínio clínico entram como resolvidas pela IA num sentido específico:
+ela não responde a pergunta, ela **entrega o link** — que é exatamente o que a
+equipe faria. Não há perda de qualidade no atendimento, porque a resposta
+humana seria idêntica.
 
 O terço humano não é falha do desenho — é ação externa (Hotmart, trocar
 cartão, mudar endereço), julgamento (reclamação, reembolso) ou risco

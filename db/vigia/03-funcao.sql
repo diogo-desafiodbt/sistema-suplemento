@@ -162,6 +162,23 @@ BEGIN
   WHERE status = 'completed'
     AND (payload->>'skipped' IS NOT NULL OR payload->>'triagem_falhou' = 'true');
 
+  -- 9) assinatura paga que ficou sem protocolo
+  -- A criação do protocolo é disparada pelo evento `pagamento/confirmado`. Se
+  -- o evento se perder, ninguém percebe: o cliente pagou e não tem protocolo,
+  -- logo não tem pedido, logo não recebe. Existia uma rota de varredura para
+  -- isso, mas ela nasceu sem credencial e respondeu 401 a vida inteira — foi
+  -- apagada em 24/08/2026. A varredura vira esta pergunta.
+  INSERT INTO achados
+  SELECT 'assinatura-sem-protocolo:' || s.id, 'assinatura-sem-protocolo',
+         jsonb_build_object('assinatura', s.id, 'email', u.email,
+           'pago_em', min(p.paid_at))
+  FROM subscriptions s
+  JOIN users u ON u.id = s.user_id
+  JOIN payments p ON p.subscription_id = s.id AND p.status = 'paid'
+  WHERE s.protocol_id IS NULL
+    AND p.paid_at < now() - interval '30 minutes'
+  GROUP BY s.id, u.email;
+
   -- ---------------------------------------------------------------------------
   -- Contabilidade
   -- ---------------------------------------------------------------------------

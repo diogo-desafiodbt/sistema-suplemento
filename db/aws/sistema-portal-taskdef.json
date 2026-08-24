@@ -26,20 +26,24 @@
       "volumesFrom": [],
       "secrets": [
         {
-          "name": "NEXT_PUBLIC_SUPABASE_URL",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/NEXT_PUBLIC_SUPABASE_URL-A6vBQl"
+          "name": "COGNITO_CLIENT_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/COGNITO_CLIENT_ID-QSt2e9"
         },
         {
-          "name": "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/NEXT_PUBLIC_SUPABASE_ANON_KEY-q4gxCM"
+          "name": "COGNITO_CLIENT_SECRET",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/COGNITO_CLIENT_SECRET-kcH7pJ"
         },
         {
-          "name": "SENHA_PRE_LANCAMENTO",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/SENHA_PRE_LANCAMENTO-i9ZND5"
+          "name": "COGNITO_USER_POOL_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/COGNITO_USER_POOL_ID-aL7TrU"
         },
         {
           "name": "NEXT_PUBLIC_APP_URL",
           "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/NEXT_PUBLIC_APP_URL-hovbJO"
+        },
+        {
+          "name": "SENHA_PRE_LANCAMENTO",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/SENHA_PRE_LANCAMENTO-i9ZND5"
         }
       ],
       "logConfiguration": {
@@ -53,18 +57,18 @@
       "systemControls": []
     }
   ],
-  "family": "sistema-portal",
+  "cpu": "256",
   "executionRoleArn": "arn:aws:iam::768102455037:role/ecsTaskExecutionRole",
+  "family": "sistema-portal",
+  "memory": "512",
   "networkMode": "awsvpc",
-  "volumes": [],
   "placementConstraints": [],
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
   "runtimePlatform": {
     "cpuArchitecture": "ARM64",
     "operatingSystemFamily": "LINUX"
   },
-  "requiresCompatibilities": [
-    "FARGATE"
-  ],
-  "cpu": "256",
-  "memory": "512"
+  "volumes": []
 }

@@ -8,6 +8,13 @@ import { Vazio } from '@/components/admin/ui/Vazio'
 import type { SupportDbFacts } from '@/lib/support/facts'
 import type { Triagem } from '@/lib/support/triage'
 
+type DecisaoPainel = {
+  travas_liberadas?: boolean
+  motivos_travas?: string[]
+  pode_resolver_sozinho?: boolean
+  origem?: string
+}
+
 type SupportMessageView = {
   id: string
   direction: 'inbound' | 'outbound'
@@ -25,6 +32,7 @@ export type SupportThreadView = {
   db_facts: SupportDbFacts | null
   suggested_reply: string | null
   triagem_ia: Triagem | null
+  decisao_ia: DecisaoPainel | null
   last_message_at: string
   created_at: string
   users: { full_name: string | null; email: string | null } | null
@@ -271,6 +279,34 @@ function ThreadCard({
           <li>Ainda sem classificação — a triagem falhou ou não rodou.</li>
         )}
       </ul>
+
+      {thread.decisao_ia ? (
+        <>
+          <p className="admin-card-rotulo">Travas</p>
+          <ul
+            style={{
+              margin: '0 0 16px',
+              padding: '10px 12px',
+              listStyle: 'none',
+              border: '1px solid var(--admin-borda)',
+              borderRadius: 'var(--admin-raio)',
+              fontSize: 14,
+            }}
+          >
+            <li>
+              {thread.decisao_ia.travas_liberadas
+                ? 'Todas as travas passaram (ainda assim não enviamos sozinhos).'
+                : 'Reprovado nas travas — rascunho abaixo para você revisar.'}
+            </li>
+            {(thread.decisao_ia.motivos_travas ?? []).map((m) => (
+              <li key={m}>· {m}</li>
+            ))}
+            {thread.decisao_ia.origem === 'modelo_fixo_tecnico' ? (
+              <li>Resposta técnica: modelo fixo (sem redação da IA).</li>
+            ) : null}
+          </ul>
+        </>
+      ) : null}
 
       {thread.status !== 'respondido' &&
         thread.status !== 'encerrada' && (

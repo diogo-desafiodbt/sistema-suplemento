@@ -55,9 +55,28 @@ if [ "$STATUS" != "SUCCEEDED" ]; then
 fi
 
 echo "→ subindo no ECS ($SERVICOS)"
+# Quando o serviço tem taskdef versionada, ela é a fonte da verdade: registra
+# uma revisão a partir do arquivo e aponta o serviço para ela.
+#
+# Antes daqui, isto era `--force-new-deployment` puro, que troca a imagem e
+# mantém a revisão antiga. Resultado em 24/08/2026: o SUPPORT_IMAP_HOST foi
+# criado no Secrets Manager, mas registrar a revisão nova não bastava — sem
+# alguém apontar o serviço à mão, o contêiner continuava sem a variável. O
+# poll de suporte rodou por dias sem ler um e-mail. Registrar não é apontar.
 for S in $SERVICOS; do
-  aws ecs update-service --region "$REGIAO" --cluster "$CLUSTER" --service "$S" \
-    --force-new-deployment --query 'service.serviceName' --output text > /dev/null
+  ARQUIVO="db/aws/$S-taskdef.json"
+  if [ -f "$ARQUIVO" ]; then
+    REV=$(aws ecs register-task-definition --region "$REGIAO" \
+      --cli-input-json "file://$ARQUIVO" \
+      --query 'taskDefinition.revision' --output text)
+    aws ecs update-service --region "$REGIAO" --cluster "$CLUSTER" --service "$S" \
+      --task-definition "$S:$REV" --query 'service.serviceName' --output text > /dev/null
+    echo "  $S → revisão $REV (de $ARQUIVO)"
+  else
+    aws ecs update-service --region "$REGIAO" --cluster "$CLUSTER" --service "$S" \
+      --force-new-deployment --query 'service.serviceName' --output text > /dev/null
+    echo "  $S → imagem nova, revisão inalterada (sem taskdef versionada)"
+  fi
 done
 # Espera todos: se um subir e outro não, ficam versões diferentes atendendo
 # caminhos diferentes do mesmo site.

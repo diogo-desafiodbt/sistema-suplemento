@@ -20,7 +20,7 @@ export default async function AdminSuportePage() {
   const [pendingRows, historyRows] = await Promise.all([
     sql<SupportThreadView[]>`
       SELECT t.id, t.from_email, t.subject, t.status, t.user_id, t.db_facts,
-             t.suggested_reply, t.triagem_ia, t.last_message_at, t.created_at,
+             t.suggested_reply, t.triagem_ia, t.decisao_ia, t.last_message_at, t.created_at,
         CASE WHEN u.id IS NULL THEN NULL ELSE jsonb_build_object(
           'full_name', u.full_name, 'email', u.email) END AS users,
         COALESCE(msgs.list, '[]'::jsonb) AS support_messages
@@ -39,7 +39,7 @@ export default async function AdminSuportePage() {
     `,
     sql<SupportThreadView[]>`
       SELECT t.id, t.from_email, t.subject, t.status, t.user_id, t.db_facts,
-             t.suggested_reply, t.triagem_ia, t.last_message_at, t.created_at,
+             t.suggested_reply, t.triagem_ia, t.decisao_ia, t.last_message_at, t.created_at,
         CASE WHEN u.id IS NULL THEN NULL ELSE jsonb_build_object(
           'full_name', u.full_name, 'email', u.email) END AS users,
         COALESCE(msgs.list, '[]'::jsonb) AS support_messages
@@ -62,7 +62,7 @@ export default async function AdminSuportePage() {
     <div style={{ maxWidth: 896 }}>
       <CabecaDePagina trilha="Operação / Suporte" titulo="Suporte" />
       <p className="admin-sub" style={{ marginTop: -12, marginBottom: 20 }}>
-        Revise o que chegou. Nesta etapa a IA só classifica — nada sai sozinho.
+        Revise o rascunho. Nada sai sozinho nesta etapa — a chave automática é a próxima entrega.
       </p>
       <SupportThreadPanel pending={pendingRows} history={historyRows} />
     </div>
