@@ -67,9 +67,11 @@ export const supportAnalyze = inngest.createFunction(
       thread.from_email,
     )
     let triagem = null
+    let triagemFalhou = false
     try {
       triagem = await triarConversa(transcricao)
     } catch (error) {
+      triagemFalhou = true
       console.error('Falha na triagem de suporte:', error)
     }
 
@@ -94,6 +96,8 @@ export const supportAnalyze = inngest.createFunction(
         thread_id: threadId,
         status: deveFicarNova ? 'nova' : statusAtual,
         triagem: triagem?.categoria ?? null,
+        // Sem isto a conversa cai sem classificação e o job fica verde.
+        triagem_falhou: triagemFalhou,
         teto_automatico: tetoAutomatico,
       },
     })
