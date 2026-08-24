@@ -16,6 +16,10 @@
         {
           "name": "NODE_ENV",
           "value": "production"
+        },
+        {
+          "name": "SUPORTE_ENVIO_AUTOMATICO",
+          "value": "off"
         }
       ],
       "mountPoints": [],

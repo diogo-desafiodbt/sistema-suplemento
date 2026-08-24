@@ -7,6 +7,7 @@ import { investigar } from '@/lib/support/investigate'
 import { verificarSaida } from '@/lib/support/saida'
 import { responderTecnico } from '@/lib/support/tecnico'
 import { aplicarTravas } from '@/lib/support/travas'
+import { modoDeEnvio, podeEnviarAutomaticamente } from '@/lib/support/modo-envio'
 import { montarTranscricao, triarConversa } from '@/lib/support/triage'
 import { inngest } from '../client'
 
@@ -317,6 +318,12 @@ export const supportAnalyze = inngest.createFunction(
         motivos_travas: travas.motivos,
       }
 
+      const modo = modoDeEnvio()
+      // Décima condição: a chave soma-se às travas. off/shadow nunca enviam;
+      // on com trava reprovada também não. O envio de verdade entra quando a
+      // chave estiver on — nesta entrega ela nasce e fica em off.
+      const liberadoParaEnvio = podeEnviarAutomaticamente(travas.liberado)
+
       await sql`
         UPDATE support_threads
         SET
@@ -337,8 +344,9 @@ export const supportAnalyze = inngest.createFunction(
           travas_liberadas: travas.liberado,
           motivos_travas: travas.motivos,
           investigacao_truncada: investigacao.truncada,
+          modo_envio: modo,
+          liberado_para_envio: liberadoParaEnvio,
           enviado_automaticamente: false,
-          // Trabalho feito: decisão e rascunho gravados. Sem `skipped`.
         },
       })
 

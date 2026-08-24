@@ -54,6 +54,21 @@ Acrescente a variável em `db/aws/sistema-suplemento-taskdef.json`, que virou a
 fonte da verdade do que o contêiner enxerga. Se esquecer, a verificação 6/6 do
 `conferir-deploy.sh` acusa.
 
+### Estado real depois da Parte A: `on` ainda não envia
+
+Verificado em 24/08/2026. A chave existe, é lida num lugar só, e o resultado
+(`liberado_para_envio`) é gravado no registro do job. Mas **nada consome esse
+resultado**, porque não existe chamada de envio dentro do `support_analyze` —
+o único `sendSupportEmail` do sistema continua sendo o botão do Pedro.
+
+Ou seja: hoje, virar a chave para `on` **não faz nada acontecer**. Isso é o
+estado mais seguro possível, e é de propósito. Mas está escrito aqui porque
+uma chave que não faz o que o nome promete é a mesma armadilha do job que se
+registra como concluído sem ter feito o trabalho.
+
+**Quando o envio for ligado, ele entra em um lugar só, guardado por
+`liberadoParaEnvio` e por nada mais.** Não acrescente uma segunda porta.
+
 ---
 
 ## Parte B — o painel do Pedro
