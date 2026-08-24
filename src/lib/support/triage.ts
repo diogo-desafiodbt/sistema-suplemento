@@ -67,8 +67,8 @@ sair sem um humano ler, então ela é a peça mais importante desta ficha:
 - institucional: sobre a empresa, parceria, imprensa, trabalho
 - outro: não se encaixa em nenhuma, ou não é pedido de suporte
 
-REGRA DURA: na dúvida entre uma categoria administrativa e `prescricao`, escolha
-`prescricao`. Errar para o lado do humano custa uma resposta mais lenta; errar
+REGRA DURA: na dúvida entre uma categoria administrativa e "prescricao", escolha
+"prescricao". Errar para o lado do humano custa uma resposta mais lenta; errar
 para o outro lado coloca orientação de saúde numa resposta automática.
 
 Leia a conversa inteira, não só a última mensagem.
