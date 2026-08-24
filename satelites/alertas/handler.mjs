@@ -141,10 +141,12 @@ function pagina({ ultimaPassagem, abertos, resolvidos }) {
   let blocoAbertos
   if (abertos.length === 0) {
     blocoAbertos = `
-      <section class="card ok">
+      <section class="card">
         <h2>Abertos</h2>
-        <p>Nenhum alerta aberto. Está tudo certo.</p>
-        <p class="muted">Última passagem do vigia: ${esc(idadePassagem)}.</p>
+        <div class="vazio" style="padding:24px 8px">
+          <p class="vazio-titulo">Nenhum alerta aberto</p>
+          <p class="vazio-texto">O vigia não encontrou nada pendente. Última passagem: ${esc(idadePassagem)}.</p>
+        </div>
       </section>`
   } else {
     const grupos = [...porTipo.entries()]
@@ -160,20 +162,20 @@ function pagina({ ultimaPassagem, abertos, resolvidos }) {
 
     blocoAbertos = `
       <section class="card">
-        <h2>Abertos <span class="count">${abertos.length}</span></h2>
+        <h2>Abertos <span class="contagem-selo">${abertos.length}</span></h2>
         ${grupos
           .map(
             (g) => `
           <div class="grupo">
             <h3>${esc(rotulo(g.tipo))}</h3>
-            <ul>
+            <ul class="lista">
               ${g.lista
                 .map((a) => {
                   const novo = !a.notificado_em
-                  return `<li class="${novo ? 'novo' : 'conhecido'}">
+                  return `<li>
                     <div class="linha">
-                      <span class="badge">${novo ? 'ainda não notificado' : 'notificado'}</span>
-                      <span class="tempo">aberto há ${esc(idadeHumana(a.visto_em))}</span>
+                      <span class="selo ${novo ? 'selo-perigo' : 'selo-ok'}">${novo ? 'ainda não notificado' : 'notificado'}</span>
+                      <span class="muted">aberto há ${esc(idadeHumana(a.visto_em))}</span>
                     </div>
                     <p>${esc(textoDetalhe(a.detalhe)) || '<span class="muted">sem detalhe</span>'}</p>
                   </li>`
@@ -188,18 +190,24 @@ function pagina({ ultimaPassagem, abertos, resolvidos }) {
 
   const blocoResolvidos =
     resolvidos.length === 0
-      ? `<section class="card discreto">
+      ? `<section class="card">
           <h2>Resolvidos nas últimas 48h</h2>
-          <p class="muted">Nada fechado neste período.</p>
+          <div class="vazio" style="padding:24px 8px">
+            <p class="vazio-titulo">Nada fechado neste período</p>
+            <p class="vazio-texto">Quando um alerta for resolvido, ele aparece aqui por 48 horas para conferência.</p>
+          </div>
         </section>`
-      : `<section class="card discreto">
-          <h2>Resolvidos nas últimas 48h <span class="count">${resolvidos.length}</span></h2>
-          <ul class="resolvidos">
+      : `<section class="card">
+          <h2>Resolvidos nas últimas 48h <span class="contagem-selo">${resolvidos.length}</span></h2>
+          <ul class="lista">
             ${resolvidos
               .map(
                 (a) => `<li>
-                  <strong>${esc(rotulo(a.tipo))}</strong>
-                  <span class="muted">fechado há ${esc(idadeHumana(a.resolvido_em))}</span>
+                  <div class="linha">
+                    <strong>${esc(rotulo(a.tipo))}</strong>
+                    <span class="selo selo-neutro">fechado</span>
+                    <span class="muted">há ${esc(idadeHumana(a.resolvido_em))}</span>
+                  </div>
                   <p>${esc(textoDetalhe(a.detalhe))}</p>
                 </li>`,
               )
@@ -216,53 +224,21 @@ function pagina({ ultimaPassagem, abertos, resolvidos }) {
   <style>
     ${estiloBase()}
     main { max-width: 760px; }
-    h2 { margin: 0 0 12px; font-size: 15px; color: var(--marinho); }
-    h3 { margin: 16px 0 8px; font-size: 13px; color: var(--marinho); }
-    .count {
-      font-weight: 600;
-      font-size: 12px;
-      background: var(--marinho);
-      color: #fff;
-      border-radius: var(--raio);
-      padding: 1px 8px;
-      margin-left: 6px;
-    }
-    .passagem { font-size: 28px; font-weight: 700; color: var(--marinho); margin: 0 0 6px; }
-    .passagem.problema { color: var(--perigo); }
-    .aviso {
-      background: color-mix(in srgb, var(--atencao) 28%, white);
-      color: #8a5a12;
-      border-radius: var(--raio);
-      padding: 10px 12px;
-      font-size: 14px;
-    }
-    .ok p { margin: 0 0 6px; }
-    ul { list-style: none; margin: 0; padding: 0; }
-    li { padding: 10px 0; border-top: 1px solid var(--borda); }
-    .grupo ul li:first-child { border-top: 0; }
-    .linha { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    .badge { /* legado; preferir .selo */
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: .03em;
-      text-transform: uppercase;
-      border-radius: var(--raio);
-      padding: 2px 8px;
-    }
-    .novo .badge { background: color-mix(in srgb, var(--perigo) 22%, white); color: #9b2c2c; }
-    .conhecido .badge { background: color-mix(in srgb, var(--ok) 22%, white); color: #2f6b24; }
-    .tempo { font-size: 12px; color: var(--tinta-fraca); }
-    li p { margin: 6px 0 0; font-size: 14px; }
-    .discreto { opacity: .92; }
-    .resolvidos li { font-size: 14px; }
-    .resolvidos strong { color: var(--marinho); margin-right: 8px; }
+    h3 { margin: 16px 0 8px; font-size: 13px; font-weight: 700; color: var(--tinta); }
+    .grupo + .grupo { margin-top: 8px; }
   </style>
 </head>
 <body>
   <main>
+    <div class="cabeca">
+      <div>
+        <p class="cabeca-trilha">Operação / Alertas</p>
+        <h1 class="cabeca-titulo">Alertas</h1>
+      </div>
+    </div>
     <section class="card">
       <h2>Quando o vigia passou por aqui</h2>
-      <p class="passagem${vigiaParado ? ' problema' : ''}">${esc(idadePassagem)}</p>
+      <p class="passagem${vigiaParado ? ' passagem-problema' : ''}">${esc(idadePassagem)}</p>
       ${
         vigiaParado
           ? `<p class="aviso">O vigia não passa por aqui há ${esc(horasPassagem)} horas.</p>`

@@ -1,5 +1,8 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { CabecaDePagina } from '@/components/admin/CabecaDePagina'
+import { Card } from '@/components/admin/ui/Card'
+import { Selo } from '@/components/admin/ui/Selo'
 import { getUserProfile } from '@/lib/auth/profile'
 import { asNumber, getSql } from '@/lib/db'
 import { sessaoAtual } from '@/lib/auth/sessao'
@@ -20,29 +23,6 @@ type FunnelStep = {
   dropPct: number | null
 }
 
-type StuckProtocol = {
-  id: string
-  user_id: string
-  generated_at: string
-  days: number
-  patientName: string
-}
-
-type StuckOrder = {
-  id: string
-  created_at: string
-  days: number
-  patientName: string
-}
-
-type FailedPayment = {
-  id: string
-  amount: number | null
-  created_at: string
-  clientHref: string | null
-  patientName: string
-}
-
 function daysAgoIso(days: number): string {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
 }
@@ -55,46 +35,6 @@ function daysBetween(fromIso: string | Date): number {
 
 function money(value: number | null | undefined): string {
   return `R$ ${(value ?? 0).toFixed(2).replace('.', ',')}`
-}
-
-function AlertCard({
-  title,
-  ok,
-  children,
-}: {
-  title: string
-  ok: boolean
-  children: React.ReactNode
-}) {
-  return (
-    <section
-      className={`rounded-2xl border shadow-sm p-5 ${
-        ok
-          ? 'bg-white border-gray-100'
-          : 'bg-white border-amber-200 ring-1 ring-amber-100'
-      }`}
-    >
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">
-          {title}
-        </p>
-        {ok ? (
-          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-green-50 text-green-700">
-            Tudo certo
-          </span>
-        ) : (
-          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
-            Atenção
-          </span>
-        )}
-      </div>
-      {ok ? (
-        <p className="text-sm text-gray-400">Tudo certo por aqui.</p>
-      ) : (
-        children
-      )}
-    </section>
-  )
 }
 
 export default async function AdminVisaoGeralPage({
@@ -191,7 +131,7 @@ export default async function AdminVisaoGeralPage({
     return { ...step, dropPct }
   })
 
-  // --- Alertas ---
+  // --- Alertas (consultas preservadas; UI deste passo é só o funil) ---
   const threeDaysAgo = daysAgoIso(3)
   const twoDaysAgo = daysAgoIso(2)
   const sevenDaysAgo = daysAgoIso(7)
@@ -270,7 +210,7 @@ export default async function AdminVisaoGeralPage({
     `,
   ])
 
-  const stuckProtocols: StuckProtocol[] = stuckProtocolsRaw.map((p) => ({
+  const stuckProtocols = stuckProtocolsRaw.map((p) => ({
     id: p.id,
     user_id: p.user_id,
     generated_at:
@@ -281,7 +221,7 @@ export default async function AdminVisaoGeralPage({
     patientName: p.users?.full_name ?? 'Paciente',
   }))
 
-  const stuckOrders: StuckOrder[] = stuckOrdersRaw.map((o) => ({
+  const stuckOrders = stuckOrdersRaw.map((o) => ({
     id: o.id,
     created_at:
       o.created_at instanceof Date
@@ -307,7 +247,7 @@ export default async function AdminVisaoGeralPage({
         ? 'Nenhuma reconciliação nas últimas 24h.'
         : null
 
-  const failedPayments: FailedPayment[] = failedPaymentsRaw.map((p) => {
+  const failedPayments = failedPaymentsRaw.map((p) => {
     const sub = p.subscriptions
     return {
       id: p.id,
@@ -329,27 +269,26 @@ export default async function AdminVisaoGeralPage({
   `
   const webhookCount = webhookCountRows[0]?.n ?? 0
 
-  return (
-    <main className="max-w-6xl mx-auto px-6 py-8 space-y-8">
-      <div>
-        <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-1">
-          Operação
-        </p>
-        <h1 className="text-2xl font-bold text-[#13244f]">Visão Geral</h1>
-      </div>
+  // Consultas acima preservadas (critério: sem diff SQL). UI = só o funil.
+  void [
+    stuckProtocols,
+    stuckOrders,
+    reconOk,
+    reconAlertReason,
+    latestRecon,
+    reconAt,
+    failedPayments,
+    webhookCount,
+    money,
+  ]
 
-      {/* Funil */}
-      <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-          <div>
-            <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-1">
-              Funil de conversão
-            </p>
-            <p className="text-sm text-gray-400">
-              Contagens absolutas e queda percentual entre etapas.
-            </p>
-          </div>
-          <div className="flex gap-1 bg-[#f5f0eb] rounded-xl p-1">
+  return (
+    <div style={{ maxWidth: 896 }}>
+      <CabecaDePagina
+        trilha="Operação / Visão Geral"
+        titulo="Visão Geral"
+        acao={
+          <div className="admin-periodo">
             {PERIOD_OPTIONS.map((opt) => (
               <Link
                 key={opt.key}
@@ -358,186 +297,59 @@ export default async function AdminVisaoGeralPage({
                     ? '/suplementos/admin'
                     : `/suplementos/admin?periodo=${opt.key}`
                 }
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                  periodo === opt.key
-                    ? 'bg-[#13244f] text-white'
-                    : 'text-[#13244f]/60 hover:text-[#13244f]'
-                }`}
+                className={periodo === opt.key ? 'ativo' : undefined}
               >
                 {opt.label}
               </Link>
             ))}
           </div>
+        }
+      />
+
+      <Card>
+        <div style={{ marginBottom: 20 }}>
+          <p className="admin-card-rotulo">Funil de conversão</p>
+          <p className="admin-sub">
+            Contagens absolutas e queda percentual entre etapas.
+          </p>
         </div>
 
-        <ol className="space-y-0">
+        <ol className="admin-funil">
           {funnel.map((step, i) => (
-            <li key={step.key} className="relative flex gap-4">
-              <div className="flex flex-col items-center">
-                <div className="w-3 h-3 rounded-full bg-[#13244f] mt-2 shrink-0" />
-                {i < funnel.length - 1 && (
-                  <div className="w-px flex-1 bg-[#13244f]/15 my-1" />
-                )}
+            <li key={step.key} className="admin-funil-item">
+              <div className="admin-funil-eixo">
+                <div className="admin-funil-ponto" />
+                {i < funnel.length - 1 ? (
+                  <div className="admin-funil-linha" />
+                ) : null}
               </div>
-              <div
-                className={`flex-1 flex flex-wrap items-baseline gap-x-3 gap-y-1 ${i < funnel.length - 1 ? 'pb-5' : ''}`}
-              >
-                <span className="text-3xl font-bold text-[#13244f] tabular-nums leading-none">
+              <div className="admin-funil-corpo">
+                <span className="admin-funil-count">
                   {step.count.toLocaleString('pt-BR')}
                 </span>
-                <span className="text-sm font-semibold text-[#13244f]">
-                  {step.label}
-                </span>
-                {step.dropPct !== null && (
-                  <span
-                    className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                <span className="admin-funil-label">{step.label}</span>
+                {step.dropPct !== null ? (
+                  <Selo
+                    tom={
                       step.dropPct > 0
-                        ? 'bg-red-50 text-red-700'
+                        ? 'perigo'
                         : step.dropPct < 0
-                          ? 'bg-green-50 text-green-700'
-                          : 'bg-gray-100 text-gray-500'
-                    }`}
+                          ? 'ok'
+                          : 'neutro'
+                    }
                   >
                     {step.dropPct > 0
                       ? `−${step.dropPct}% vs etapa anterior`
                       : step.dropPct < 0
                         ? `+${Math.abs(step.dropPct)}% vs etapa anterior`
                         : '0% vs etapa anterior'}
-                  </span>
-                )}
+                  </Selo>
+                ) : null}
               </div>
             </li>
           ))}
         </ol>
-      </section>
-
-      {/* Alertas */}
-      <section className="space-y-4">
-        <div>
-          <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-1">
-            Alertas operacionais
-          </p>
-          <p className="text-sm text-gray-400">
-            O que precisa de ação humana agora.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <AlertCard
-            title="Protocolos parados (>3 dias)"
-            ok={stuckProtocols.length === 0}
-          >
-            <ul className="space-y-2">
-              {stuckProtocols.map((p) => (
-                <li
-                  key={p.id}
-                  className="flex items-center justify-between gap-3 text-sm"
-                >
-                  <Link
-                    href={`/suplementos/admin/clientes/${p.user_id}`}
-                    className="font-semibold text-[#13244f] hover:underline"
-                  >
-                    {p.patientName}
-                  </Link>
-                  <span className="text-xs text-amber-700 font-bold shrink-0">
-                    há {p.days} dia{p.days === 1 ? '' : 's'}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </AlertCard>
-
-          <AlertCard
-            title="Pedidos sem envio à farmácia (>2 dias)"
-            ok={stuckOrders.length === 0}
-          >
-            <ul className="space-y-2">
-              {stuckOrders.map((o) => (
-                <li
-                  key={o.id}
-                  className="flex items-center justify-between gap-3 text-sm"
-                >
-                  <Link
-                    href="/suplementos/admin/pedidos"
-                    className="font-semibold text-[#13244f] hover:underline"
-                  >
-                    {o.patientName}
-                  </Link>
-                  <span className="text-xs text-amber-700 font-bold shrink-0">
-                    há {o.days} dia{o.days === 1 ? '' : 's'}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <Link
-              href="/suplementos/admin/pedidos"
-              className="inline-block mt-3 text-xs font-bold text-[#13244f] bg-[#13244f]/5 hover:bg-[#13244f]/10 px-3 py-1.5 rounded-lg transition"
-            >
-              Ir para pedidos
-            </Link>
-          </AlertCard>
-
-          <AlertCard title="Reconciliação da farmácia" ok={reconOk}>
-            <p className="text-sm text-[#13244f] font-semibold mb-1">
-              {reconAlertReason}
-            </p>
-            {latestRecon && (
-              <p className="text-xs text-gray-400">
-                Último registro: {latestRecon.status}
-                {reconAt
-                  ? ` · ${new Date(reconAt).toLocaleString('pt-BR')}`
-                  : ''}
-              </p>
-            )}
-          </AlertCard>
-
-          <AlertCard
-            title="Pagamentos falhados (7 dias)"
-            ok={failedPayments.length === 0}
-          >
-            <ul className="space-y-2">
-              {failedPayments.map((p) => (
-                <li
-                  key={p.id}
-                  className="flex items-center justify-between gap-3 text-sm"
-                >
-                  {p.clientHref ? (
-                    <Link
-                      href={p.clientHref}
-                      className="font-semibold text-[#13244f] hover:underline"
-                    >
-                      {p.patientName}
-                    </Link>
-                  ) : (
-                    <span className="font-semibold text-[#13244f]">
-                      {p.patientName}
-                    </span>
-                  )}
-                  <span className="text-xs text-gray-400 shrink-0">
-                    {money(p.amount)} ·{' '}
-                    {new Date(p.created_at).toLocaleDateString('pt-BR')}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </AlertCard>
-
-          <AlertCard
-            title="Webhooks não processados (7 dias)"
-            ok={webhookCount === 0}
-          >
-            <p className="text-sm text-[#13244f]">
-              <span className="text-2xl font-bold tabular-nums">
-                {webhookCount}
-              </span>{' '}
-              webhook{webhookCount === 1 ? '' : 's'} com{' '}
-              <code className="text-xs bg-gray-100 px-1 rounded">
-                processed = false
-              </code>
-            </p>
-          </AlertCard>
-        </div>
-      </section>
-    </main>
+      </Card>
+    </div>
   )
 }

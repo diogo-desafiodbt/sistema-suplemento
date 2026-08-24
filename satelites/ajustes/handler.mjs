@@ -224,109 +224,8 @@ function nav(abasAtiva, dentroDaMoldura) {
 function estilos() {
   return `
     ${estiloBase()}
-    .tabs {
-      background: var(--papel);
-      border-bottom: 1px solid var(--borda);
-      padding: 10px 24px;
-      display: flex;
-      gap: 6px;
-      overflow-x: auto;
-    }
-    .tabs a {
-      padding: 8px 16px;
-      border-radius: var(--raio);
-      font-size: 14px;
-      font-weight: 500;
-      color: color-mix(in srgb, var(--marinho) 60%, transparent);
-      text-decoration: none;
-      white-space: nowrap;
-    }
-    .tabs a:hover { background: rgba(19, 36, 79, .08); color: var(--marinho); }
-    .tabs a.ativa { background: var(--marinho); color: #fff; }
     main { max-width: 960px; }
     main.estreito { max-width: 640px; }
-    .topo { margin-bottom: 20px; }
-    .topo .secao {
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      color: var(--tinta-fraca);
-      margin: 0 0 4px;
-    }
-    .topo h1 { margin: 0; font-size: 24px; color: var(--marinho); }
-    .topo p { margin: 4px 0 0; font-size: 14px; color: var(--tinta-fraca); }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 12px;
-    }
-    label {
-      display: block;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: .04em;
-      text-transform: uppercase;
-      color: var(--tinta-fraca);
-      margin-bottom: 4px;
-    }
-    input, select {
-      width: 100%;
-      border: 1px solid var(--borda);
-      border-radius: var(--raio);
-      padding: 8px 12px;
-      font-size: 14px;
-      color: var(--marinho);
-      background: var(--papel);
-      font-family: inherit;
-    }
-    input:focus, select:focus {
-      outline: none;
-      box-shadow: 0 0 0 2px rgba(19, 36, 79, .15);
-    }
-    .acoes { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
-    .mono { font-family: ui-monospace, monospace; font-weight: 700; color: var(--marinho); }
-    .pill {
-      display: inline-block;
-      font-size: 11px;
-      font-weight: 700;
-      border-radius: var(--raio);
-      padding: 4px 10px;
-      border: 0;
-      cursor: pointer;
-      font-family: inherit;
-    }
-    .pill-ativo { background: color-mix(in srgb, var(--ok) 22%, white); color: #2f6b24; }
-    .pill-inativo { background: #f0f2f5; color: var(--tinta-fraca); }
-    .flash-ok {
-      background: color-mix(in srgb, var(--ok) 22%, white);
-      color: #2f6b24;
-      border-radius: var(--raio);
-      padding: 10px 14px;
-      margin-bottom: 16px;
-      font-size: 14px;
-    }
-    .flash-erro {
-      background: color-mix(in srgb, var(--perigo) 22%, white);
-      color: #9b2c2c;
-      border-radius: var(--raio);
-      padding: 10px 14px;
-      margin-bottom: 16px;
-      font-size: 14px;
-    }
-    .config-item { margin-bottom: 12px; }
-    .config-item:last-child { margin-bottom: 0; }
-    .config-chave {
-      font-family: ui-monospace, monospace;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: .06em;
-      text-transform: uppercase;
-      color: var(--tinta-fraca);
-      margin: 0 0 4px;
-    }
-    .config-linha { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    .config-linha input { flex: 1; min-width: 200px; font-family: ui-monospace, monospace; }
   `
 }
 
@@ -371,33 +270,57 @@ function flash(query) {
 function paginaCupons(cupons, query) {
   const linhas =
     cupons.length === 0
-      ? `<tr><td colspan="6" class="vazio">Nenhum cupom cadastrado.</td></tr>`
+      ? ''
       : cupons
           .map((c) => {
             const ativo = c.is_active
             return `<tr>
-              <td class="mono">${esc(c.code)}</td>
+              <td class="mono" style="font-weight:700;color:var(--tinta)">${esc(c.code)}</td>
               <td class="muted">${c.type === 'percentage' ? 'Percentual' : 'Valor fixo'}</td>
-              <td><strong>${esc(formatValor(c))}</strong></td>
-              <td class="muted">${esc(c.used_count)} / ${c.max_uses ?? '∞'}</td>
-              <td class="muted">${esc(formatData(c.expires_at))}</td>
+              <td class="num"><strong>${esc(formatValor(c))}</strong></td>
+              <td class="num muted">${esc(c.used_count)} / ${c.max_uses ?? '∞'}</td>
+              <td class="num muted">${esc(formatData(c.expires_at))}</td>
               <td>
                 <form method="POST" action="${BASE}/cupons">
                   <input type="hidden" name="acao" value="alternar">
                   <input type="hidden" name="id" value="${esc(c.id)}">
-                  <button type="submit" class="pill ${ativo ? 'pill-ativo' : 'pill-inativo'}">${ativo ? 'Ativo' : 'Inativo'}</button>
+                  <button type="submit" class="selo ${ativo ? 'selo-ok' : 'selo-neutro'}" style="border:0;cursor:pointer;font-family:inherit">${ativo ? 'Ativo' : 'Inativo'}</button>
                 </form>
               </td>
             </tr>`
           })
           .join('')
 
+  const lista =
+    cupons.length === 0
+      ? `<div class="vazio">
+          <p class="vazio-titulo">Nenhum cupom cadastrado</p>
+          <p class="vazio-texto">Crie o primeiro cupom no formulário acima. Ele só vale depois de salvo e ativo.</p>
+        </div>`
+      : `<div class="tabela-wrap">
+          <table class="tabela">
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Tipo</th>
+                <th>Valor</th>
+                <th>Usos</th>
+                <th>Validade</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>${linhas}</tbody>
+          </table>
+        </div>`
+
   const conteudo = `
     ${flash(query)}
-    <div class="topo">
-      <p class="secao">Marketing</p>
-      <h1>Cupons de desconto</h1>
-      <p class="muted">${cupons.length} cupons</p>
+    <div class="cabeca">
+      <div>
+        <p class="cabeca-trilha">Ajustes / Cupons</p>
+        <h1 class="cabeca-titulo">Cupons</h1>
+      </div>
+      <span class="cabeca-meta">${cupons.length} cupons</span>
     </div>
 
     <form method="POST" action="${BASE}/cupons" class="card">
@@ -433,21 +356,7 @@ function paginaCupons(cupons, query) {
       </div>
     </form>
 
-    <div class="card" style="padding:0; overflow:hidden;">
-      <table>
-        <thead>
-          <tr>
-            <th>Código</th>
-            <th>Tipo</th>
-            <th>Valor</th>
-            <th>Usos</th>
-            <th>Validade</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>${linhas}</tbody>
-      </table>
-    </div>`
+    <div class="card card-flush">${lista}</div>`
 
   return layout({ titulo: 'Cupons', aba: 'cupons', estreito: false, conteudo })
 }
@@ -455,11 +364,16 @@ function paginaCupons(cupons, query) {
 function paginaConfig(configs, query) {
   const bloco =
     configs.length === 0
-      ? '<div class="card vazio">Nenhuma configuração encontrada.</div>'
+      ? `<div class="card">
+          <div class="vazio">
+            <p class="vazio-titulo">Nenhuma configuração encontrada</p>
+            <p class="vazio-texto">Ainda não há chaves em system_config. Elas aparecem aqui quando forem criadas no banco.</p>
+          </div>
+        </div>`
       : configs
           .map(
             (c) => `
-        <div class="card config-item">
+        <div class="card">
           <p class="config-chave">${esc(c.key)}</p>
           ${c.description ? `<p class="muted">${esc(c.description)}</p>` : ''}
           <form method="POST" action="${BASE}/config" class="config-linha">
@@ -473,11 +387,13 @@ function paginaConfig(configs, query) {
 
   const conteudo = `
     ${flash(query)}
-    <div class="topo">
-      <p class="secao">Sistema</p>
-      <h1>Configurações</h1>
-      <p>Valores operacionais editáveis sem redeploy.</p>
+    <div class="cabeca">
+      <div>
+        <p class="cabeca-trilha">Ajustes / Config</p>
+        <h1 class="cabeca-titulo">Config</h1>
+      </div>
     </div>
+    <p class="muted" style="margin:-8px 0 16px">Valores operacionais editáveis sem redeploy.</p>
     ${bloco}`
 
   return layout({ titulo: 'Configurações', aba: 'config', estreito: true, conteudo })

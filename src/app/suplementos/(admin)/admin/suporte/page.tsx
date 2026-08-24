@@ -3,6 +3,7 @@ import {
   SupportThreadPanel,
   type SupportThreadView,
 } from '@/components/admin/SupportThreadPanel'
+import { CabecaDePagina } from '@/components/admin/CabecaDePagina'
 import { getUserProfile } from '@/lib/auth/profile'
 import { getSql } from '@/lib/db'
 import { sessaoAtual } from '@/lib/auth/sessao'
@@ -58,18 +59,12 @@ export default async function AdminSuportePage() {
   ])
 
   return (
-    <main className="max-w-4xl mx-auto px-6 py-8">
-      <div className="mb-6">
-        <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-1">
-          Operações
-        </p>
-        <h1 className="text-2xl font-bold text-[#13244f]">Suporte</h1>
-        <p className="text-sm text-[#13244f]/60 mt-1">
-          Revise sugestões antes de enviar. Só o aviso genérico sai sozinho.
-        </p>
-      </div>
-
+    <div style={{ maxWidth: 896 }}>
+      <CabecaDePagina trilha="Operação / Suporte" titulo="Suporte" />
+      <p className="admin-sub" style={{ marginTop: -12, marginBottom: 20 }}>
+        Revise sugestões antes de enviar. Só o aviso genérico sai sozinho.
+      </p>
       <SupportThreadPanel pending={pendingRows} history={historyRows} />
-    </main>
+    </div>
   )
 }

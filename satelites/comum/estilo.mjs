@@ -1,6 +1,6 @@
 /**
  * Tokens e classes compartilhadas dos satélites do admin.
- * Mesma paleta da casca React — sem duplicar tokens em cada handler.
+ * Classes novas nascem aqui — não no handler.
  */
 export function tokensCss() {
   return `
@@ -20,19 +20,44 @@ export function tokensCss() {
 `
 }
 
-/** Classes base: .card, .tabela, .selo, .btn, .vazio */
+/** Classes base: .card, .tabela, .selo, .btn, .vazio + auxiliares de tela */
 export function classesCss() {
   return `
 * { box-sizing: border-box; }
 body {
   margin: 0;
-  padding: 12px 16px;
+  padding: 0 4px 24px;
   font-family: Roboto, ui-sans-serif, system-ui, -apple-system, sans-serif;
   color: var(--tinta);
   line-height: 1.45;
   background: transparent;
 }
-main { margin: 0 auto; padding: 0 0 24px; }
+main { margin: 0 auto; max-width: 1080px; }
+
+.cabeca {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.cabeca-trilha {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--tinta-fraca);
+}
+.cabeca-titulo {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--tinta);
+  line-height: 1.15;
+}
+.cabeca-meta { font-size: 14px; color: var(--tinta-fraca); font-variant-numeric: tabular-nums; }
 
 .card {
   background: var(--papel);
@@ -42,7 +67,8 @@ main { margin: 0 auto; padding: 0 0 24px; }
   margin-bottom: 16px;
   box-shadow: 0 1px 2px rgba(19, 36, 79, 0.04);
 }
-.card h2 {
+.card-flush { padding: 0; overflow: hidden; }
+.card h2, .card-rotulo {
   margin: 0 0 14px;
   font-size: 11px;
   font-weight: 700;
@@ -76,6 +102,7 @@ main { margin: 0 auto; padding: 0 0 24px; }
 .tabela tr:hover td, table tr:hover td {
   background: rgba(19, 36, 79, 0.03);
 }
+.num { font-variant-numeric: tabular-nums; }
 
 .selo {
   display: inline-block;
@@ -90,6 +117,7 @@ main { margin: 0 auto; padding: 0 0 24px; }
 .selo-perigo { background: color-mix(in srgb, var(--perigo) 22%, white); color: #9b2c2c; }
 .selo-atencao { background: color-mix(in srgb, var(--atencao) 28%, white); color: #8a5a12; }
 .selo-neutro { background: #f0f2f5; color: var(--tinta-fraca); }
+.selo-info { background: #e8f0fe; color: #1e4fad; }
 
 .btn {
   display: inline-block;
@@ -110,6 +138,7 @@ main { margin: 0 auto; padding: 0 0 24px; }
   border: 1px solid var(--borda);
 }
 .btn-secundario:hover { background: rgba(19, 36, 79, 0.04); }
+.btn-compacto { padding: 6px 12px; font-size: 12px; }
 
 .vazio {
   text-align: center;
@@ -131,10 +160,118 @@ main { margin: 0 auto; padding: 0 0 24px; }
 .vazio-acao { margin-top: 16px; }
 
 .muted { color: var(--tinta-fraca); font-size: 13px; }
+.nome { margin: 0; font-weight: 600; color: var(--tinta); }
+.sub { margin: 2px 0 0; font-size: 12px; color: var(--tinta-fraca); }
+.mono { font-family: ui-monospace, monospace; font-size: 12px; color: var(--tinta-fraca); }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--tinta-fraca);
+  margin-bottom: 4px;
+}
+input, select, textarea {
+  width: 100%;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 8px 12px;
+  font-size: 14px;
+  color: var(--tinta);
+  background: var(--papel);
+  font-family: inherit;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(19, 36, 79, .15);
+}
+.acoes { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.acoes-col { display: flex; flex-direction: column; gap: 6px; min-width: 10rem; }
+.acoes-col form { margin: 0; }
+.acoes-col .btn { display: block; width: 100%; text-align: center; }
+
+.flash-ok {
+  background: color-mix(in srgb, var(--ok) 22%, white);
+  color: #2f6b24;
+  border-radius: var(--raio);
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+.flash-erro {
+  background: color-mix(in srgb, var(--perigo) 22%, white);
+  color: #9b2c2c;
+  border-radius: var(--raio);
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.lista { list-style: none; margin: 0; padding: 0; }
+.lista li { padding: 10px 0; border-top: 1px solid var(--borda); }
+.lista li:first-child { border-top: 0; }
+.linha { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.passagem { font-size: 28px; font-weight: 700; color: var(--tinta); margin: 0 0 6px; font-variant-numeric: tabular-nums; }
+.passagem-problema { color: var(--perigo); }
+.aviso {
+  background: color-mix(in srgb, var(--atencao) 28%, white);
+  color: #8a5a12;
+  border-radius: var(--raio);
+  padding: 10px 12px;
+  font-size: 14px;
+}
+.contagem-selo {
+  font-weight: 600;
+  font-size: 12px;
+  background: var(--marinho);
+  color: #fff;
+  border-radius: var(--raio);
+  padding: 1px 8px;
+  margin-left: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.tabs {
+  background: var(--papel);
+  border-bottom: 1px solid var(--borda);
+  padding: 10px 0;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  margin-bottom: 16px;
+}
+.tabs a {
+  padding: 8px 16px;
+  border-radius: var(--raio);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--tinta-fraca);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.tabs a:hover { background: rgba(19, 36, 79, .08); color: var(--marinho); }
+.tabs a.ativa { background: var(--marinho); color: #fff; }
+.config-chave {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--tinta-fraca);
+  margin: 0 0 4px;
+}
+.config-linha { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.config-linha input { flex: 1; min-width: 200px; font-family: ui-monospace, monospace; }
+.sem-acao { font-size: 12px; color: var(--tinta-fraca); }
 `
 }
 
-/** CSS completo para injetar no `<style>` do satélite. */
 export function estiloBase() {
   return tokensCss() + classesCss()
 }

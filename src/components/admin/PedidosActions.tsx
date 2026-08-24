@@ -158,7 +158,8 @@ export function PedidosActions({ orders }: { orders: OrderRow[] }) {
                               openUrl: true,
                             })
                           }
-                          className="text-xs font-semibold text-[#f4001e] border border-[#f4001e]/30 hover:bg-[#f4001e]/5 rounded-full px-3 py-1.5 disabled:opacity-50"
+                          className="admin-btn admin-btn--secundario"
+                          style={{ fontSize: 12, padding: '6px 12px' }}
                         >
                           Baixar PDF da etiqueta
                         </button>

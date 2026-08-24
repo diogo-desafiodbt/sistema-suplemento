@@ -1,4 +1,9 @@
 import { redirect } from 'next/navigation'
+import { CabecaDePagina } from '@/components/admin/CabecaDePagina'
+import { Card } from '@/components/admin/ui/Card'
+import { Selo } from '@/components/admin/ui/Selo'
+import { Tabela } from '@/components/admin/ui/Tabela'
+import { Vazio } from '@/components/admin/ui/Vazio'
 import { getUserProfile } from '@/lib/auth/profile'
 import { getSql } from '@/lib/db'
 import {
@@ -27,12 +32,13 @@ const INTEGRIDADE_LABEL: Record<IntegridadePdf, string> = {
   sem_registro: 'Sem registro',
 }
 
-const INTEGRIDADE_BADGE: Record<IntegridadePdf, string> = {
-  integro: 'bg-green-50 text-green-700',
-  alterado: 'bg-red-50 text-red-700',
-  // Âmbar, não vermelho: não conferimos, e isso é diferente de acusar.
-  indisponivel: 'bg-amber-50 text-amber-700',
-  sem_registro: 'bg-gray-100 text-gray-600',
+function tomIntegridade(
+  estado: IntegridadePdf,
+): 'ok' | 'perigo' | 'atencao' | 'neutro' {
+  if (estado === 'integro') return 'ok'
+  if (estado === 'alterado') return 'perigo'
+  if (estado === 'indisponivel') return 'atencao'
+  return 'neutro'
 }
 
 export default async function AdminAuditoriaPage() {
@@ -75,87 +81,62 @@ export default async function AdminAuditoriaPage() {
   >
 
   return (
-    <main className="max-w-6xl mx-auto px-6 py-8">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-1">
-            Compliance
-          </p>
-          <h1 className="text-2xl font-bold text-[#13244f]">
-            Auditoria de prescrições
-          </h1>
-        </div>
-        <span className="text-sm text-gray-400">
-          {auditLogs.length} registros
-        </span>
-      </div>
+    <div>
+      <CabecaDePagina
+        trilha="Clínico / Auditoria"
+        titulo="Auditoria"
+        acao={
+          <span className="admin-num" style={{ color: 'var(--admin-tinta-fraca)', fontSize: 14 }}>
+            {auditLogs.length} registros
+          </span>
+        }
+      />
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-100">
-              <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">
-                Profissional
-              </th>
-              <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">
-                Paciente
-              </th>
-              <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">
-                Data de assinatura
-              </th>
-              <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">
-                Hash do PDF
-              </th>
-              <th className="text-left px-5 py-3.5 text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">
-                Integridade
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {auditLogs.length === 0 ? (
+      <Card className="!p-0 overflow-hidden">
+        {auditLogs.length === 0 ? (
+          <Vazio
+            titulo="Nenhum registro de auditoria"
+            explicacao="Assinaturas de prescrição ainda não geraram trilha. Cada PDF assinado aparece aqui com o hash para conferência."
+          />
+        ) : (
+          <Tabela>
+            <thead>
               <tr>
-                <td
-                  colSpan={5}
-                  className="px-5 py-12 text-center text-gray-400 text-sm"
-                >
-                  Nenhum registro de auditoria ainda.
-                </td>
+                <th>Profissional</th>
+                <th>Paciente</th>
+                <th>Data de assinatura</th>
+                <th>Hash do PDF</th>
+                <th>Integridade</th>
               </tr>
-            ) : (
-              auditLogs.map((log) => {
+            </thead>
+            <tbody>
+              {auditLogs.map((log) => {
                 const estado =
                   integridadePorProtocolo[log.protocol_id] ?? 'sem_registro'
                 return (
-                <tr
-                  key={log.id}
-                  className="border-b border-gray-50 hover:bg-[#f5f0eb]/50 transition-colors"
-                >
-                  <td className="px-5 py-4 font-semibold text-[#13244f]">
-                    {log.professionals?.users?.full_name ?? '—'}
-                  </td>
-                  <td className="px-5 py-4 font-semibold text-[#13244f]">
-                    {log.protocols?.users?.full_name ?? '—'}
-                  </td>
-                  <td className="px-5 py-4 text-gray-400 text-xs">
-                    {new Date(log.signed_at).toLocaleString('pt-BR')}
-                  </td>
-                  <td className="px-5 py-4 font-mono text-xs text-gray-400 break-all max-w-xs">
-                    {log.pdf_hash}
-                  </td>
-                  <td className="px-5 py-4">
-                    <span
-                      className={`text-xs font-bold px-2.5 py-1 rounded-full ${INTEGRIDADE_BADGE[estado]}`}
-                    >
-                      {INTEGRIDADE_LABEL[estado]}
-                    </span>
-                  </td>
-                </tr>
+                  <tr key={log.id}>
+                    <td className="admin-nome">
+                      {log.professionals?.users?.full_name ?? '—'}
+                    </td>
+                    <td className="admin-nome">
+                      {log.protocols?.users?.full_name ?? '—'}
+                    </td>
+                    <td className="admin-num admin-sub">
+                      {new Date(log.signed_at).toLocaleString('pt-BR')}
+                    </td>
+                    <td className="admin-mono">{log.pdf_hash}</td>
+                    <td>
+                      <Selo tom={tomIntegridade(estado)}>
+                        {INTEGRIDADE_LABEL[estado]}
+                      </Selo>
+                    </td>
+                  </tr>
                 )
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-    </main>
+              })}
+            </tbody>
+          </Tabela>
+        )}
+      </Card>
+    </div>
   )
 }

@@ -1,6 +1,10 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { Botao } from '@/components/admin/ui/Botao'
+import { Card } from '@/components/admin/ui/Card'
+import { Selo } from '@/components/admin/ui/Selo'
+import { Vazio } from '@/components/admin/ui/Vazio'
 import type { SupportDbFacts } from '@/lib/support/facts'
 
 type SupportMessageView = {
@@ -47,7 +51,6 @@ function formatFacts(facts: SupportDbFacts | null): string[] {
       lines.push(
         `Último evento: ${ev.descricao ?? '—'} (${[ev.cidade, ev.local].filter(Boolean).join(' / ') || '—'})`,
       )
-      if (ev.datahora) lines.push(`Data do evento: ${formatDate(ev.datahora)}`)
     } else {
       lines.push('Último evento: —')
     }
@@ -118,6 +121,12 @@ function statusLabel(status: string): string {
   }
 }
 
+function tomStatus(status: string): 'ok' | 'atencao' | 'neutro' {
+  if (status === 'respondido') return 'ok'
+  if (status === 'aguardando_revisao' || status === 'novo') return 'atencao'
+  return 'neutro'
+}
+
 function ThreadCard({
   thread,
   onSent,
@@ -160,87 +169,97 @@ function ThreadCard({
   }
 
   return (
-    <article className="rounded-2xl border border-[#13244f]/10 bg-white p-5 space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase">
-            {statusLabel(thread.status)}
-          </p>
-          <h2 className="text-lg font-semibold text-[#13244f] mt-1">
+    <Card>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <Selo tom={tomStatus(thread.status)}>{statusLabel(thread.status)}</Selo>
+          <h2 className="admin-nome" style={{ fontSize: 18, marginTop: 8 }}>
             {thread.subject || '(sem assunto)'}
           </h2>
-          <p className="text-sm text-[#13244f]/70 mt-1">
+          <p className="admin-sub">
             De: {thread.from_email}
             {thread.users?.full_name ? ` · ${thread.users.full_name}` : ''}
             {!thread.user_id ? ' · cliente não identificado' : ''}
           </p>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="admin-sub admin-num">
             Última msg: {formatDate(thread.last_message_at)}
           </p>
         </div>
       </div>
 
-      <div>
-        <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-2">
-          Histórico
-        </p>
-        <div className="space-y-2 max-h-64 overflow-y-auto">
-          {messages.map((m) => (
-            <div
-              key={m.id}
-              className={`rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
+      <p className="admin-card-rotulo">Histórico</p>
+      <div style={{ maxHeight: 256, overflowY: 'auto', marginBottom: 16 }}>
+        {messages.map((m) => (
+          <div
+            key={m.id}
+            style={{
+              marginBottom: 8,
+              padding: '8px 12px',
+              borderRadius: 'var(--admin-raio)',
+              background:
                 m.direction === 'inbound'
-                  ? 'bg-[#f5f0eb] text-[#13244f]'
-                  : 'bg-[#13244f]/5 text-[#13244f]/90'
-              }`}
-            >
-              <p className="text-[11px] font-medium text-[#13244f]/50 mb-1">
-                {m.direction === 'inbound' ? 'Cliente' : 'Suporte'} ·{' '}
-                {formatDate(m.created_at)}
-              </p>
-              {m.body_text || '(vazio)'}
-            </div>
-          ))}
-        </div>
+                  ? 'var(--admin-fundo)'
+                  : 'color-mix(in srgb, var(--admin-marinho) 6%, white)',
+              whiteSpace: 'pre-wrap',
+              fontSize: 14,
+            }}
+          >
+            <p className="admin-sub" style={{ marginBottom: 4 }}>
+              {m.direction === 'inbound' ? 'Cliente' : 'Suporte'} ·{' '}
+              {formatDate(m.created_at)}
+            </p>
+            {m.body_text || '(vazio)'}
+          </div>
+        ))}
       </div>
 
-      <div>
-        <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-2">
-          O que buscamos no banco
-        </p>
-        <ul className="text-sm text-[#13244f]/80 space-y-1 bg-[#fafafa] rounded-lg px-3 py-2 border border-gray-100">
-          {factLines.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
-      </div>
+      <p className="admin-card-rotulo">O que buscamos no banco</p>
+      <ul
+        style={{
+          margin: '0 0 16px',
+          padding: '10px 12px',
+          listStyle: 'none',
+          border: '1px solid var(--admin-borda)',
+          borderRadius: 'var(--admin-raio)',
+          fontSize: 14,
+        }}
+      >
+        {factLines.map((line) => (
+          <li key={line} style={{ marginTop: 2 }}>
+            {line}
+          </li>
+        ))}
+      </ul>
 
       {thread.status !== 'respondido' && (
         <div>
-          <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-2">
-            Mensagem sugerida
-          </p>
+          <p className="admin-card-rotulo">Mensagem sugerida</p>
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
             rows={8}
-            className="w-full rounded-lg border border-[#13244f]/15 px-3 py-2 text-sm text-[#13244f] focus:outline-none focus:ring-2 focus:ring-[#13244f]/30"
+            className="admin-input"
+            style={{ height: 'auto', padding: 12, resize: 'vertical' }}
             placeholder="Escreva ou edite a resposta ao cliente…"
           />
-          {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
-          <div className="mt-3 flex justify-end">
-            <button
+          {error ? (
+            <p style={{ color: 'var(--admin-perigo)', fontSize: 14, marginTop: 8 }}>
+              {error}
+            </p>
+          ) : null}
+          <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+            <Botao
               type="button"
+              variante="primario"
               onClick={handleSend}
               disabled={sending || !text.trim()}
-              className="rounded-lg bg-[#f4001e] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50 hover:bg-[#d4001a] transition"
             >
               {sending ? 'Enviando…' : 'Enviar'}
-            </button>
+            </Botao>
           </div>
         </div>
       )}
-    </article>
+    </Card>
   )
 }
 
@@ -257,17 +276,18 @@ export function SupportThreadPanel({
   const visiblePending = pending.filter((t) => !hidden.has(t.id))
 
   return (
-    <div className="space-y-8">
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold tracking-widest text-[#13244f]/50 uppercase">
-            Pendentes ({visiblePending.length})
-          </h2>
-        </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+      <section style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <p className="admin-card-rotulo">
+          Pendentes ({visiblePending.length})
+        </p>
         {visiblePending.length === 0 ? (
-          <p className="text-sm text-gray-500">
-            Nenhuma conversa aguardando ação.
-          </p>
+          <Card>
+            <Vazio
+              titulo="Nenhuma conversa aguardando ação"
+              explicacao="A fila está vazia. Novos e-mails de suporte aparecem aqui depois da análise, prontos para revisão antes do envio."
+            />
+          </Card>
         ) : (
           visiblePending.map((thread) => (
             <ThreadCard
@@ -283,18 +303,22 @@ export function SupportThreadPanel({
         <button
           type="button"
           onClick={() => setShowHistory((v) => !v)}
-          className="text-sm font-medium text-[#13244f]/70 hover:text-[#13244f]"
+          className="admin-link-suave"
+          style={{ background: 'none', border: 0, cursor: 'pointer', fontFamily: 'inherit' }}
         >
           {showHistory
             ? 'Ocultar histórico'
             : `Ver histórico (${history.length})`}
         </button>
         {showHistory && (
-          <div className="mt-4 space-y-4">
+          <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
             {history.length === 0 ? (
-              <p className="text-sm text-gray-500">
-                Nenhuma thread respondida ainda.
-              </p>
+              <Card>
+                <Vazio
+                  titulo="Nenhuma thread respondida ainda"
+                  explicacao="Conversas já enviadas ficam neste histórico para consulta. A fila de pendentes é o lugar de ação."
+                />
+              </Card>
             ) : (
               history.map((thread) => (
                 <ThreadCard key={thread.id} thread={thread} onSent={() => {}} />

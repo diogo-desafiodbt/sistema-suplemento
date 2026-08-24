@@ -23,14 +23,6 @@ const statusLabel = {
   failed: 'Falhou',
 }
 
-const statusClasse = {
-  pending: 'status-pending',
-  sent_to_pharmacy: 'status-farmacia',
-  dispatched: 'status-caminho',
-  delivered: 'status-entregue',
-  failed: 'status-falhou',
-}
-
 /** @type {postgres.Sql | undefined} */
 let sql
 
@@ -137,44 +129,71 @@ function botoes(order) {
 
   if (canGenerate) {
     partes.push(`<form method="POST" action="${esc(urlAcao(order.id, 'gerar-etiqueta'))}">
-      <button type="submit" class="btn btn-primario">Gerar etiqueta agora</button>
+      <button type="submit" class="btn btn-primario btn-compacto">Gerar etiqueta agora</button>
     </form>`)
   }
 
   if (hasLabel) {
     partes.push(`<form method="POST" action="${esc(urlAcao(order.id, 'atualizar-rastreio'))}">
-      <button type="submit" class="btn btn-secundario">Atualizar rastreio agora</button>
+      <button type="submit" class="btn btn-secundario btn-compacto">Atualizar rastreio agora</button>
     </form>`)
     partes.push(`<form method="POST" action="${esc(urlAcao(order.id, 'pdf-etiqueta'))}" target="_blank">
-      <button type="submit" class="btn btn-pdf">Baixar PDF da etiqueta</button>
+      <button type="submit" class="btn btn-secundario btn-compacto">Baixar PDF da etiqueta</button>
     </form>`)
   }
 
-  return `<div class="acoes">${partes.join('')}</div>`
+  return `<div class="acoes-col">${partes.join('')}</div>`
 }
 
 function pagina(pedidos) {
-  const linhas =
+  const seloStatus = {
+    pending: 'selo-neutro',
+    sent_to_pharmacy: 'selo-info',
+    dispatched: 'selo-atencao',
+    delivered: 'selo-ok',
+    failed: 'selo-perigo',
+  }
+
+  const corpo =
     pedidos.length === 0
-      ? `<tr><td colspan="6" class="vazio">Nenhum pedido registrado.</td></tr>`
-      : pedidos
-          .map((order) => {
-            const classe =
-              statusClasse[order.status] ?? 'status-pending'
-            const rotulo = statusLabel[order.status] ?? order.status
-            return `<tr>
-              <td>
-                <p class="nome">${esc(order.full_name ?? '—')}</p>
-                <p class="codigo">${esc(order.client_code ?? '')}</p>
-              </td>
-              <td><span class="pill ${classe}">${esc(rotulo)}</span></td>
-              <td class="valor">${esc(formatValor(order.total_amount))}</td>
-              <td class="rastreio">${esc(order.tracking_code ?? '—')}</td>
-              <td class="data">${esc(formatData(order.created_at))}</td>
-              <td>${botoes(order)}</td>
-            </tr>`
-          })
-          .join('')
+      ? `<div class="vazio">
+          <p class="vazio-titulo">Nenhum pedido ainda</p>
+          <p class="vazio-texto">O portão de pré-lançamento está fechado. Os pedidos aparecem aqui assim que a loja abrir.</p>
+        </div>`
+      : `<div class="tabela-wrap">
+          <table class="tabela">
+            <thead>
+              <tr>
+                <th>Paciente</th>
+                <th>Status</th>
+                <th>Valor</th>
+                <th>Rastreio</th>
+                <th>Data</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${pedidos
+                .map((order) => {
+                  const tom =
+                    seloStatus[order.status] ?? 'selo-neutro'
+                  const rotulo = statusLabel[order.status] ?? order.status
+                  return `<tr>
+                    <td>
+                      <p class="nome">${esc(order.full_name ?? '—')}</p>
+                      <p class="sub">${esc(order.client_code ?? '')}</p>
+                    </td>
+                    <td><span class="selo ${tom}">${esc(rotulo)}</span></td>
+                    <td class="num">${esc(formatValor(order.total_amount))}</td>
+                    <td class="mono">${esc(order.tracking_code ?? '—')}</td>
+                    <td class="num muted">${esc(formatData(order.created_at))}</td>
+                    <td>${botoes(order)}</td>
+                  </tr>`
+                })
+                .join('')}
+            </tbody>
+          </table>
+        </div>`
 
   return `<!doctype html>
 <html lang="pt-BR">
@@ -182,77 +201,18 @@ function pagina(pedidos) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Pedidos</title>
-  <style>
-    ${estiloBase()}
-    main { max-width: 1080px; }
-    .topo { margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
-    .topo .secao {
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      color: var(--tinta-fraca);
-      margin: 0 0 4px;
-    }
-    .topo h1 { margin: 0; font-size: 24px; color: var(--marinho); }
-    .topo .contagem { font-size: 14px; color: var(--tinta-fraca); }
-    .card { padding: 0; overflow: hidden; }
-    .tabela-wrap, .card > table { display: block; overflow-x: auto; }
-    table th { padding: 14px 20px; }
-    table td { padding: 16px 20px; vertical-align: top; }
-    .nome { margin: 0; font-weight: 600; color: var(--marinho); }
-    .codigo { margin: 2px 0 0; font-size: 12px; color: var(--tinta-fraca); }
-    .valor { font-weight: 600; color: var(--marinho); white-space: nowrap; }
-    .rastreio { font-family: ui-monospace, monospace; font-size: 12px; color: var(--tinta-fraca); }
-    .data { font-size: 12px; color: var(--tinta-fraca); white-space: nowrap; }
-    .pill {
-      display: inline-block;
-      font-size: 11px;
-      font-weight: 700;
-      border-radius: var(--raio);
-      padding: 4px 10px;
-    }
-    .status-pending { background: #f0f2f5; color: #495057; }
-    .status-farmacia { background: #e8f0fe; color: #1e4fad; }
-    .status-caminho { background: color-mix(in srgb, var(--atencao) 28%, white); color: #8a5a12; }
-    .status-entregue { background: color-mix(in srgb, var(--ok) 22%, white); color: #2f6b24; }
-    .status-falhou { background: color-mix(in srgb, var(--perigo) 22%, white); color: #9b2c2c; }
-    .acoes { display: flex; flex-direction: column; gap: 6px; min-width: 10rem; }
-    .acoes form { margin: 0; }
-    .acoes .btn { display: block; width: 100%; padding: 6px 12px; font-size: 12px; text-align: center; }
-    .btn-pdf {
-      background: var(--papel);
-      color: var(--vermelho);
-      border: 1px solid color-mix(in srgb, var(--vermelho) 30%, white);
-    }
-    .btn-pdf:hover { background: color-mix(in srgb, var(--vermelho) 6%, white); }
-    .sem-acao { font-size: 12px; color: #ced4da; }
-  </style>
+  <style>${estiloBase()}</style>
 </head>
 <body>
   <main>
-    <div class="topo">
+    <div class="cabeca">
       <div>
-        <p class="secao">Operações</p>
-        <h1>Pedidos</h1>
+        <p class="cabeca-trilha">Operação / Pedidos</p>
+        <h1 class="cabeca-titulo">Pedidos</h1>
       </div>
-      <span class="contagem">${pedidos.length} registros</span>
+      <span class="cabeca-meta">${pedidos.length} registros</span>
     </div>
-    <div class="card">
-      <table>
-        <thead>
-          <tr>
-            <th>Paciente</th>
-            <th>Status</th>
-            <th>Valor</th>
-            <th>Rastreio</th>
-            <th>Data</th>
-            <th>Ações</th>
-          </tr>
-        </thead>
-        <tbody>${linhas}</tbody>
-      </table>
-    </div>
+    <div class="card card-flush">${corpo}</div>
   </main>
 </body>
 </html>`
