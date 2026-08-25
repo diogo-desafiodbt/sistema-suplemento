@@ -14,31 +14,8 @@ type Item = {
   tipo: string
   projeto: string
   titulo: string | null
-  ambiente: string | null
-  status: string | null
   quantos: number
 }
-
-// A intensidade de um dia não é o número de commits: um commit de 3 mil linhas
-// e um de duas não são o mesmo dia de trabalho. A escala é logarítmica porque
-// os picos são muito altos — 12/08 teve 20 mil linhas, e numa escala linear
-// ele achataria todos os outros dias em cinza.
-function nivel(linhas: number, commits: number): number {
-  const peso = linhas + commits * 40
-  if (peso === 0) return 0
-  if (peso < 200) return 1
-  if (peso < 900) return 2
-  if (peso < 3000) return 3
-  return 4
-}
-
-const CORES = [
-  'var(--historia-0)',
-  'var(--historia-1)',
-  'var(--historia-2)',
-  'var(--historia-3)',
-  'var(--historia-4)',
-]
 
 function ymd(d: Date): string {
   return d.toISOString().slice(0, 10)
@@ -49,8 +26,8 @@ export default async function HistoricoPage() {
 
   const dias = await sql<Dia[]>`
     SELECT quando::date::text AS dia,
-           count(*) FILTER (WHERE tipo = 'commit')                 AS commits,
-           count(*) FILTER (WHERE tipo IN ('deploy','build'))      AS publicacoes,
+           count(*) FILTER (WHERE tipo = 'commit')            AS commits,
+           count(*) FILTER (WHERE tipo IN ('deploy','build')) AS publicacoes,
            coalesce(sum(coalesce(inseridas,0) + coalesce(removidas,0)), 0) AS linhas
       FROM dev_evento
      GROUP BY 1 ORDER BY 1
@@ -59,9 +36,9 @@ export default async function HistoricoPage() {
   const itens = await sql<Item[]>`
     SELECT quando::date::text AS dia, tipo, projeto,
            CASE WHEN tipo = 'commit' THEN titulo ELSE NULL END AS titulo,
-           ambiente, status, count(*)::int AS quantos
+           count(*)::int AS quantos
       FROM dev_evento
-     GROUP BY 1,2,3,4,5,6, CASE WHEN tipo='commit' THEN titulo ELSE NULL END
+     GROUP BY 1,2,3,4
      ORDER BY dia DESC, tipo
   `
 
@@ -75,35 +52,73 @@ export default async function HistoricoPage() {
     { commits: 0, publicacoes: 0, linhas: 0 },
   )
 
-  // O calendário começa no domingo da semana do primeiro dia, senão as colunas
-  // saem desalinhadas do dia da semana.
-  const primeiro = dias.length ? new Date(dias[0]!.dia + 'T12:00:00Z') : new Date()
-  const ultimo = dias.length ? new Date(dias[dias.length - 1]!.dia + 'T12:00:00Z') : new Date()
-  const inicio = new Date(primeiro)
-  inicio.setUTCDate(inicio.getUTCDate() - inicio.getUTCDay())
+  const fmt = (s: string) =>
+    s
+      ? new Date(s + 'T12:00:00Z').toLocaleDateString('pt-BR', {
+          day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC',
+        })
+      : ''
 
-  const semanas: { dia: string; n: number; d?: Dia }[][] = []
-  const cursor = new Date(inicio)
-  while (cursor <= ultimo) {
-    const semana: { dia: string; n: number; d?: Dia }[] = []
-    for (let i = 0; i < 7; i++) {
+  // A série usa TODOS os dias corridos, não só os que tiveram atividade: uma
+  // semana parada precisa aparecer como linha no chão. É o vazio entre os
+  // picos que mostra o ritmo — se o eixo pulasse os dias vazios, um mês de
+  // pausa ficaria do mesmo tamanho de um dia.
+  const serie: { dia: string; valor: number }[] = []
+  if (dias.length) {
+    const cursor = new Date(dias[0]!.dia + 'T12:00:00Z')
+    const ate = new Date(dias[dias.length - 1]!.dia + 'T12:00:00Z')
+    while (cursor <= ate) {
       const chave = ymd(cursor)
-      const d = porDia.get(chave)
-      semana.push({
-        dia: chave,
-        n: d ? nivel(Number(d.linhas), Number(d.commits)) : 0,
-        d,
-      })
+      serie.push({ dia: chave, valor: Number(porDia.get(chave)?.linhas ?? 0) })
       cursor.setUTCDate(cursor.getUTCDate() + 1)
     }
-    semanas.push(semana)
   }
 
+  // Média de 7 dias. O dia a dia é dente de serra — um commit grande faz um
+  // pico de 20 mil linhas encostado num zero. A média é o que torna a
+  // evolução legível, que é o ponto do gráfico.
+  const media = serie.map((_, i) => {
+    const janela = serie.slice(Math.max(0, i - 6), i + 1)
+    return janela.reduce((a, p) => a + p.valor, 0) / janela.length
+  })
+
+  const L = 980
+  const A = 250
+  const PAD = { e: 56, d: 16, t: 16, b: 30 }
+  const larg = L - PAD.e - PAD.d
+  const alt = A - PAD.t - PAD.b
+  const topo = Math.max(1, ...serie.map((p) => p.valor))
+  const x = (i: number) =>
+    PAD.e + (serie.length < 2 ? 0 : (i * larg) / (serie.length - 1))
+  const y = (v: number) => PAD.t + alt - (v / topo) * alt
+
+  const area =
+    serie.length > 1
+      ? `M ${x(0)} ${y(0)} ${serie
+          .map((p, i) => `L ${x(i)} ${y(p.valor)}`)
+          .join(' ')} L ${x(serie.length - 1)} ${y(0)} Z`
+      : ''
+  const linhaMedia =
+    serie.length > 1
+      ? serie
+          .map((_, i) => `${i === 0 ? 'M' : 'L'} ${x(i)} ${y(media[i]!)}`)
+          .join(' ')
+      : ''
+
+  const meses: { i: number; texto: string }[] = []
+  serie.forEach((p, i) => {
+    const mes = p.dia.slice(0, 7)
+    if (!meses.some((m) => serie[m.i]!.dia.slice(0, 7) === mes)) {
+      meses.push({
+        i,
+        texto: new Date(p.dia + 'T12:00:00Z').toLocaleDateString('pt-BR', {
+          month: 'short', timeZone: 'UTC',
+        }),
+      })
+    }
+  })
+
   const diasDaLinha = [...new Set(itens.map((i) => i.dia))]
-  const fmt = (s: string) =>
-    new Date(s + 'T12:00:00Z').toLocaleDateString('pt-BR', {
-      day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC',
-    })
 
   return (
     <div className="historia">
@@ -115,38 +130,53 @@ export default async function HistoricoPage() {
       </header>
 
       <section className="historia-numeros">
-        <div><b>{dias.length}</b><span>dias de trabalho</span></div>
         <div><b>{totais.commits}</b><span>commits</span></div>
         <div><b>{totais.publicacoes}</b><span>publicações</span></div>
         <div><b>{totais.linhas.toLocaleString('pt-BR')}</b><span>linhas mexidas</span></div>
       </section>
 
-      <section className="historia-mapa-caixa">
-        <div className="historia-mapa" role="img"
-             aria-label={`Intensidade de desenvolvimento por dia, de ${fmt(dias[0]?.dia ?? '')} até ${fmt(dias[dias.length-1]?.dia ?? '')}`}>
-          {semanas.map((semana, i) => (
-            <div className="historia-semana" key={i}>
-              {semana.map((c) => (
-                <div
-                  key={c.dia}
-                  className="historia-celula"
-                  style={{ background: CORES[c.n] }}
-                  title={
-                    c.d
-                      ? `${fmt(c.dia)} — ${c.d.commits} commits, ${c.d.publicacoes} publicações, ${Number(c.d.linhas).toLocaleString('pt-BR')} linhas`
-                      : `${fmt(c.dia)} — sem atividade`
-                  }
-                />
-              ))}
-            </div>
-          ))}
+      <section className="historia-grafico-caixa">
+        <div className="historia-grafico-topo">
+          <h2>Intensidade de desenvolvimento</h2>
+          <span>linhas mexidas por dia · a linha cheia é a média de 7 dias</span>
         </div>
-        <p className="historia-legenda">
-          <span>menos</span>
-          {CORES.map((c, i) => (
-            <i key={i} style={{ background: c }} />
+
+        <svg
+          className="historia-grafico"
+          viewBox={`0 0 ${L} ${A}`}
+          preserveAspectRatio="none"
+          role="img"
+          aria-label={`Evolução da intensidade de desenvolvimento de ${fmt(serie[0]?.dia ?? '')} até ${fmt(serie[serie.length - 1]?.dia ?? '')}`}
+        >
+          {[0, 0.25, 0.5, 0.75, 1].map((f) => (
+            <line key={f} className="historia-grade"
+                  x1={PAD.e} x2={L - PAD.d} y1={y(topo * f)} y2={y(topo * f)} />
           ))}
-          <span>mais</span>
+          {[0, 0.5, 1].map((f) => (
+            <text key={f} className="historia-eixo-y" x={PAD.e - 10} y={y(topo * f) + 4}>
+              {Math.round(topo * f).toLocaleString('pt-BR')}
+            </text>
+          ))}
+          {area && <path d={area} className="historia-area" />}
+          {linhaMedia && <path d={linhaMedia} className="historia-media" />}
+          {meses.map((m) => (
+            <text key={m.i} className="historia-eixo-x" x={x(m.i)} y={A - 10}>
+              {m.texto}
+            </text>
+          ))}
+          {serie.map((p, i) =>
+            p.valor > 0 ? (
+              <circle key={p.dia} className="historia-ponto"
+                      cx={x(i)} cy={y(p.valor)} r={2.5}>
+                <title>{`${fmt(p.dia)} — ${p.valor.toLocaleString('pt-BR')} linhas`}</title>
+              </circle>
+            ) : null,
+          )}
+        </svg>
+
+        <p className="historia-grafico-pe">
+          Começa em {fmt(serie[0]?.dia ?? '')}, no primeiro commit da LP do
+          Primeiro Passo, e vai até hoje.
         </p>
       </section>
 
@@ -154,8 +184,9 @@ export default async function HistoricoPage() {
         {diasDaLinha.map((dia) => {
           const doDia = itens.filter((i) => i.dia === dia)
           const commits = doDia.filter((i) => i.tipo === 'commit')
-          const pubs = doDia.filter((i) => i.tipo === 'deploy' || i.tipo === 'build')
-          const nPubs = pubs.reduce((a, p) => a + p.quantos, 0)
+          const nPubs = doDia
+            .filter((i) => i.tipo === 'deploy' || i.tipo === 'build')
+            .reduce((a, p) => a + p.quantos, 0)
           const resumo = porDia.get(dia)
           return (
             <article className="historia-dia" key={dia}>

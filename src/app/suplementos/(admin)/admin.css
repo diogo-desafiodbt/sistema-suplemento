@@ -657,13 +657,6 @@
    A escala de cor sai do marinho da marca, não de um verde genérico: o mapa
    fica ao lado do resto do admin e precisa parecer da mesma casa.
 --------------------------------------------------------------------------- */
-:root {
-  --historia-0: #edf1f7;
-  --historia-1: #b9c6dd;
-  --historia-2: #7f96c1;
-  --historia-3: #4560a0;
-  --historia-4: #13244f;
-}
 
 .historia-numeros {
   display: grid;
@@ -691,43 +684,52 @@
   color: var(--admin-tinta-fraca);
 }
 
-.historia-mapa-caixa {
+.historia-grafico-caixa {
   background: var(--admin-papel);
   border: 1px solid var(--admin-borda);
   border-radius: var(--admin-raio);
-  padding: 18px;
+  padding: 18px 20px 14px;
   margin-bottom: 28px;
 }
-/* O mapa rola sozinho: são 19 semanas, e a tela do admin nem sempre cabe. */
-.historia-mapa {
+.historia-grafico-topo {
   display: flex;
-  gap: 3px;
-  overflow-x: auto;
-  padding-bottom: 6px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 14px;
 }
-.historia-semana {
-  display: grid;
-  grid-template-rows: repeat(7, 12px);
-  gap: 3px;
+.historia-grafico-topo h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--admin-marinho);
 }
-.historia-celula {
-  width: 12px;
-  height: 12px;
-  border-radius: 2px;
-}
-.historia-legenda {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin: 10px 0 0;
-  font-size: 11px;
+.historia-grafico-topo span {
+  font-size: 12px;
   color: var(--admin-tinta-fraca);
 }
-.historia-legenda i {
-  width: 12px;
-  height: 12px;
-  border-radius: 2px;
-  display: inline-block;
+/* Altura fixa e largura livre: o gráfico é sobre a forma da curva no tempo,
+   não sobre ler valor exato — por isso o preserveAspectRatio="none". */
+.historia-grafico {
+  display: block;
+  width: 100%;
+  height: 250px;
+}
+.historia-grade   { stroke: var(--admin-borda); stroke-width: 1; }
+.historia-area    { fill: rgba(19, 36, 79, 0.10); stroke: none; }
+/* A média é a protagonista: é ela que conta a evolução. O dia a dia fica
+   como sombra atrás. */
+.historia-media   { fill: none; stroke: var(--admin-marinho); stroke-width: 2.5;
+                    stroke-linejoin: round; stroke-linecap: round; }
+.historia-ponto   { fill: var(--admin-vermelho); opacity: .55; }
+.historia-eixo-y  { fill: var(--admin-tinta-fraca); font-size: 11px; text-anchor: end;
+                    font-variant-numeric: tabular-nums; }
+.historia-eixo-x  { fill: var(--admin-tinta-fraca); font-size: 11px; text-anchor: middle; }
+.historia-grafico-pe {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--admin-tinta-fraca);
 }
 
 .historia-linha {
