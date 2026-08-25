@@ -4,6 +4,10 @@ import { sessaoAtual } from '@/lib/auth/sessao'
 import { getSql } from '@/lib/db'
 import { getThreadReplyHeaders, sendSupportEmail } from '@/lib/support/mailer'
 
+const MENSAGEM_ENCERRAMENTO = `Estamos encerrando este atendimento. Se precisar de algo mais, responda este e-mail ou escreva de novo — abrimos uma conversa nova para você.
+
+Equipe Desafio Diabetes`
+
 async function requireAdmin() {
   const sessao = await sessaoAtual()
   if (!sessao) return null
@@ -14,7 +18,7 @@ async function requireAdmin() {
 }
 
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
   try {
@@ -24,15 +28,6 @@ export async function POST(
     }
 
     const { id } = await context.params
-    const body = (await request.json()) as { body_text?: string }
-    const bodyText = body.body_text?.trim()
-    if (!bodyText) {
-      return NextResponse.json(
-        { error: 'Texto da resposta obrigatório' },
-        { status: 400 },
-      )
-    }
-
     const sql = getSql()
     const threadRows = await sql<
       {
@@ -56,9 +51,9 @@ export async function POST(
       )
     }
 
-    if (thread.status === 'encerrada' || thread.status === 'respondido') {
+    if (thread.status === 'encerrada') {
       return NextResponse.json(
-        { error: 'Conversa encerrada' },
+        { error: 'Conversa já encerrada' },
         { status: 400 },
       )
     }
@@ -68,28 +63,24 @@ export async function POST(
       threadId: id,
       toEmail: thread.from_email,
       subject: thread.subject ?? 'Suporte Desafio Diabetes',
-      bodyText,
+      bodyText: MENSAGEM_ENCERRAMENTO,
       inReplyToMessageId: headers.inReplyToMessageId,
       referencesMessageIds: headers.referencesMessageIds,
       useReplySubject: true,
     })
 
-    // NÃO sobrescrever suggested_reply com o texto do Pedro. O rascunho da IA
-    // é metade da comparação do modo sombra: "das conversas em que as travas
-    // liberaram, quantas vezes ele mandou o texto da IA sem mexer?". O que ele
-    // enviou já está em support_messages como 'outbound', gravado dentro do
-    // mailer — a comparação é entre os dois. Sobrescrever apaga o lado da IA.
+    // Não mexe em suggested_reply — o rascunho da IA fica para o modo sombra.
     await sql`
       UPDATE support_threads
       SET
-        status = 'com_suporte',
+        status = 'encerrada'::support_thread_status,
         reviewed_by = ${auth.userId}::uuid
       WHERE id = ${id}::uuid
     `
 
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error('admin suporte responder error:', error)
+    console.error('admin suporte encerrar error:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Erro interno' },
       { status: 500 },

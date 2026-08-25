@@ -580,6 +580,56 @@
   word-break: break-all;
 }
 
+.admin-abas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--admin-borda);
+  padding-bottom: 0;
+}
+
+.admin-aba {
+  appearance: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--admin-tinta-fraca);
+  padding: 10px 14px;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-aba:hover {
+  color: var(--admin-marinho);
+}
+
+.admin-aba--ativa {
+  color: var(--admin-marinho);
+  border-bottom-color: var(--admin-marinho);
+}
+
+.admin-aba-contagem {
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--admin-tinta-fraca);
+  background: var(--admin-fundo);
+  border: 1px solid var(--admin-borda);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.admin-aba--ativa .admin-aba-contagem {
+  color: var(--admin-marinho);
+  border-color: color-mix(in srgb, var(--admin-marinho) 25%, var(--admin-borda));
+}
+
 .admin-grid-2 {
   display: grid;
   grid-template-columns: 1fr;

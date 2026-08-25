@@ -161,5 +161,11 @@ alerta. **Nunca registre sucesso num caminho que não fez o trabalho.**
 4. O Pedro edita o rascunho, envia, e `suggested_reply` continua com o texto
    original da IA.
 5. O botão de encerrar fecha a conversa; escrever depois abre conversa nova.
-6. `grep -rn "sendSupportEmail" src/` continua apontando um único chamador.
+6. Todo chamador de `sendSupportEmail` está atrás de um **clique humano**.
+   Corrigido em 25/08: o critério dizia "um único chamador", e isso estava
+   errado — o botão Encerrar precisa enviar a mensagem padrão, então são dois:
+   `responder` e `encerrar`. O que importa nunca foi a contagem, é que
+   nenhum caminho automático chegue ao envio. Confira que os dois exigem
+   sessão de admin e que nada em `src/lib/inngest/` chama o mailer:
+   `grep -rn "sendSupportEmail" src/lib/inngest/` tem que voltar vazio.
 7. `enviado_automaticamente` é `false` em todas as conversas ao fim dos testes.

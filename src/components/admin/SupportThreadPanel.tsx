@@ -5,13 +5,14 @@ import { Botao } from '@/components/admin/ui/Botao'
 import { Card } from '@/components/admin/ui/Card'
 import { Selo } from '@/components/admin/ui/Selo'
 import { Vazio } from '@/components/admin/ui/Vazio'
-import type { SupportDbFacts } from '@/lib/support/facts'
 import type { Triagem } from '@/lib/support/triage'
 
 type DecisaoPainel = {
   travas_liberadas?: boolean
   motivos_travas?: string[]
   pode_resolver_sozinho?: boolean
+  motivo_escalonamento?: string | null
+  dados_usados?: string[]
   origem?: string
 }
 
@@ -29,91 +30,20 @@ export type SupportThreadView = {
   subject: string | null
   status: string
   user_id: string | null
-  db_facts: SupportDbFacts | null
   suggested_reply: string | null
   triagem_ia: Triagem | null
   decisao_ia: DecisaoPainel | null
+  enviado_automaticamente?: boolean
   last_message_at: string
   created_at: string
   users: { full_name: string | null; email: string | null } | null
   support_messages: SupportMessageView[]
 }
 
+type Aba = 'fila' | 'com_suporte' | 'auto_ia' | 'encerradas'
+
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString('pt-BR')
-}
-
-function formatFacts(facts: SupportDbFacts | null): string[] {
-  if (!facts) return ['Nenhum fato buscado ainda.']
-
-  const lines: string[] = [`Categoria: ${facts.category}`]
-
-  if (facts.category === 'frete' && facts.frete) {
-    if (!facts.frete.found) {
-      lines.push('Frete: nenhum pedido encontrado para este cliente.')
-      return lines
-    }
-    lines.push(`Pedido: ${facts.frete.order_id}`)
-    lines.push(`Status: ${facts.frete.status}`)
-    lines.push(`Rastreio: ${facts.frete.tracking_code ?? '—'}`)
-    if (facts.frete.last_event) {
-      const ev = facts.frete.last_event
-      lines.push(
-        `Último evento: ${ev.descricao ?? '—'} (${[ev.cidade, ev.local].filter(Boolean).join(' / ') || '—'})`,
-      )
-    } else {
-      lines.push('Último evento: —')
-    }
-    lines.push(
-      `Previsão de entrega: ${
-        facts.frete.estimated_delivery
-          ? formatDate(facts.frete.estimated_delivery)
-          : '—'
-      }`,
-    )
-  }
-
-  if (facts.category === 'pagamento' && facts.pagamento) {
-    if (!facts.pagamento.found) {
-      lines.push('Pagamento: nenhuma assinatura encontrada para este cliente.')
-      return lines
-    }
-    lines.push(`Status pagamento: ${facts.pagamento.payment_status ?? '—'}`)
-    lines.push(
-      `Valor: ${
-        facts.pagamento.amount != null
-          ? facts.pagamento.amount.toLocaleString('pt-BR', {
-              style: 'currency',
-              currency: 'BRL',
-            })
-          : '—'
-      }`,
-    )
-    lines.push(`Plano: ${facts.pagamento.plan_type ?? '—'}`)
-    lines.push(`Assinatura: ${facts.pagamento.subscription_status ?? '—'}`)
-    lines.push(
-      `Próx. cobrança: ${
-        facts.pagamento.next_billing_at
-          ? formatDate(facts.pagamento.next_billing_at)
-          : '—'
-      }`,
-    )
-    lines.push(
-      `Expira em: ${
-        facts.pagamento.expires_at
-          ? formatDate(facts.pagamento.expires_at)
-          : '—'
-      }`,
-    )
-  }
-
-  if (facts.category === 'fora_de_escopo') {
-    lines.push(
-      'Fora de escopo — sem consulta ao banco. Escreva a resposta manualmente.',
-    )
-  }
-
-  return lines
 }
 
 function statusLabel(status: string): string {
@@ -138,36 +68,44 @@ function statusLabel(status: string): string {
   }
 }
 
-function tomStatus(status: string): 'ok' | 'atencao' | 'neutro' {
-  if (status === 'respondido' || status === 'encerrada' || status === 'com_suporte')
-    return 'ok'
-  if (
-    status === 'aguardando_revisao' ||
-    status === 'novo' ||
-    status === 'nova'
-  )
+function tomStatus(status: string): 'ok' | 'atencao' | 'neutro' | 'perigo' {
+  if (status === 'encerrada' || status === 'respondido') return 'ok'
+  if (status === 'com_suporte') return 'neutro'
+  if (status === 'aguardando_revisao' || status === 'nova' || status === 'novo')
     return 'atencao'
   return 'neutro'
 }
 
 function ThreadCard({
   thread,
-  onSent,
+  onMoved,
+  somenteLeitura,
 }: {
   thread: SupportThreadView
-  onSent: (id: string) => void
+  onMoved: (id: string) => void
+  somenteLeitura?: boolean
 }) {
   const [text, setText] = useState(thread.suggested_reply ?? '')
   const [sending, setSending] = useState(false)
+  const [closing, setClosing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const factLines = useMemo(
-    () => formatFacts(thread.db_facts),
-    [thread.db_facts],
+
+  const messages = useMemo(
+    () =>
+      [...(thread.support_messages ?? [])].sort(
+        (a, b) =>
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      ),
+    [thread.support_messages],
   )
-  const messages = [...(thread.support_messages ?? [])].sort(
-    (a, b) =>
-      new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-  )
+  const inbound = messages.filter((m) => m.direction === 'inbound')
+  const outbound = messages.filter((m) => m.direction === 'outbound')
+  const decisao = thread.decisao_ia
+  const triagem = thread.triagem_ia
+  const aberta =
+    !somenteLeitura &&
+    thread.status !== 'encerrada' &&
+    thread.status !== 'respondido'
 
   async function handleSend() {
     setSending(true)
@@ -183,7 +121,7 @@ function ThreadCard({
         setError(data.error ?? 'Falha ao enviar')
         return
       }
-      onSent(thread.id)
+      onMoved(thread.id)
     } catch {
       setError('Erro de rede ao enviar')
     } finally {
@@ -191,11 +129,52 @@ function ThreadCard({
     }
   }
 
+  async function handleEncerrar() {
+    if (
+      !window.confirm(
+        'Encerrar esta conversa? O cliente recebe a mensagem padrão de encerramento.',
+      )
+    ) {
+      return
+    }
+    setClosing(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/admin/suporte/${thread.id}/encerrar`, {
+        method: 'POST',
+      })
+      const data = (await res.json()) as { error?: string }
+      if (!res.ok) {
+        setError(data.error ?? 'Falha ao encerrar')
+        return
+      }
+      onMoved(thread.id)
+    } catch {
+      setError('Erro de rede ao encerrar')
+    } finally {
+      setClosing(false)
+    }
+  }
+
   return (
     <Card>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 12,
+          marginBottom: 20,
+        }}
+      >
         <div style={{ flex: 1, minWidth: 200 }}>
-          <Selo tom={tomStatus(thread.status)}>{statusLabel(thread.status)}</Selo>
+          <Selo tom={tomStatus(thread.status)}>
+            {statusLabel(thread.status)}
+          </Selo>
+          {thread.enviado_automaticamente ? (
+            <span style={{ marginLeft: 8 }}>
+              <Selo tom="ok">Enviado pela IA</Selo>
+            </span>
+          ) : null}
           <h2 className="admin-nome" style={{ fontSize: 18, marginTop: 8 }}>
             {thread.subject || '(sem assunto)'}
           </h2>
@@ -210,108 +189,167 @@ function ThreadCard({
         </div>
       </div>
 
-      <p className="admin-card-rotulo">Histórico</p>
-      <div style={{ maxHeight: 256, overflowY: 'auto', marginBottom: 16 }}>
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            style={{
-              marginBottom: 8,
-              padding: '8px 12px',
-              borderRadius: 'var(--admin-raio)',
-              background:
-                m.direction === 'inbound'
-                  ? 'var(--admin-fundo)'
-                  : 'color-mix(in srgb, var(--admin-marinho) 6%, white)',
-              whiteSpace: 'pre-wrap',
-              fontSize: 14,
-            }}
-          >
-            <p className="admin-sub" style={{ marginBottom: 4 }}>
-              {m.direction === 'inbound' ? 'Cliente' : 'Suporte'} ·{' '}
-              {formatDate(m.created_at)}
-            </p>
-            {m.body_text || '(vazio)'}
-          </div>
-        ))}
+      {/* Fonte: e-mail do cliente em destaque — o Pedro julga por isto. */}
+      <p className="admin-card-rotulo">E-mail do cliente</p>
+      <div style={{ marginBottom: 24 }}>
+        {inbound.length === 0 ? (
+          <p className="admin-sub">Nenhuma mensagem do cliente nesta conversa.</p>
+        ) : (
+          inbound.map((m) => (
+            <div
+              key={m.id}
+              style={{
+                marginBottom: 12,
+                padding: '16px 18px',
+                borderRadius: 'var(--admin-raio)',
+                background: 'var(--admin-fundo)',
+                border: '1px solid var(--admin-borda)',
+                whiteSpace: 'pre-wrap',
+                fontSize: 16,
+                lineHeight: 1.55,
+                color: 'var(--admin-tinta)',
+              }}
+            >
+              <p className="admin-sub" style={{ marginBottom: 8 }}>
+                {formatDate(m.created_at)}
+              </p>
+              {m.body_text || '(vazio)'}
+            </div>
+          ))
+        )}
       </div>
 
-      <p className="admin-card-rotulo">O que buscamos no banco</p>
-      <ul
+      {/* Interpretação da IA — subordinada, nunca como fato. */}
+      <div
         style={{
-          margin: '0 0 16px',
-          padding: '10px 12px',
-          listStyle: 'none',
-          border: '1px solid var(--admin-borda)',
+          marginBottom: 20,
+          padding: '14px 16px',
           borderRadius: 'var(--admin-raio)',
-          fontSize: 14,
+          border: '1px dashed var(--admin-borda)',
+          background: 'color-mix(in srgb, var(--admin-marinho) 3%, white)',
         }}
       >
-        {factLines.map((line) => (
-          <li key={line} style={{ marginTop: 2 }}>
-            {line}
-          </li>
-        ))}
-      </ul>
+        <p
+          className="admin-card-rotulo"
+          style={{ marginBottom: 10, letterSpacing: '0.06em' }}
+        >
+          Leitura da IA — interpretação, não fato
+        </p>
 
-      <p className="admin-card-rotulo">Triagem</p>
-      <ul
-        style={{
-          margin: '0 0 16px',
-          padding: '10px 12px',
-          listStyle: 'none',
-          border: '1px solid var(--admin-borda)',
-          borderRadius: 'var(--admin-raio)',
-          fontSize: 14,
-        }}
-      >
-        {thread.triagem_ia ? (
-          <>
-            <li>Categoria: {thread.triagem_ia.categoria}</li>
-            <li>Pergunta: {thread.triagem_ia.pergunta_resumida}</li>
-            <li>Referência: {thread.triagem_ia.referencia_citada ?? '—'}</li>
-            <li>
-              Tom: {thread.triagem_ia.tom} · Urgência:{' '}
-              {thread.triagem_ia.urgencia}
-            </li>
-          </>
-        ) : (
-          <li>Ainda sem classificação — a triagem falhou ou não rodou.</li>
-        )}
-      </ul>
-
-      {thread.decisao_ia ? (
-        <>
-          <p className="admin-card-rotulo">Travas</p>
+        {triagem ? (
           <ul
             style={{
-              margin: '0 0 16px',
-              padding: '10px 12px',
+              margin: '0 0 12px',
+              padding: 0,
               listStyle: 'none',
-              border: '1px solid var(--admin-borda)',
-              borderRadius: 'var(--admin-raio)',
               fontSize: 14,
             }}
           >
             <li>
-              {thread.decisao_ia.travas_liberadas
-                ? 'Todas as travas passaram (ainda assim não enviamos sozinhos).'
-                : 'Reprovado nas travas — rascunho abaixo para você revisar.'}
+              <strong>Categoria:</strong> {triagem.categoria}
             </li>
-            {(thread.decisao_ia.motivos_travas ?? []).map((m) => (
-              <li key={m}>· {m}</li>
-            ))}
-            {thread.decisao_ia.origem === 'modelo_fixo_tecnico' ? (
-              <li>Resposta técnica: modelo fixo (sem redação da IA).</li>
+            <li>
+              <strong>Tom:</strong> {triagem.tom} · <strong>Urgência:</strong>{' '}
+              {triagem.urgencia}
+            </li>
+            <li>
+              <strong>Resumo (IA):</strong> {triagem.pergunta_resumida}
+            </li>
+            {triagem.referencia_citada ? (
+              <li>
+                <strong>Referência citada:</strong> {triagem.referencia_citada}
+              </li>
             ) : null}
           </ul>
+        ) : (
+          <p className="admin-sub" style={{ marginBottom: 12 }}>
+            Sem triagem — a classificação falhou ou ainda não rodou.
+          </p>
+        )}
+
+        {decisao ? (
+          <ul
+            style={{
+              margin: 0,
+              padding: 0,
+              listStyle: 'none',
+              fontSize: 14,
+            }}
+          >
+            <li>
+              <strong>Achou que resolvia sozinha:</strong>{' '}
+              {decisao.pode_resolver_sozinho ? 'sim' : 'não'}
+            </li>
+            {decisao.motivo_escalonamento ? (
+              <li>
+                <strong>Motivo do escalonamento:</strong>{' '}
+                {decisao.motivo_escalonamento}
+              </li>
+            ) : null}
+            <li style={{ marginTop: 8 }}>
+              <strong>Travas:</strong>{' '}
+              {decisao.travas_liberadas
+                ? 'todas passaram (envio automático só com a chave em on)'
+                : 'reprovadas — uma a uma:'}
+            </li>
+            {(decisao.motivos_travas ?? []).map((m) => (
+              <li key={m} style={{ paddingLeft: 12 }}>
+                · {m}
+              </li>
+            ))}
+            <li style={{ marginTop: 8 }}>
+              <strong>Dados que a IA diz ter usado:</strong>
+            </li>
+            {(decisao.dados_usados ?? []).length === 0 ? (
+              <li style={{ paddingLeft: 12 }}>· (nenhum)</li>
+            ) : (
+              (decisao.dados_usados ?? []).map((d) => (
+                <li key={d} style={{ paddingLeft: 12 }}>
+                  · {d}
+                </li>
+              ))
+            )}
+            {decisao.origem === 'modelo_fixo_tecnico' ? (
+              <li style={{ marginTop: 8 }}>
+                Resposta técnica: modelo fixo (sem redação da IA).
+              </li>
+            ) : null}
+          </ul>
+        ) : (
+          <p className="admin-sub">Ainda sem decisão gravada.</p>
+        )}
+      </div>
+
+      {outbound.length > 0 ? (
+        <>
+          <p className="admin-card-rotulo">Já enviado nesta conversa</p>
+          <div style={{ maxHeight: 180, overflowY: 'auto', marginBottom: 16 }}>
+            {outbound.map((m) => (
+              <div
+                key={m.id}
+                style={{
+                  marginBottom: 8,
+                  padding: '8px 12px',
+                  borderRadius: 'var(--admin-raio)',
+                  background:
+                    'color-mix(in srgb, var(--admin-marinho) 6%, white)',
+                  whiteSpace: 'pre-wrap',
+                  fontSize: 13,
+                }}
+              >
+                <p className="admin-sub" style={{ marginBottom: 4 }}>
+                  {formatDate(m.created_at)}
+                </p>
+                {m.body_text || '(vazio)'}
+              </div>
+            ))}
+          </div>
         </>
       ) : null}
 
-      {thread.status !== 'respondido' &&
-        thread.status !== 'encerrada' && (
+      {aberta ? (
         <div>
-          <p className="admin-card-rotulo">Mensagem sugerida</p>
+          <p className="admin-card-rotulo">Rascunho (editável)</p>
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
@@ -321,90 +359,163 @@ function ThreadCard({
             placeholder="Escreva ou edite a resposta ao cliente…"
           />
           {error ? (
-            <p style={{ color: 'var(--admin-perigo)', fontSize: 14, marginTop: 8 }}>
+            <p
+              style={{
+                color: 'var(--admin-perigo)',
+                fontSize: 14,
+                marginTop: 8,
+              }}
+            >
               {error}
             </p>
           ) : null}
-          <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+          <div
+            style={{
+              marginTop: 12,
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 10,
+              justifyContent: 'flex-end',
+            }}
+          >
+            <Botao
+              type="button"
+              variante="secundario"
+              onClick={handleEncerrar}
+              disabled={sending || closing}
+            >
+              {closing ? 'Encerrando…' : 'Encerrar conversa'}
+            </Botao>
             <Botao
               type="button"
               variante="primario"
               onClick={handleSend}
-              disabled={sending || !text.trim()}
+              disabled={sending || closing || !text.trim()}
             >
               {sending ? 'Enviando…' : 'Enviar'}
             </Botao>
           </div>
         </div>
-      )}
+      ) : null}
     </Card>
   )
 }
 
-export function SupportThreadPanel({
-  pending,
-  history,
+function ListaAba({
+  threads,
+  vazioTitulo,
+  vazioTexto,
+  somenteLeitura,
+  onMoved,
 }: {
-  pending: SupportThreadView[]
-  history: SupportThreadView[]
+  threads: SupportThreadView[]
+  vazioTitulo: string
+  vazioTexto: string
+  somenteLeitura?: boolean
+  onMoved: (id: string) => void
 }) {
-  const [hidden, setHidden] = useState<Set<string>>(new Set())
-  const [showHistory, setShowHistory] = useState(false)
+  if (threads.length === 0) {
+    return (
+      <Card>
+        <Vazio titulo={vazioTitulo} explicacao={vazioTexto} />
+      </Card>
+    )
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {threads.map((thread) => (
+        <ThreadCard
+          key={thread.id}
+          thread={thread}
+          somenteLeitura={somenteLeitura}
+          onMoved={onMoved}
+        />
+      ))}
+    </div>
+  )
+}
 
-  const visiblePending = pending.filter((t) => !hidden.has(t.id))
+export function SupportThreadPanel({
+  fila,
+  comSuporte,
+  autoIa,
+  encerradas,
+}: {
+  fila: SupportThreadView[]
+  comSuporte: SupportThreadView[]
+  autoIa: SupportThreadView[]
+  encerradas: SupportThreadView[]
+}) {
+  const [aba, setAba] = useState<Aba>('fila')
+  const [hidden, setHidden] = useState<Set<string>>(new Set())
+
+  const ocultar = (id: string) =>
+    setHidden((prev) => new Set(prev).add(id))
+
+  const listaFila = fila.filter((t) => !hidden.has(t.id))
+  const listaComSuporte = comSuporte.filter((t) => !hidden.has(t.id))
+
+  const abas: { id: Aba; rotulo: string; n: number }[] = [
+    { id: 'fila', rotulo: 'Na fila', n: listaFila.length },
+    { id: 'com_suporte', rotulo: 'Com o suporte', n: listaComSuporte.length },
+    { id: 'auto_ia', rotulo: 'Respondidas pela IA', n: autoIa.length },
+    { id: 'encerradas', rotulo: 'Encerradas', n: encerradas.length },
+  ]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-      <section style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <p className="admin-card-rotulo">
-          Pendentes ({visiblePending.length})
-        </p>
-        {visiblePending.length === 0 ? (
-          <Card>
-            <Vazio
-              titulo="Nenhuma conversa aguardando ação"
-              explicacao="A fila está vazia. Novos e-mails de suporte aparecem aqui depois da análise, prontos para revisão antes do envio."
-            />
-          </Card>
-        ) : (
-          visiblePending.map((thread) => (
-            <ThreadCard
-              key={thread.id}
-              thread={thread}
-              onSent={(id) => setHidden((prev) => new Set(prev).add(id))}
-            />
-          ))
-        )}
-      </section>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div className="admin-abas" role="tablist" aria-label="Filas de suporte">
+        {abas.map((a) => (
+          <button
+            key={a.id}
+            type="button"
+            role="tab"
+            aria-selected={aba === a.id}
+            className={
+              aba === a.id ? 'admin-aba admin-aba--ativa' : 'admin-aba'
+            }
+            onClick={() => setAba(a.id)}
+          >
+            {a.rotulo}
+            <span className="admin-aba-contagem">{a.n}</span>
+          </button>
+        ))}
+      </div>
 
-      <section>
-        <button
-          type="button"
-          onClick={() => setShowHistory((v) => !v)}
-          className="admin-link-suave"
-          style={{ background: 'none', border: 0, cursor: 'pointer', fontFamily: 'inherit' }}
-        >
-          {showHistory
-            ? 'Ocultar histórico'
-            : `Ver histórico (${history.length})`}
-        </button>
-        {showHistory && (
-          <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {history.length === 0 ? (
-              <Card>
-                <Vazio
-                  titulo="Nenhuma thread respondida ainda"
-                  explicacao="Conversas já enviadas ficam neste histórico para consulta. A fila de pendentes é o lugar de ação."
-                />
-              </Card>
-            ) : (
-              history.map((thread) => (
-                <ThreadCard key={thread.id} thread={thread} onSent={() => {}} />
-              ))
-            )}
-          </div>
-        )}
-      </section>
+      {aba === 'fila' ? (
+        <ListaAba
+          threads={listaFila}
+          vazioTitulo="Fila vazia"
+          vazioTexto="Novas conversas aparecem aqui depois da análise, prontas para você revisar."
+          onMoved={ocultar}
+        />
+      ) : null}
+      {aba === 'com_suporte' ? (
+        <ListaAba
+          threads={listaComSuporte}
+          vazioTitulo="Nenhuma conversa com o suporte"
+          vazioTexto="Quando você responder, a conversa vem para cá — a IA não toma mais a frente."
+          onMoved={ocultar}
+        />
+      ) : null}
+      {aba === 'auto_ia' ? (
+        <ListaAba
+          threads={autoIa}
+          vazioTitulo="Nada enviado pela IA ainda"
+          vazioTexto="Esta aba existe para auditar as primeiras semanas depois que a chave automática for ligada. Hoje fica vazia de propósito."
+          somenteLeitura
+          onMoved={() => {}}
+        />
+      ) : null}
+      {aba === 'encerradas' ? (
+        <ListaAba
+          threads={encerradas}
+          vazioTitulo="Nenhuma conversa encerrada"
+          vazioTexto="Conversas fechadas pelo botão Encerrar ficam aqui. Se o cliente escrever de novo, abre conversa nova."
+          somenteLeitura
+          onMoved={() => {}}
+        />
+      ) : null}
     </div>
   )
 }
