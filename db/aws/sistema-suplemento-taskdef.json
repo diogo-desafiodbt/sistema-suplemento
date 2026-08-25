@@ -19,11 +19,11 @@
         },
         {
           "name": "SUPORTE_ENVIO_ALLOWLIST",
-          "value": "diogomottarodrigues@icloud.com"
+          "value": ""
         },
         {
           "name": "SUPORTE_ENVIO_AUTOMATICO",
-          "value": "on"
+          "value": "off"
         }
       ],
       "mountPoints": [],
