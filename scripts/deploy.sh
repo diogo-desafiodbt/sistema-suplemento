@@ -82,6 +82,22 @@ done
 # caminhos diferentes do mesmo site.
 aws ecs wait services-stable --region "$REGIAO" --cluster "$CLUSTER" --services $SERVICOS
 
+# Registra a publicação no histórico enquanto ela ainda está fresca. Podia ser
+# um job puxando da AWS depois, mas isso exigiria permissão nova de IAM e
+# dependeria de o job acordar. Aqui o dado nasce no momento certo, de graça.
+# Falhar a gravação não pode derrubar um deploy que já deu certo — daí o `|| true`.
+echo "→ registrando no histórico de desenvolvimento"
+SHA=$(git rev-parse --short=10 HEAD 2>/dev/null || echo desconhecido)
+ASSUNTO=$(git log -1 --pretty=%s 2>/dev/null | sed "s/'/''/g" | cut -c1-300)
+cat > /tmp/registrar-deploy.sql <<SQLFIM
+INSERT INTO public.dev_evento
+  (tipo, fonte, projeto, quando, titulo, ref, autor)
+VALUES ('deploy','codebuild','sistema-suplemento', now(),
+        '$ASSUNTO', '$SHA', 'deploy.sh')
+ON CONFLICT DO NOTHING;
+SQLFIM
+./scripts/rodar-sql.sh clinico /tmp/registrar-deploy.sql > /dev/null 2>&1 || true
+
 echo "→ re-sincronizando o Inngest"
 # Sem isto, o Inngest continua com o registro anterior até alguém provocar.
 # Foi o que deixou os 13 jobs parados de 16/08 a 19/08.

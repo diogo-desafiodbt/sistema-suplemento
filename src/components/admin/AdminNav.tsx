@@ -128,6 +128,16 @@ const grupos: { titulo: string; itens: Item[] }[] = [
         ),
       },
       {
+        label: 'Histórico',
+        href: '/suplementos/admin/historico',
+        icone: (
+          <Icone>
+            <path d="M3 3v18h18" />
+            <path d="M7 15l4-5 3 3 5-7" />
+          </Icone>
+        ),
+      },
+      {
         label: 'Usuários',
         href: '/suplementos/admin/usuarios',
         icone: (

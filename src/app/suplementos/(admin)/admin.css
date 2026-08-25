@@ -651,3 +651,146 @@
     margin-left: 0;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Histórico de desenvolvimento
+   A escala de cor sai do marinho da marca, não de um verde genérico: o mapa
+   fica ao lado do resto do admin e precisa parecer da mesma casa.
+--------------------------------------------------------------------------- */
+:root {
+  --historia-0: #edf1f7;
+  --historia-1: #b9c6dd;
+  --historia-2: #7f96c1;
+  --historia-3: #4560a0;
+  --historia-4: #13244f;
+}
+
+.historia-numeros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin: 18px 0 24px;
+}
+.historia-numeros > div {
+  background: var(--admin-papel);
+  border: 1px solid var(--admin-borda);
+  border-radius: var(--admin-raio);
+  padding: 16px 18px;
+}
+.historia-numeros b {
+  display: block;
+  font-size: 26px;
+  line-height: 1.1;
+  color: var(--admin-marinho);
+  font-variant-numeric: tabular-nums;
+}
+.historia-numeros span {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--admin-tinta-fraca);
+}
+
+.historia-mapa-caixa {
+  background: var(--admin-papel);
+  border: 1px solid var(--admin-borda);
+  border-radius: var(--admin-raio);
+  padding: 18px;
+  margin-bottom: 28px;
+}
+/* O mapa rola sozinho: são 19 semanas, e a tela do admin nem sempre cabe. */
+.historia-mapa {
+  display: flex;
+  gap: 3px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+.historia-semana {
+  display: grid;
+  grid-template-rows: repeat(7, 12px);
+  gap: 3px;
+}
+.historia-celula {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+.historia-legenda {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 10px 0 0;
+  font-size: 11px;
+  color: var(--admin-tinta-fraca);
+}
+.historia-legenda i {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.historia-linha {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.historia-dia {
+  background: var(--admin-papel);
+  border: 1px solid var(--admin-borda);
+  border-radius: var(--admin-raio);
+  padding: 14px 16px;
+}
+.historia-dia-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.historia-dia-topo h2 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--admin-marinho);
+  margin: 0;
+}
+.historia-dia-topo span {
+  font-size: 12px;
+  color: var(--admin-tinta-fraca);
+  font-variant-numeric: tabular-nums;
+}
+.historia-dia ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.historia-dia li {
+  font-size: 13px;
+  color: var(--admin-tinta);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  line-height: 1.45;
+}
+.historia-sopub {
+  color: var(--admin-tinta-fraca);
+  font-style: italic;
+}
+/* Cada projeto tem sua marca. Sem isso, uma lista de 28 commits num dia vira
+   uma parede de texto e some a informação de onde o trabalho aconteceu. */
+.historia-marca {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  transform: translateY(-1px);
+  background: var(--admin-tinta-fraca);
+}
+.historia-marca[data-projeto='sistema-suplemento'] { background: var(--admin-marinho); }
+.historia-marca[data-projeto='site']               { background: var(--admin-vermelho); }
+.historia-marca[data-projeto='blog']               { background: var(--admin-atencao); }
+.historia-marca[data-projeto='lp-primeiro-passo']  { background: var(--admin-ok); }
