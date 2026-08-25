@@ -8,6 +8,7 @@ import { verificarSaida } from '@/lib/support/saida'
 import { responderTecnico } from '@/lib/support/tecnico'
 import { aplicarTravas } from '@/lib/support/travas'
 import { modoDeEnvio, podeEnviarAutomaticamente } from '@/lib/support/modo-envio'
+import { getThreadReplyHeaders, sendSupportEmail } from '@/lib/support/mailer'
 import { montarTranscricao, triarConversa } from '@/lib/support/triage'
 import { inngest } from '../client'
 
@@ -35,12 +36,13 @@ export const supportAnalyze = inngest.createFunction(
         {
           id: string
           from_email: string
+          subject: string | null
           user_id: string | null
           status: string
           respostas_automaticas_ia: number | null
         }[]
       >`
-        SELECT id, from_email, user_id, status, respostas_automaticas_ia
+        SELECT id, from_email, subject, user_id, status, respostas_automaticas_ia
         FROM support_threads
         WHERE id = ${threadId}::uuid
         LIMIT 1
@@ -319,18 +321,39 @@ export const supportAnalyze = inngest.createFunction(
       }
 
       const modo = modoDeEnvio()
-      // Décima condição: a chave soma-se às travas. off/shadow nunca enviam;
-      // on com trava reprovada também não. O envio de verdade entra quando a
-      // chave estiver on — nesta entrega ela nasce e fica em off.
-      const liberadoParaEnvio = podeEnviarAutomaticamente(travas.liberado)
+      // Décima e décima-primeira condições: a chave e a cerca de destino
+      // somam-se às nove travas, nunca as substituem. off/shadow nunca enviam;
+      // `on` com trava reprovada ou destino fora da lista também não.
+      //
+      // ESTE é o único ponto do sistema em que uma resposta sai sem alguém
+      // clicar. Se um dia precisar de uma segunda porta, é sinal de que a
+      // primeira está no lugar errado — conserte a primeira.
+      const liberadoParaEnvio = podeEnviarAutomaticamente(
+        travas.liberado,
+        thread.from_email,
+      )
+
+      if (liberadoParaEnvio) {
+        const cabecalhos = await getThreadReplyHeaders(threadId)
+        await sendSupportEmail({
+          threadId,
+          toEmail: thread.from_email,
+          subject: thread.subject ?? 'Suporte Desafio Diabetes',
+          bodyText: travas.decisao.resposta,
+          inReplyToMessageId: cabecalhos.inReplyToMessageId,
+          referencesMessageIds: cabecalhos.referencesMessageIds,
+          useReplySubject: true,
+        })
+      }
 
       await sql`
         UPDATE support_threads
         SET
           decisao_ia = ${sql.json(decisaoGravada as never)},
           suggested_reply = ${travas.decisao.resposta},
-          status = 'aguardando_revisao'::support_thread_status,
-          enviado_automaticamente = false
+          status = ${liberadoParaEnvio ? 'com_ia' : 'aguardando_revisao'}::support_thread_status,
+          enviado_automaticamente = ${liberadoParaEnvio},
+          respostas_automaticas_ia = respostas_automaticas_ia + ${liberadoParaEnvio ? 1 : 0}
         WHERE id = ${threadId}::uuid
       `
 
@@ -339,14 +362,14 @@ export const supportAnalyze = inngest.createFunction(
         affectedRows: 1,
         payload: {
           thread_id: threadId,
-          status: 'aguardando_revisao',
+          status: liberadoParaEnvio ? 'com_ia' : 'aguardando_revisao',
           triagem: triagem.categoria,
           travas_liberadas: travas.liberado,
           motivos_travas: travas.motivos,
           investigacao_truncada: investigacao.truncada,
           modo_envio: modo,
           liberado_para_envio: liberadoParaEnvio,
-          enviado_automaticamente: false,
+          enviado_automaticamente: liberadoParaEnvio,
         },
       })
 

@@ -26,7 +26,36 @@ export function modoDeEnvio(): ModoEnvio {
   return interpretarModoEnvio(process.env.SUPORTE_ENVIO_AUTOMATICO)
 }
 
-/** Só `on` com travas liberadas justifica envio. shadow e off nunca. */
-export function podeEnviarAutomaticamente(travasLiberadas: boolean): boolean {
-  return modoDeEnvio() === 'on' && travasLiberadas
+/**
+ * Cerca de destino. Nasceu como cerca de TESTE, em 25/08/2026: para exercitar
+ * o envio automático sem que nenhum cliente real entrasse no experimento.
+ *
+ * Ausente ou vazia = NINGUÉM recebe. Para liberar geral é preciso escrever `*`
+ * — um ato deliberado, não um esquecimento. É o mesmo princípio do token de
+ * webhook: falta de configuração vira negativa, nunca permissão.
+ *
+ * Aceita lista separada por vírgula, com endereço inteiro ou `*@dominio`.
+ */
+export function destinoLiberado(email: string | null | undefined): boolean {
+  const bruto = process.env.SUPORTE_ENVIO_ALLOWLIST?.trim()
+  if (!bruto) return false
+  if (bruto === '*') return true
+  const alvo = email?.trim().toLowerCase()
+  if (!alvo) return false
+  return bruto
+    .split(',')
+    .map((p) => p.trim().toLowerCase())
+    .filter(Boolean)
+    .some((p) => (p.startsWith('*@') ? alvo.endsWith(p.slice(1)) : alvo === p))
+}
+
+/**
+ * Só `on`, com travas liberadas E destino permitido. shadow e off nunca.
+ * É a décima e a décima-primeira condição — somam-se às nove, não substituem.
+ */
+export function podeEnviarAutomaticamente(
+  travasLiberadas: boolean,
+  destino: string | null | undefined,
+): boolean {
+  return modoDeEnvio() === 'on' && travasLiberadas && destinoLiberado(destino)
 }

@@ -18,8 +18,12 @@
           "value": "production"
         },
         {
+          "name": "SUPORTE_ENVIO_ALLOWLIST",
+          "value": "diogomottarodrigues@icloud.com"
+        },
+        {
           "name": "SUPORTE_ENVIO_AUTOMATICO",
-          "value": "off"
+          "value": "on"
         }
       ],
       "mountPoints": [],
