@@ -82,21 +82,18 @@ done
 # caminhos diferentes do mesmo site.
 aws ecs wait services-stable --region "$REGIAO" --cluster "$CLUSTER" --services $SERVICOS
 
-# Registra a publicação no histórico enquanto ela ainda está fresca. Podia ser
-# um job puxando da AWS depois, mas isso exigiria permissão nova de IAM e
-# dependeria de o job acordar. Aqui o dado nasce no momento certo, de graça.
-# Falhar a gravação não pode derrubar um deploy que já deu certo — daí o `|| true`.
-echo "→ registrando no histórico de desenvolvimento"
-SHA=$(git rev-parse --short=10 HEAD 2>/dev/null || echo desconhecido)
-ASSUNTO=$(git log -1 --pretty=%s 2>/dev/null | sed "s/'/''/g" | cut -c1-300)
-cat > /tmp/registrar-deploy.sql <<SQLFIM
-INSERT INTO public.dev_evento
-  (tipo, fonte, projeto, quando, titulo, ref, autor)
-VALUES ('deploy','codebuild','sistema-suplemento', now(),
-        '$ASSUNTO', '$SHA', 'deploy.sh')
-ON CONFLICT DO NOTHING;
-SQLFIM
-./scripts/rodar-sql.sh clinico /tmp/registrar-deploy.sql > /dev/null 2>&1 || true
+# Abastece o histórico de desenvolvimento: os commits novos dos quatro
+# repositórios mais a publicação de agora. Roda aqui porque o deploy é o
+# momento em que a máquina certa está com os repositórios na mão.
+#
+# A primeira versão só gravava o deploy, e isso deixava o gráfico da tela
+# parado — ele é feito de linhas mexidas, que vêm dos commits. Uma curva que
+# para de crescer sozinha e ninguém percebe é o mesmo erro do job que se
+# registra como concluído sem ter feito o trabalho.
+#
+# Falhar aqui não pode derrubar um deploy que já deu certo.
+echo "→ abastecendo o histórico de desenvolvimento"
+python3 scripts/registrar-historia.py --deploy || echo "  (histórico não registrou — segue o deploy)"
 
 echo "→ re-sincronizando o Inngest"
 # Sem isto, o Inngest continua com o registro anterior até alguém provocar.
