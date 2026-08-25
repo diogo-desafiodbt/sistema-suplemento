@@ -199,10 +199,9 @@ export function criarFerramentas(
           status: string | null
           paid_at: string | Date | null
           created_at: string | Date
-          payment_method: string | null
         }[]
       >`
-        SELECT p.amount, p.status, p.paid_at, p.created_at, p.payment_method
+        SELECT p.amount, p.status, p.paid_at, p.created_at
         FROM payments p
         JOIN subscriptions s ON s.id = p.subscription_id
         WHERE s.user_id = ${userId}::uuid
@@ -214,7 +213,6 @@ export function criarFerramentas(
         'status',
         'paid_at',
         'created_at',
-        'payment_method',
       ])
       return JSON.stringify({
         cobrancas: rows.map((r) => ({
@@ -223,7 +221,11 @@ export function criarFerramentas(
           data: r.paid_at
             ? new Date(r.paid_at).toISOString()
             : new Date(r.created_at).toISOString(),
-          forma: r.payment_method,
+          // A tabela payments não guarda forma de pagamento nem cupom.
+          // Antes daqui a consulta pedia p.payment_method, coluna que nunca
+          // existiu: a ferramenta financeira quebrava para TODO cliente que
+          // perguntasse sobre cobrança. Achado em 25/08 rodando de verdade.
+          forma: null as string | null,
           cupom: null as string | null,
         })),
       })
