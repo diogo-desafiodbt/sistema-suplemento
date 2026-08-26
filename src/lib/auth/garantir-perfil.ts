@@ -37,6 +37,26 @@ export async function garantirPerfilCognito(params: {
   `
   if (existente[0]) return existente[0].id
 
+  // Antes de criar cliente novo, procura pelo E-MAIL. Quem comprou o guia pela
+  // Hotmart já existe como cliente sem conta de acesso: tem e-mail, não tem
+  // código de login. Sem esta busca, o primeiro login dessa pessoa criaria uma
+  // segunda linha, e ela ficaria com a compra do guia num cliente e o pedido
+  // de suplemento em outro — meia história em cada lado, e nenhuma tela
+  // mostrando a pessoa inteira.
+  //
+  // Adotar é preencher o código de login na linha que já existe. Só adota
+  // quem ainda não tem código: se a linha já tiver um outro, são duas contas
+  // Cognito disputando o mesmo e-mail, e isso é caso de gente, não de código.
+  const porEmail = await sql<{ id: string }[]>`
+    UPDATE users
+       SET cognito_sub = ${params.cognitoSub},
+           full_name = coalesce(full_name, ${params.fullName})
+     WHERE lower(email) = lower(${params.email})
+       AND cognito_sub IS NULL
+    RETURNING id
+  `
+  if (porEmail[0]) return porEmail[0].id
+
   const inserido = await sql<{ id: string }[]>`
     INSERT INTO users (id, email, full_name, cognito_sub, client_code)
     VALUES (
