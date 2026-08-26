@@ -43,9 +43,33 @@ export type RespostaAcesso =
   | { tipo: 'pagamento_pendente'; texto: string }
   | { tipo: 'escalar'; motivo: string }
 
+/**
+ * Nomes que a Hotmart entrega no lugar do nome de verdade. Um em 1.083 hoje,
+ * e sem esta lista a pessoa receberia "Olá, SEM!". Uma em mil ainda é uma
+ * pessoa lendo.
+ */
+const NAO_E_NOME = new Set([
+  'SEM NOME', 'NAO INFORMADO', 'NÃO INFORMADO', 'N/A', 'NA',
+  'TESTE', 'COMPRADOR', 'CLIENTE',
+])
+
+/**
+ * Primeiro nome, em caixa de gente. Muita compra vem com o nome todo em
+ * maiúsculas — "VIRGINIA" vira "Virginia", porque saudação em caixa alta soa
+ * como grito.
+ */
 function saudacao(nome: string | null | undefined): string {
-  const p = nome?.trim().split(/\s+/)[0]
-  return p ? `Olá, ${p}!` : 'Olá!'
+  const limpo = nome?.trim() ?? ''
+  if (!limpo || NAO_E_NOME.has(limpo.toUpperCase())) return 'Olá!'
+  const primeiro = limpo.split(/\s+/)[0] ?? ''
+  if (primeiro.length < 2) return 'Olá!'
+  // Caixa alta vira caixa de gente; caixa baixa ganha a inicial. O nome chega
+  // como a pessoa digitou no checkout, e ali tem de tudo.
+  const resto =
+    primeiro === primeiro.toUpperCase()
+      ? primeiro.slice(1).toLowerCase()
+      : primeiro.slice(1)
+  return `Olá, ${primeiro.charAt(0).toUpperCase()}${resto}!`
 }
 
 function dataBr(d: string | Date | null): string | null {
