@@ -3,8 +3,7 @@ import { redirect } from 'next/navigation'
 import imgLogoAzul from '@/../public/logo-azul.png'
 import { DashboardNav } from '@/components/patient/DashboardNav'
 import { ProfileForm } from '@/components/patient/ProfileForm'
-import { perguntarAoNucleo } from '@/lib/contrato/nucleo'
-import { sessaoAtual } from '@/lib/auth/sessao'
+import { NAO_ENCONTRADO, perguntarAoNucleo } from '@/lib/contrato/nucleo'
 
 type Perfil = {
   full_name: string | null
@@ -25,18 +24,20 @@ type Endereco = {
 }
 
 export default async function PerfilPage() {
-  const sessao = await sessaoAtual()
-  if (!sessao) redirect('/suplementos/login')
-
   const [profile, enderecoRes] = await Promise.all([
     perguntarAoNucleo<Perfil>('meu-perfil'),
     perguntarAoNucleo<Endereco | { address: null }>('meu-endereco'),
   ])
 
-  if (!profile) redirect('/suplementos/login')
+  // Cognito sem linha em users → 401 do núcleo → null. Não renderiza vazio.
+  if (!profile || profile === NAO_ENCONTRADO) redirect('/suplementos/login')
 
+  // Endereço é o caso em que não ter é normal: quem ainda não cadastrou vê o
+  // formulário vazio. 404 aqui é ausência, não sessão perdida.
   const address =
-    enderecoRes && !('address' in enderecoRes && enderecoRes.address === null)
+    enderecoRes &&
+    enderecoRes !== NAO_ENCONTRADO &&
+    !('address' in enderecoRes && enderecoRes.address === null)
       ? (enderecoRes as Endereco)
       : null
 
@@ -73,7 +74,7 @@ export default async function PerfilPage() {
         <ProfileForm
           initialData={{
             full_name: profile.full_name ?? '',
-            email: profile.email ?? sessao.email ?? '',
+            email: profile.email ?? '',
             phone: profile.phone ?? '',
             cpf: profile.cpf ?? '',
             birth_date: profile.birth_date ?? '',

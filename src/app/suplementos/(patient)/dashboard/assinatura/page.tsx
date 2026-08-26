@@ -3,8 +3,7 @@ import { redirect } from 'next/navigation'
 import imgLogoAzul from '@/../public/logo-azul.png'
 import { AssinaturaClient } from '@/components/patient/AssinaturaClient'
 import { DashboardNav } from '@/components/patient/DashboardNav'
-import { perguntarAoNucleo } from '@/lib/contrato/nucleo'
-import { sessaoAtual } from '@/lib/auth/sessao'
+import { NAO_ENCONTRADO, perguntarAoNucleo } from '@/lib/contrato/nucleo'
 
 type Assinatura = {
   id: string
@@ -25,15 +24,17 @@ type PagamentosRes = {
 }
 
 export default async function AssinaturaPage() {
-  const sessao = await sessaoAtual()
-  if (!sessao) redirect('/suplementos/login')
-
   const [assinaturaRes, pagamentosRes] = await Promise.all([
     perguntarAoNucleo<Assinatura | { subscription: null }>('minha-assinatura'),
     perguntarAoNucleo<PagamentosRes>('meus-pagamentos'),
   ])
 
-  if (assinaturaRes === null || pagamentosRes === null) {
+  if (
+    assinaturaRes == null ||
+    pagamentosRes == null ||
+    assinaturaRes === NAO_ENCONTRADO ||
+    pagamentosRes === NAO_ENCONTRADO
+  ) {
     redirect('/suplementos/login')
   }
 

@@ -4,7 +4,7 @@ import { notFound, redirect } from 'next/navigation'
 import imgLogoAzul from '@/../public/logo-azul.png'
 import { CopyButton } from '@/components/CopyButton'
 import { DashboardNav } from '@/components/patient/DashboardNav'
-import { perguntarAoNucleo } from '@/lib/contrato/nucleo'
+import { NAO_ENCONTRADO, perguntarAoNucleo } from '@/lib/contrato/nucleo'
 import {
   getPatientOrderStatus,
   getPatientOrderStatusColor,
@@ -14,7 +14,6 @@ import {
   addBusinessDays,
   estimateCustomerDeliveryDays,
 } from '@/lib/shipping/estimate'
-import { sessaoAtual } from '@/lib/auth/sessao'
 import { findSupplementImageByProductName } from '@/lib/supplements-content'
 
 type OrderItem = {
@@ -74,15 +73,17 @@ export default async function PedidoDetalhePage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  const sessao = await sessaoAtual()
-  if (!sessao) redirect('/suplementos/login')
-
   const { id } = await params
 
   const orderData = await perguntarAoNucleo<PedidoDetalhe>('meu-pedido', {
     order_id: id,
   })
-  if (!orderData) notFound()
+  // 401 (sessão inválida no núcleo) e 404 (pedido inexistente) viram null.
+  // Sem users.id no portal, tratar null como login — não renderizar vazio.
+  // Aqui a distinção importa: 404 é pedido que não existe e merece a tela
+  // de 404. Mandar para o login faria a pessoa achar que perdeu a sessão.
+  if (orderData === NAO_ENCONTRADO) notFound()
+  if (!orderData) redirect('/suplementos/login')
 
   const statusMessage = getPatientOrderStatus(
     orderData.status,

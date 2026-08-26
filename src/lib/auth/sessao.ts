@@ -9,7 +9,22 @@ import { getSql } from '@/lib/db'
 
 export type Sessao = { userId: string; email: string | null }
 
-/** Quem está logado nesta requisição, ou null. */
+/**
+ * Só verifica o JWT e devolve o `sub`. Sem banco.
+ * Usado pelo middleware no portal (MODO_PORTAL), que não tem DATABASE_URL.
+ */
+export async function subDoIdTokenVerificado(
+  idToken: string,
+): Promise<string | null> {
+  try {
+    const payload = await verificarIdToken(idToken)
+    return payload.sub
+  } catch {
+    return null
+  }
+}
+
+/** Quem está logado nesta requisição, ou null. Precisa de DATABASE_URL (núcleo). */
 export async function sessaoAtual(): Promise<Sessao | null> {
   const cookieStore = await cookies()
   const idToken = cookieStore.get(COOKIE_ID)?.value
@@ -38,14 +53,10 @@ export async function sessaoAtual(): Promise<Sessao | null> {
   }
 }
 
+/** Traduz id token → users.id. Precisa de DATABASE_URL (núcleo). */
 export async function userIdDoToken(idToken: string): Promise<string | null> {
-  let sub: string
-  try {
-    const payload = await verificarIdToken(idToken)
-    sub = payload.sub
-  } catch {
-    return null
-  }
+  const sub = await subDoIdTokenVerificado(idToken)
+  if (!sub) return null
 
   const sql = getSql()
   const rows = await sql<{ id: string }[]>`

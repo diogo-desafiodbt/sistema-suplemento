@@ -3,13 +3,12 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import imgLogoAzul from '@/../public/logo-azul.png'
 import { DashboardNav } from '@/components/patient/DashboardNav'
-import { perguntarAoNucleo } from '@/lib/contrato/nucleo'
+import { NAO_ENCONTRADO, perguntarAoNucleo } from '@/lib/contrato/nucleo'
 import {
   getPatientOrderStatus,
   getPatientOrderStatusColor,
 } from '@/lib/order-status'
 import { getProductDisplayName } from '@/lib/product-display-names'
-import { sessaoAtual } from '@/lib/auth/sessao'
 import { findSupplementImageByProductName } from '@/lib/supplements-content'
 
 type OrderItem = {
@@ -30,11 +29,8 @@ type Pedido = {
 }
 
 export default async function PedidosPage() {
-  const sessao = await sessaoAtual()
-  if (!sessao) redirect('/suplementos/login')
-
   const res = await perguntarAoNucleo<{ pedidos: Pedido[] }>('meus-pedidos')
-  if (!res) redirect('/suplementos/login')
+  if (!res || res === NAO_ENCONTRADO) redirect('/suplementos/login')
   const orderList = res.pedidos
 
   return (

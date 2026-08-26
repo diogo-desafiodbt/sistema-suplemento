@@ -18,6 +18,10 @@
           "value": "production"
         },
         {
+          "name": "MODO_PORTAL",
+          "value": "1"
+        },
+        {
           "name": "NUCLEO_URL",
           "value": "https://desafiodiabetes.com"
         }

@@ -2,13 +2,12 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { getUserProfile } from '@/lib/auth/profile'
 import { renovar, subDoTokenJwt } from '@/lib/auth/cognito'
 import {
-  COOKIE_ACCESS,
   COOKIE_ID,
   COOKIE_REFRESH,
   gravarTokensRenovados,
   limparTokens,
 } from '@/lib/auth/cookies'
-import { userIdDoToken } from '@/lib/auth/sessao'
+import { subDoIdTokenVerificado, userIdDoToken } from '@/lib/auth/sessao'
 import {
   assinarSessaoSatelite,
   SESSAO_SATELITE_COOKIE,
@@ -17,6 +16,11 @@ import {
 import { getAppBaseUrl } from '@/lib/url-base'
 
 export const runtime = 'nodejs'
+
+/** Portal (Fase 5): sem DATABASE_URL. Flag explícita — ausência ≠ modo portal. */
+function modoPortal(): boolean {
+  return process.env.MODO_PORTAL === '1'
+}
 
 function portaoFechado(request: NextRequest): boolean {
   if (!process.env.SENHA_PRE_LANCAMENTO) return false
@@ -43,6 +47,54 @@ export async function middleware(request: NextRequest) {
   let idToken = request.cookies.get(COOKIE_ID)?.value
   const refreshToken = request.cookies.get(COOKIE_REFRESH)?.value
 
+  const path = request.nextUrl.pathname
+  const isAdmin = path.startsWith('/suplementos/admin')
+  const isProfessional = path.startsWith('/suplementos/profissional')
+  const isDashboard = path.startsWith('/suplementos/dashboard')
+  const isProtected = isAdmin || isProfessional || isDashboard
+
+  // --- Portal: JWT verificado basta. Sem tradução para users.id (sem banco). ---
+  if (modoPortal()) {
+    let sub: string | null = null
+    if (idToken) {
+      sub = await subDoIdTokenVerificado(idToken)
+    }
+
+    if (!sub && idToken && refreshToken) {
+      const subJwt = subDoTokenJwt(idToken)
+      if (subJwt) {
+        const renovados = await renovar(refreshToken, subJwt)
+        if (renovados) {
+          gravarTokensRenovados(response, renovados)
+          idToken = renovados.idToken
+          sub = await subDoIdTokenVerificado(renovados.idToken)
+        } else {
+          limparTokens(response)
+          idToken = undefined
+        }
+      }
+    }
+
+    // Este serviço não consegue checar papel: papel mora em `users`, e aqui não
+    // há banco. Então ele NEGA as áreas que dependem de papel, em vez de
+    // confiar que o ALB nunca vai mandá-las para cá. Regra de ALB é
+    // configuração, e configuração muda sem passar por revisão de código.
+    if (isAdmin || isProfessional) {
+      const dest = new URL('/suplementos/dashboard', getAppBaseUrl())
+      dest.search = request.nextUrl.search
+      return NextResponse.redirect(dest)
+    }
+
+    if (isDashboard && !sub) {
+      const dest = new URL('/suplementos/login', getAppBaseUrl())
+      dest.search = request.nextUrl.search
+      return NextResponse.redirect(dest)
+    }
+
+    return response
+  }
+
+  // --- Núcleo (e demais serviços com DATABASE_URL): comportamento atual. ---
   let userId: string | null = null
   if (idToken) {
     userId = await userIdDoToken(idToken)
@@ -62,12 +114,6 @@ export async function middleware(request: NextRequest) {
       }
     }
   }
-
-  const path = request.nextUrl.pathname
-  const isAdmin = path.startsWith('/suplementos/admin')
-  const isProfessional = path.startsWith('/suplementos/profissional')
-  const isDashboard = path.startsWith('/suplementos/dashboard')
-  const isProtected = isAdmin || isProfessional || isDashboard
 
   if (isProtected && !userId) {
     const dest = new URL('/suplementos/login', getAppBaseUrl())
