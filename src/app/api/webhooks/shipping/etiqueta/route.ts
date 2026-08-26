@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { getSql } from '@/lib/db'
-import { isBearerTokenAuthorizedComTransicao } from '@/lib/security/token'
+import { isTokenDeParceiroSemCabecalho } from '@/lib/security/token'
 import { summarizeShippingWebhookPayload } from '@/lib/security/webhook-payload'
 import { notifyShippingUpdate } from '@/lib/shipping/notify'
 import type { WebhookEtiquetaPayload } from '@/types/shipping'
@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
   // proxy e referrer. O ..._ANTERIOR mantém a credencial antiga válida enquanto
   // a Envie Agora não atualiza o painel; apagar essa variável fecha a janela.
   if (
-    !isBearerTokenAuthorizedComTransicao(
+    !isTokenDeParceiroSemCabecalho(
       request,
       process.env.SHIPPING_WEBHOOK_TOKEN,
       process.env.SHIPPING_WEBHOOK_TOKEN_ANTERIOR,
