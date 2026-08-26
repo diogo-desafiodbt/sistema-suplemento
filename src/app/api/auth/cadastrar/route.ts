@@ -6,7 +6,7 @@ import {
   entrar,
 } from '@/lib/auth/cognito'
 import { gravarTokens } from '@/lib/auth/cookies'
-import { garantirPerfilCognito } from '@/lib/auth/garantir-perfil'
+import { pedirVinculoNoNucleo } from '@/lib/contrato/vincular'
 
 const schema = z.object({
   email: z.string().email(),
@@ -24,12 +24,9 @@ export async function POST(request: Request) {
   const { email, password, full_name: fullName } = parsed.data
 
   try {
-    const sub = await criarUsuario(email, password)
-    await garantirPerfilCognito({
-      cognitoSub: sub,
-      email,
-      fullName: fullName ?? null,
-    })
+    // Cognito primeiro. O vínculo em users.cognito_sub só o núcleo (app_web)
+    // pode escrever — passa por /api/contrato/auth/vincular depois do login.
+    await criarUsuario(email, password)
 
     const tokens = await entrar(email, password)
     if (!tokens) {
@@ -38,6 +35,7 @@ export async function POST(request: Request) {
 
     const response = NextResponse.json({ ok: true })
     gravarTokens(response, tokens)
+    await pedirVinculoNoNucleo(tokens.idToken, fullName ?? null)
     return response
   } catch (error) {
     if (error instanceof EmailJaCadastradoError) {

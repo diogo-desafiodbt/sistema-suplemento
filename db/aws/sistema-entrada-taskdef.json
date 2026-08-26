@@ -16,6 +16,10 @@
         {
           "name": "NODE_ENV",
           "value": "production"
+        },
+        {
+          "name": "NUCLEO_URL",
+          "value": "https://desafiodiabetes.com"
         }
       ],
       "mountPoints": [],

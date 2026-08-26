@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { entrar } from '@/lib/auth/cognito'
 import { gravarTokens } from '@/lib/auth/cookies'
+import { pedirVinculoNoNucleo } from '@/lib/contrato/vincular'
 
 const schema = z.object({
   email: z.string().email(),
@@ -28,5 +29,10 @@ export async function POST(request: Request) {
 
   const response = NextResponse.json({ ok: true })
   gravarTokens(response, tokens)
+
+  // Síncrono, antes de devolver: sem vínculo o dashboard manda de volta ao
+  // login. Falha não derruba quem já está vinculado.
+  await pedirVinculoNoNucleo(tokens.idToken)
+
   return response
 }
