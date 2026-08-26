@@ -3,6 +3,7 @@ import { getUserProfile } from '@/lib/auth/profile'
 import { sessaoAtual } from '@/lib/auth/sessao'
 import { getSql } from '@/lib/db'
 import { getThreadReplyHeaders, sendSupportEmail } from '@/lib/support/mailer'
+import { registrarVeredito } from '@/lib/support/veredito'
 
 async function requireAdmin() {
   const sessao = await sessaoAtual()
@@ -24,7 +25,11 @@ export async function POST(
     }
 
     const { id } = await context.params
-    const body = (await request.json()) as { body_text?: string }
+    const body = (await request.json()) as {
+      body_text?: string
+      veredito?: 'aprovada' | 'rejeitada'
+      segundos?: number
+    }
     const bodyText = body.body_text?.trim()
     if (!bodyText) {
       return NextResponse.json(
@@ -40,9 +45,14 @@ export async function POST(
         from_email: string
         subject: string | null
         status: string
+        suggested_reply: string | null
+        categoria: string | null
+        origem: string | null
       }[]
     >`
-      SELECT id, from_email, subject, status
+      SELECT id, from_email, subject, status, suggested_reply,
+             triagem_ia->>'categoria' AS categoria,
+             decisao_ia->>'origem' AS origem
       FROM support_threads
       WHERE id = ${id}::uuid
       LIMIT 1
@@ -79,6 +89,31 @@ export async function POST(
     // liberaram, quantas vezes ele mandou o texto da IA sem mexer?". O que ele
     // enviou já está em support_messages como 'outbound', gravado dentro do
     // mailer — a comparação é entre os dois. Sobrescrever apaga o lado da IA.
+    // Registra o julgamento antes de mexer na conversa. É o que transforma o
+    // modo sombra em número: sem isto, medir se a IA está pronta exigiria ler
+    // conversa por conversa e opinar.
+    //
+    // Falhar aqui não pode impedir o Pedro de atender: o e-mail já saiu.
+    if (thread.suggested_reply && body.veredito) {
+      try {
+        await registrarVeredito({
+          threadId: id,
+          veredito: body.veredito,
+          sugestao: thread.suggested_reply,
+          enviado: bodyText,
+          segundos:
+            typeof body.segundos === 'number' && body.segundos >= 0
+              ? Math.round(body.segundos)
+              : null,
+          categoria: thread.categoria,
+          origem: thread.origem,
+          decididoPor: auth.userId,
+        })
+      } catch (erro) {
+        console.error('Falha ao registrar veredito da sugestão:', erro)
+      }
+    }
+
     await sql`
       UPDATE support_threads
       SET

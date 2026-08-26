@@ -796,3 +796,55 @@
 .historia-marca[data-projeto='site']               { background: var(--admin-vermelho); }
 .historia-marca[data-projeto='blog']               { background: var(--admin-atencao); }
 .historia-marca[data-projeto='lp-primeiro-passo']  { background: var(--admin-ok); }
+
+/* ---------------------------------------------------------------------------
+   Veredito sobre a sugestão da IA
+   Fica entre o rascunho e os botões de ação, no caminho de quem vai enviar —
+   não numa barra lateral que dá para ignorar. O envio depende dele.
+--------------------------------------------------------------------------- */
+.sugestao-veredito {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--admin-borda);
+  border-radius: var(--admin-raio);
+  background: #f7f9fc;
+}
+.sugestao-veredito-pergunta {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--admin-marinho);
+}
+.sugestao-veredito-botoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sugestao-btn {
+  border: 1px solid var(--admin-borda);
+  background: var(--admin-papel);
+  color: var(--admin-tinta);
+  border-radius: var(--admin-raio);
+  padding: 7px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.sugestao-btn:hover { border-color: var(--admin-marinho); }
+/* Só o escolhido ganha cor. Dois botões coloridos lado a lado empurram para
+   um dos dois, e aqui a resposta honesta importa mais que a rápida. */
+.sugestao-btn--ativo.sugestao-btn--sim {
+  background: var(--admin-ok);
+  border-color: var(--admin-ok);
+  color: #fff;
+}
+.sugestao-btn--ativo.sugestao-btn--nao {
+  background: var(--admin-marinho);
+  border-color: var(--admin-marinho);
+  color: #fff;
+}
+.sugestao-veredito-nota {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--admin-tinta-fraca);
+}

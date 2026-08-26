@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Botao } from '@/components/admin/ui/Botao'
 import { Card } from '@/components/admin/ui/Card'
 import { Selo } from '@/components/admin/ui/Selo'
@@ -89,6 +89,16 @@ function ThreadCard({
   const [sending, setSending] = useState(false)
   const [closing, setClosing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Veredito sobre a sugestão da IA. `null` = ele ainda não decidiu; nesse
+  // caso o botão de enviar fica bloqueado, porque o julgamento é o dado que
+  // este período existe para colher.
+  const [veredito, setVeredito] = useState<'aprovada' | 'rejeitada' | null>(
+    null,
+  )
+  // Quando a conversa abriu. Aprovação em três segundos não é leitura, é
+  // carimbo — e uma taxa de acerto cheia de carimbo engana quem for decidir
+  // ligar o envio automático.
+  const abertoEm = useRef<number>(Date.now())
 
   const messages = useMemo(
     () =>
@@ -114,7 +124,11 @@ function ThreadCard({
       const res = await fetch(`/api/admin/suporte/${thread.id}/responder`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body_text: text }),
+        body: JSON.stringify({
+          body_text: text,
+          veredito: veredito ?? undefined,
+          segundos: Math.round((Date.now() - abertoEm.current) / 1000),
+        }),
       })
       const data = (await res.json()) as { error?: string }
       if (!res.ok) {
@@ -369,6 +383,52 @@ function ThreadCard({
               {error}
             </p>
           ) : null}
+          {/* O julgamento sobre a sugestão da IA. Enquanto ele não decidir, o
+              envio fica bloqueado — este período existe para colher esse
+              dado, e uma resposta enviada sem veredito é uma amostra
+              perdida. Rejeitar não apaga o texto: ele reescreve por cima. */}
+          {thread.suggested_reply ? (
+            <div className="sugestao-veredito">
+              <p className="sugestao-veredito-pergunta">
+                A sugestão da IA servia?
+              </p>
+              <div className="sugestao-veredito-botoes">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVeredito('aprovada')
+                    setText(thread.suggested_reply ?? '')
+                  }}
+                  className={
+                    veredito === 'aprovada'
+                      ? 'sugestao-btn sugestao-btn--sim sugestao-btn--ativo'
+                      : 'sugestao-btn sugestao-btn--sim'
+                  }
+                >
+                  Servia — vou enviar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVeredito('rejeitada')}
+                  className={
+                    veredito === 'rejeitada'
+                      ? 'sugestao-btn sugestao-btn--nao sugestao-btn--ativo'
+                      : 'sugestao-btn sugestao-btn--nao'
+                  }
+                >
+                  Não servia — escrevo outra
+                </button>
+              </div>
+              <p className="sugestao-veredito-nota">
+                {veredito === 'aprovada'
+                  ? 'Pode ajustar o texto antes de enviar. A diferença entre o que a IA escreveu e o que você mandar é registrada.'
+                  : veredito === 'rejeitada'
+                    ? 'Escreva a resposta certa abaixo. O que você escrever é o que ensina a IA.'
+                    : 'Responda para liberar o envio.'}
+              </p>
+            </div>
+          ) : null}
+
           <div
             style={{
               marginTop: 12,
@@ -390,7 +450,12 @@ function ThreadCard({
               type="button"
               variante="primario"
               onClick={handleSend}
-              disabled={sending || closing || !text.trim()}
+              disabled={
+                sending ||
+                closing ||
+                !text.trim() ||
+                (!!thread.suggested_reply && veredito === null)
+              }
             >
               {sending ? 'Enviando…' : 'Enviar'}
             </Botao>
