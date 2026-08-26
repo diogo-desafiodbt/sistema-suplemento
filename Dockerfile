@@ -9,7 +9,11 @@
 # empacotamento depois. Uma imagem construída sobre um `.next` velho é o
 # risco desse desenho, e o script existe para eliminá-lo.
 
-FROM node:22-alpine
+# Espelho da AWS, não o Docker Hub. O Hub limita download anônimo, e em
+# 26/08/2026 o deploy quebrou com "429 Too Many Requests" — falha externa, sem
+# relação com o código, que volta sozinha quando menos convém. O espelho é a
+# mesma imagem, sem limite, e o projeto já o usa no contêiner do vigia.
+FROM public.ecr.aws/docker/library/node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
 
