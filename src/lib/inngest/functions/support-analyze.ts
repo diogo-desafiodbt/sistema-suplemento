@@ -5,6 +5,10 @@ import { passouTetoRespostasAutomaticas } from '@/lib/support/higiene'
 import { identifySupportUser } from '@/lib/support/identify'
 import { investigar } from '@/lib/support/investigate'
 import { verificarSaida } from '@/lib/support/saida'
+import {
+  orientarAcessoAoGuia,
+  pedeAcessoAoGuia,
+} from '@/lib/support/acesso-guia'
 import { responderTecnico } from '@/lib/support/tecnico'
 import { aplicarTravas } from '@/lib/support/travas'
 import { modoDeEnvio, podeEnviarAutomaticamente } from '@/lib/support/modo-envio'
@@ -187,6 +191,67 @@ export const supportAnalyze = inngest.createFunction(
           },
         })
         return { ok: true, status: 'aguardando_revisao', triagem: 'tecnico' }
+      }
+
+      // Dificuldade de acesso ao guia: orientação de primeira linha, em texto
+      // fixo. Decisão do Diogo em 25/08/2026 — a IA manda o que o Pedro
+      // mandaria (procurar na caixa, no spam, buscar por "Hotmart"), e só
+      // escala se a pessoa voltar dizendo que não funcionou.
+      //
+      // Roda ANTES da checagem de cliente identificado, como o técnico: a
+      // consulta é pelo e-mail de quem escreveu contra as compras que
+      // existem, e não depende de a pessoa ter conta no sistema.
+      const ultimaDoCliente = [...messages]
+        .reverse()
+        .find((m) => m.direction === 'inbound')?.body_text
+      if (
+        triagem.categoria === 'guia' &&
+        pedeAcessoAoGuia(ultimaDoCliente)
+      ) {
+        // Se a IA já orientou uma vez e a pessoa voltou, a segunda tentativa
+        // não acrescenta nada: ela já disse o que sabia. Escala na hora.
+        const jaOrientou = (thread.respostas_automaticas_ia ?? 0) >= 1
+        const acesso = jaOrientou
+          ? ({
+              tipo: 'escalar' as const,
+              motivo:
+                'Cliente voltou depois da orientação de acesso. A IA já disse o que sabia; daqui é reenvio, que é ação humana.',
+            })
+          : await orientarAcessoAoGuia({
+              emailRemetente: thread.from_email,
+              nomeCliente: null,
+            })
+
+        const temTexto = acesso.tipo !== 'escalar'
+        const decisaoAcesso = {
+          pode_resolver_sozinho: temTexto,
+          motivo_escalonamento: temTexto ? null : acesso.motivo,
+          resposta: temTexto ? acesso.texto : '',
+          dados_usados: ['buscar_compras_guia'],
+          video_sugerido: null,
+          origem: `modelo_fixo_acesso_guia:${acesso.tipo}`,
+        }
+        await sql`
+          UPDATE support_threads
+          SET
+            decisao_ia = ${sql.json(decisaoAcesso as never)},
+            suggested_reply = ${temTexto ? acesso.texto : null},
+            status = 'aguardando_revisao'::support_thread_status,
+            enviado_automaticamente = false
+          WHERE id = ${threadId}::uuid
+        `
+        await registrarFim(jobId, {
+          status: 'completed',
+          affectedRows: 1,
+          payload: {
+            thread_id: threadId,
+            status: 'aguardando_revisao',
+            triagem: 'guia',
+            acesso: acesso.tipo,
+            enviado_automaticamente: false,
+          },
+        })
+        return { ok: true, status: 'aguardando_revisao', triagem: 'guia' }
       }
 
       // Sem cliente identificado não há ferramenta segura.
