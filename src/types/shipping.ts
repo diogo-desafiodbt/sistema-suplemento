@@ -115,11 +115,13 @@ export type RastreamentoEvento = {
   cidade: string | null
   datahora: string
   /**
-   * Só a API que CONSULTAMOS devolve este campo. O webhook que a Envie Agora
-   * empurra não traz — confirmado por eles em 26/08/2026. Por isso é opcional,
-   * e a entrega é detectada também pela descrição.
+   * Vem nos dois — mas em TIPOS DIFERENTES. A API que consultamos devolve
+   * número (`1`); o webhook que eles empurram devolve booleano (`true`),
+   * confirmado por eles em 26/08/2026. Comparar com `=== 1` funcionaria num e
+   * falharia no outro, sem erro nenhum: o pedido simplesmente nunca sairia de
+   * "a caminho".
    */
-  finalizado?: number
+  finalizado?: number | boolean
   numeroetiqueta?: string
   notafiscal?: string
 }

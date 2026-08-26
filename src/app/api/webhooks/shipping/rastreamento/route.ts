@@ -84,14 +84,17 @@ export async function POST(request: NextRequest) {
       eventos as unknown as Array<Record<string, unknown>>,
     )
 
-    // `finalizado` só vem na API que consultamos; o webhook não traz. Sem uma
-    // segunda forma de reconhecer a entrega, o pedido ficaria em "a caminho"
-    // para sempre. A descrição é o que sobra — e é o mesmo texto que o cliente
-    // lê no rastreio.
+    // `finalizado` chega como número na API que consultamos e como booleano no
+    // webhook que eles empurram. Comparar com `=== 1` funcionava num e falhava
+    // no outro sem dar erro: o pedido nunca sairia de "a caminho".
+    //
+    // A descrição fica como segunda via. Se um dia eles mudarem o campo de
+    // novo, a entrega continua sendo reconhecida pelo texto que o próprio
+    // cliente lê no rastreio.
+    const concluido = (v: number | boolean | undefined): boolean =>
+      v === true || v === 1
     const entregue = eventos.some(
-      (e) =>
-        e.finalizado === 1 ||
-        /\bentregue\b/i.test(e.descricao ?? ''),
+      (e) => concluido(e.finalizado) || /\bentregue\b/i.test(e.descricao ?? ''),
     )
     if (entregue) {
       await sql`
