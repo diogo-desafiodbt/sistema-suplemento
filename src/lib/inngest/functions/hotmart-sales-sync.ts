@@ -9,6 +9,31 @@ import { inngest } from '../client'
 
 const SP_OFFSET = '-03:00'
 
+/**
+ * CPF do comprador, quando a Hotmart manda.
+ *
+ * O Diogo ligou a exigência de CPF no checkout em 25/08/2026. O campo não
+ * aparecia no retorno até então, e a documentação da Hotmart não deixa claro
+ * com que nome ele vem — pode ser `document`, `cpf` ou `documentNumber`,
+ * dependendo da versão da API. Em vez de apostar num nome e descobrir daqui a
+ * um mês que ficou tudo nulo, procuramos os três.
+ *
+ * Guarda só dígitos: o CPF do sistema vem sem pontuação, e casar
+ * "529.982.247-25" com "52998224725" falharia em silêncio.
+ */
+function documentoDoComprador(buyer: unknown): string | null {
+  if (!buyer || typeof buyer !== 'object') return null
+  const b = buyer as Record<string, unknown>
+  for (const chave of ['document', 'cpf', 'documentNumber', 'document_number']) {
+    const v = b[chave]
+    if (typeof v === 'string' && v.trim()) {
+      const digitos = v.replace(/\D/g, '')
+      if (digitos.length >= 11) return digitos
+    }
+  }
+  return null
+}
+
 /** Janela dos últimos 2 dias corridos em America/Sao_Paulo (início do dia D-2 → agora). */
 function lastTwoCalendarDaysWindow(now: Date): {
   startMs: number
@@ -47,6 +72,7 @@ function mapSaleRow(item: HotmartSaleItem) {
     buyer_name: item.buyer?.name ?? null,
     buyer_email: item.buyer?.email ?? null,
     buyer_ucode: item.buyer?.ucode ?? null,
+    buyer_document: documentoDoComprador(item.buyer),
     status,
     order_date: epochMsToIso(purchase?.order_date),
     approved_date: epochMsToIso(purchase?.approved_date),
