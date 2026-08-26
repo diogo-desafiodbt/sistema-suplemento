@@ -9,7 +9,15 @@ export type ClaimOnceResult = {
 }
 
 export type ClaimOnceOptions = {
-  staleAfterMs?: number
+  /**
+   * Janela após a qual uma reserva presa é considerada abandonada e removida.
+   *
+   * `false` desliga a remoção. Use quando a "reserva" for um dado de verdade e
+   * não uma linha de controle — a mensagem de um cliente, por exemplo. Sem
+   * isso, o mecanismo apagaria o que a pessoa escreveu para poder repetir o
+   * trabalho, o que é pior que repetir.
+   */
+  staleAfterMs?: number | false
   /** Coluna de timestamp pra detectar claim abandonada. Default: created_at. */
   timestampColumn?: string
   /**
@@ -111,7 +119,11 @@ export async function claimOnce(
     ? sql`AND ${sql(completedColumn)} IS NULL`
     : sql``
 
-  const deleted = await sql`
+  // `false` desliga a remoção: nada é apagado, e a reserva existente vence.
+  const deleted =
+    staleAfterMs === false
+      ? []
+      : await sql`
     DELETE FROM ${sql(table)}
     WHERE ${eqFilters(sql, filters)}
       AND ${sql(timestampColumn)} < now() - (${staleAfterMs} || ' milliseconds')::interval

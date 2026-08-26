@@ -264,6 +264,15 @@ export const supportInboxPoll = inngest.createFunction(
             messageRow,
             {
               completedColumn: 'completed_at',
+              // NUNCA apagar: aqui a "reserva" é a mensagem do cliente, não
+              // uma linha de controle. Sem isto o mecanismo usaria o prazo
+              // padrão e removeria e-mail que tivesse ficado sem processar —
+              // apagando o que o cliente escreveu para não repetir trabalho.
+              //
+              // Até 26/08/2026 quem impedia isso era a permissão negada no
+              // banco, por acidente. Proteção que depende de acidente não é
+              // proteção.
+              staleAfterMs: false,
             },
           )
           won = result.won
