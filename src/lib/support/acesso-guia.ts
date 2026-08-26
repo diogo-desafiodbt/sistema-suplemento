@@ -32,6 +32,7 @@ type Compra = {
   product_name: string | null
   order_date: string | Date | null
   status: string | null
+  buyer_name: string | null
 }
 
 /** Situações da Hotmart em que a compra está paga e o envio já aconteceu. */
@@ -61,7 +62,7 @@ export async function orientarAcessoAoGuia(params: {
 }): Promise<RespostaAcesso> {
   const sql = getSqlConteudo()
   const linhas = await sql<Compra[]>`
-    SELECT product_name, order_date, status
+    SELECT product_name, order_date, status, buyer_name
       FROM hotmart_sales
      WHERE lower(buyer_email) = ${params.emailRemetente.trim().toLowerCase()}
      ORDER BY order_date DESC NULLS LAST
@@ -80,7 +81,12 @@ export async function orientarAcessoAoGuia(params: {
   }
 
   const paga = linhas.find((l) => PAGAS.has((l.status ?? '').toUpperCase()))
-  const abertura = saudacao(params.nomeCliente)
+  // O nome vem da própria compra quando quem chama não tem: chamar a pessoa
+  // pelo nome é o que separa uma resposta de atendimento de um aviso de robô,
+  // e o dado já veio na mesma consulta.
+  const abertura = saudacao(
+    params.nomeCliente ?? paga?.buyer_name ?? linhas[0]?.buyer_name,
+  )
 
   if (!paga) {
     const pendente = linhas[0]!
