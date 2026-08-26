@@ -66,7 +66,13 @@ export async function garantirPerfilCognito(params: {
       ${params.cognitoSub},
       'DD-' || lpad(nextval('public.client_code_seq')::text, 6, '0')
     )
-    ON CONFLICT (cognito_sub) DO NOTHING
+    -- O índice único de cognito_sub é PARCIAL (só vale quando não é nulo), e o
+    -- Postgres só o infere se o predicado vier junto. Sem ele o INSERT falha com
+    -- "there is no unique or exclusion constraint matching the ON CONFLICT
+    -- specification", e o cadastro cria a conta no Cognito sem linha aqui — a
+    -- pessoa fica com conta, sem acesso, e sem poder cadastrar de novo. Ninguém
+    -- tinha visto porque o cadastro falhava antes, por falta de permissão IAM.
+    ON CONFLICT (cognito_sub) WHERE cognito_sub IS NOT NULL DO NOTHING
     RETURNING id
   `
   if (inserido[0]) return inserido[0].id
