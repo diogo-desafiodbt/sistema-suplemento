@@ -11,6 +11,10 @@ import { pharmacyReconciliation } from '@/lib/inngest/functions/pharmacy-reconci
 import { processarProtocolos } from '@/lib/inngest/functions/processar-protocolos'
 import { purchaseConfirmed } from '@/lib/inngest/functions/purchase-confirmed'
 import { rfmRecalc } from '@/lib/inngest/functions/rfm-recalc'
+import {
+  shippingEtiquetaGerada,
+  shippingRastreioAtualizado,
+} from '@/lib/inngest/functions/shipping-notify'
 import { supportAnalyze } from '@/lib/inngest/functions/support-analyze'
 import { supportInboxPoll } from '@/lib/inngest/functions/support-inbox-poll'
 import { supportPendingReminder } from '@/lib/inngest/functions/support-pending-reminder'
@@ -43,6 +47,8 @@ export const { GET, POST, PUT } = serve({
     // no RDS — religar é devolver esta linha e o import. As 10 tabelas dele
     // estão prontas e vazias no banco `conteudo`.
     purchaseConfirmed,
+    shippingEtiquetaGerada,
+    shippingRastreioAtualizado,
     supportInboxPoll,
     supportAnalyze,
     supportPendingReminder,

@@ -1,8 +1,8 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { getSql } from '@/lib/db'
+import { inngest } from '@/lib/inngest/client'
 import { isTokenDeParceiroSemCabecalho } from '@/lib/security/token'
 import { summarizeShippingWebhookPayload } from '@/lib/security/webhook-payload'
-import { notifyShippingUpdate } from '@/lib/shipping/notify'
 import type { WebhookEtiquetaPayload } from '@/types/shipping'
 
 export async function POST(request: NextRequest) {
@@ -75,12 +75,24 @@ export async function POST(request: NextRequest) {
       WHERE id = ${order.id}::uuid
     `
 
-    await notifyShippingUpdate({
-      orderId: order.id,
-      eventId: 'etiqueta',
-      kind: 'dispatched',
-      trackingCode: payload.numero_etiqueta,
-    })
+    // Pedido já atualizado. O e-mail sai no Inngest (app_web) — app_entrada
+    // não tem grant em shipping_notification_logs. Falhar o send não vira 500.
+    try {
+      await inngest.send({
+        name: 'envio/etiqueta-gerada',
+        data: {
+          order_id: order.id,
+          tracking_code: payload.numero_etiqueta,
+        },
+      })
+    } catch (erro) {
+      const msg = erro instanceof Error ? erro.message : String(erro)
+      console.error('Falha ao enfileirar aviso de etiqueta:', msg)
+      await sql`
+        UPDATE webhook_logs SET error_message = ${`aviso ao cliente falhou: ${msg}`}
+        WHERE id = ${log.id}::uuid
+      `
+    }
 
     await sql`
       UPDATE webhook_logs SET processed = true WHERE id = ${log.id}::uuid

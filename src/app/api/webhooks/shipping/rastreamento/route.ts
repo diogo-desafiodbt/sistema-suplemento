@@ -1,12 +1,10 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { getSql } from '@/lib/db'
+import { inngest } from '@/lib/inngest/client'
 import { isTokenDeParceiroSemCabecalho } from '@/lib/security/token'
 import { summarizeShippingWebhookPayload } from '@/lib/security/webhook-payload'
+import { getNewTrackingEvents } from '@/lib/shipping/notify'
 import { mergeTrackingEvents } from '@/lib/shipping/tracking-events'
-import {
-  getNewTrackingEvents,
-  notifyNewTrackingEvents,
-} from '@/lib/shipping/notify'
 import type { WebhookRastreamentoPayload } from '@/types/shipping'
 
 export async function POST(request: NextRequest) {
@@ -75,10 +73,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    // Persiste antes de notificar — o painel não pode ficar sem o evento se o
-    // e-mail/claim já tiverem sido concluídos. notifyShippingUpdate é
-    // idempotente por (order_id, event_id); no retry reenviamos só o que ainda
-    // não tem completed_at (passamos o payload inteiro, não só "novos" vs JSON).
+    // Quais eventos são novos tem que ser decidido AQUI, contra o
+    // `shipping_json` de antes do merge. Depois do UPDATE abaixo todos passam a
+    // constar como conhecidos, e o Inngest não teria mais como distinguir —
+    // mandaria um e-mail por evento do histórico do pedido na primeira vez.
+    // A função é pura sobre JSON, não toca tabela, então roda bem em app_entrada.
+    const newEvents = getNewTrackingEvents(order.shipping_json, eventos)
+
+    // Persiste antes de enfileirar o aviso. notifyShippingUpdate (no Inngest)
+    // é idempotente por (order_id, event_id); no retry o claim evita reenvio.
     const merged = mergeTrackingEvents(
       order.shipping_json,
       eventos as unknown as Array<Record<string, unknown>>,
@@ -112,18 +115,20 @@ export async function POST(request: NextRequest) {
       `
     }
 
-    // O rastreio já está salvo. Se avisar o cliente falhar, isso NÃO pode
-    // virar 500: a transportadora reenviaria o mesmo evento para sempre, e o
-    // reenvio não conserta o e-mail. Registramos a falha e seguimos.
+    // O rastreio já está salvo. O e-mail sai no Inngest (app_web) — aqui só
+    // enfileiramos. Falhar o send NÃO pode virar 500: a transportadora
+    // reenviaria o evento para sempre. O Inngest reexecuta o aviso sozinho.
     try {
-      const newEvents = getNewTrackingEvents(order.shipping_json, eventos)
-      await notifyNewTrackingEvents(
-        order.id,
-        newEvents.length > 0 ? newEvents : eventos,
-      )
+      await inngest.send({
+        name: 'envio/rastreio-atualizado',
+        data: {
+          order_id: order.id,
+          eventos: newEvents.length > 0 ? newEvents : eventos,
+        },
+      })
     } catch (erro) {
       const msg = erro instanceof Error ? erro.message : String(erro)
-      console.error('Falha ao avisar o cliente do rastreio:', msg)
+      console.error('Falha ao enfileirar aviso de rastreio:', msg)
       await sql`
         UPDATE webhook_logs SET error_message = ${`aviso ao cliente falhou: ${msg}`}
         WHERE id = ${log.id}::uuid
