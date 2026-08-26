@@ -2,6 +2,12 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { CopyButton } from '@/components/CopyButton'
 import { RFM_TIER_BADGE, RFM_TIER_LABEL } from '@/lib/admin/rfm-tier'
+import {
+  buscarComprasHotmartPorEmail,
+  formatarValorCompra,
+  montarComprasUnificadas,
+  type HotmartSaleRow,
+} from '@/lib/admin/compras-cliente'
 import { asNumber, getSql } from '@/lib/db'
 import { createPrescriptionPdfSignedUrl } from '@/lib/pdf/signed-url'
 import { PLAN_LABELS } from '@/lib/plans'
@@ -50,6 +56,7 @@ type OrderRow = {
     nomeServico?: string
   } | null
   shipping_json: { eventos?: TrackingEvent[] } | null
+  order_items?: Array<{ products: { name: string } | null }>
 }
 
 type TrackingEvent = {
@@ -131,6 +138,20 @@ const PAYMENT_STATUS_BADGE: Record<string, string> = {
   paid: 'bg-green-50 text-green-700',
   pending: 'bg-amber-50 text-amber-700',
   failed: 'bg-red-50 text-red-700',
+}
+
+const COMPRA_ORIGEM_BADGE: Record<string, string> = {
+  guia: 'bg-amber-50 text-amber-800',
+  suplemento: 'bg-blue-50 text-blue-700',
+}
+
+const COMPRA_STATUS_BADGE: Record<string, string> = {
+  Pago: 'bg-green-50 text-green-700',
+  Aguardando: 'bg-gray-100 text-gray-600',
+  'Na farmácia': 'bg-blue-50 text-blue-700',
+  'A caminho': 'bg-amber-50 text-amber-700',
+  Entregue: 'bg-green-50 text-green-700',
+  Falhou: 'bg-red-50 text-red-700',
 }
 
 const PROTOCOL_STATUS_LABEL: Record<string, string> = {
@@ -281,9 +302,20 @@ export default async function AdminClienteDetalhePage({
       ORDER BY created_at DESC
     `,
     sql<OrderRow[]>`
-      SELECT * FROM orders
-      WHERE user_id = ${id}::uuid
-      ORDER BY created_at DESC
+      SELECT o.id, o.status, o.created_at, o.total_amount, o.tracking_code,
+             o.pharmacy_sent_at, o.shipping_quote_json, o.shipping_json,
+        COALESCE(it.list, '[]'::jsonb) AS order_items
+      FROM orders o
+      LEFT JOIN LATERAL (
+        SELECT jsonb_agg(jsonb_build_object(
+          'products', CASE WHEN pr.id IS NULL THEN NULL
+            ELSE jsonb_build_object('name', pr.name) END
+        ) ORDER BY oi.id) AS list
+        FROM order_items oi LEFT JOIN products pr ON pr.id = oi.product_id
+        WHERE oi.order_id = o.id
+      ) it ON true
+      WHERE o.user_id = ${id}::uuid
+      ORDER BY o.created_at DESC
     `,
     sql<Omit<ProtocolRow, 'prescription_pdf_signed_url'>[]>`
       SELECT p.id, p.status, p.generated_at, p.signed_at, p.signed_by,
@@ -337,6 +369,19 @@ export default async function AdminClienteDetalhePage({
     ...o,
     total_amount: o.total_amount == null ? null : asNumber(o.total_amount),
   }))
+
+  let hotmartErro: string | null = null
+  let hotmartCompras: HotmartSaleRow[] = []
+  try {
+    hotmartCompras = await buscarComprasHotmartPorEmail(client.email)
+  } catch (error) {
+    console.error('ficha cliente: hotmart_sales indisponível', error)
+    hotmartErro =
+      'O histórico de compras do guia (Hotmart) não pôde ser carregado. O restante da ficha continua disponível.'
+  }
+
+  const comprasUnificadas = montarComprasUnificadas(hotmartCompras, orderList)
+
   const protocolList = await Promise.all(
     protocols.map(async (p) => ({
       ...p,
@@ -455,6 +500,66 @@ export default async function AdminClienteDetalhePage({
           <Field label="Cadastro" value={fmtDateTime(client.created_at)} />
         </div>
       </section>
+
+      {/* Compras — visão unificada (Hotmart + sistema) */}
+      <SectionCard title="Compras">
+        {hotmartErro ? (
+          <p className="text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 mb-4">
+            {hotmartErro}
+          </p>
+        ) : null}
+        {comprasUnificadas.length === 0 ? (
+          <Empty
+            text={
+              hotmartErro
+                ? 'Nenhuma compra de suplemento no sistema.'
+                : 'Nenhuma compra registrada.'
+            }
+          />
+        ) : (
+          <ul className="space-y-3">
+            {comprasUnificadas.map((compra, i) => (
+              <li
+                key={`${compra.origem}-${compra.detalhe ?? compra.produto}-${i}`}
+                className="border border-gray-100 rounded-xl p-4"
+              >
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <span
+                    className={`text-xs font-bold px-2.5 py-1 rounded-full ${COMPRA_ORIGEM_BADGE[compra.origem] ?? 'bg-gray-100 text-gray-600'}`}
+                  >
+                    {compra.origemLabel}
+                  </span>
+                  <span
+                    className={`text-xs font-bold px-2.5 py-1 rounded-full ${COMPRA_STATUS_BADGE[compra.statusLabel] ?? 'bg-gray-100 text-gray-600'}`}
+                    title={compra.statusBruto || undefined}
+                  >
+                    {compra.statusLabel}
+                  </span>
+                  <span className="ml-auto text-xs text-gray-400">
+                    {fmtDateTime(compra.data)}
+                  </span>
+                </div>
+                <p className="text-sm font-semibold text-[#13244f]">
+                  {compra.produto}
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+                  <span>
+                    Valor:{' '}
+                    <strong className="text-[#13244f]">
+                      {formatarValorCompra(compra.valor, compra.moeda)}
+                    </strong>
+                  </span>
+                  {compra.detalhe ? (
+                    <span className="font-mono text-[11px] text-gray-400">
+                      {compra.detalhe}
+                    </span>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </SectionCard>
 
       {/* 2.2 — Endereço */}
       <SectionCard title="Endereço">
