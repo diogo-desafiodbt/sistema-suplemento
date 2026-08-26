@@ -129,7 +129,12 @@ export const hotmartSalesSync = inngest.createFunction(
   {
     id: 'hotmart-sales-sync',
     name: 'Sync diário de vendas Hotmart (Guia Primeiro Passo)',
-    triggers: [{ cron: 'TZ=America/Sao_Paulo 0 7 * * *' }],
+    // Além do horário, um gatilho manual: serve para forçar a sincronização
+    // depois de uma mudança na Hotmart, sem esperar o dia seguinte.
+    triggers: [
+      { cron: 'TZ=America/Sao_Paulo 0 7 * * *' },
+      { event: 'hotmart/sincronizar' },
+    ],
   },
   async ({ step }) => {
     const result = await step.run('sync-hotmart-sales', async () => {
