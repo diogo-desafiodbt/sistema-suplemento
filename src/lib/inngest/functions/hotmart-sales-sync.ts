@@ -3,11 +3,49 @@ import {
   fetchAllSalesHistory,
   type HotmartSaleItem,
 } from '@/lib/hotmart/client'
+import { getSql } from '@/lib/db'
 import { getSqlConteudo, upsertConteudo } from '@/lib/conteudo/db'
 import { registrarFim, registrarInicio } from '@/lib/jobs/registro'
 import { inngest } from '../client'
 
 const SP_OFFSET = '-03:00'
+
+/**
+ * Garante que cada comprador da Hotmart exista como cliente.
+ *
+ * Casa por e-mail, que é a única chave que temos para quem comprou antes de
+ * 25/08/2026 — a Hotmart não guardava CPF até então. Quem já é cliente não é
+ * tocado: `DO NOTHING`, nunca `DO UPDATE`. Uma venda não corrige o cadastro
+ * de ninguém.
+ */
+async function garantirClientesDaHotmart(
+  rows: { buyer_email: string | null; buyer_name: string | null }[],
+): Promise<number> {
+  const porEmail = new Map<string, string | null>()
+  for (const r of rows) {
+    const email = r.buyer_email?.trim().toLowerCase()
+    if (email) porEmail.set(email, r.buyer_name?.trim() || null)
+  }
+  if (porEmail.size === 0) return 0
+
+  const sql = getSql()
+  let criados = 0
+  for (const [email, nome] of porEmail) {
+    const feito = await sql<{ id: string }[]>`
+      INSERT INTO users (id, email, full_name, client_code)
+      VALUES (
+        gen_random_uuid(),
+        ${email},
+        ${nome},
+        'DD-' || lpad(nextval('public.client_code_seq')::text, 6, '0')
+      )
+      ON CONFLICT (email) DO NOTHING
+      RETURNING id
+    `
+    if (feito[0]) criados++
+  }
+  return criados
+}
 
 /**
  * CPF do comprador, quando a Hotmart manda.
@@ -150,9 +188,28 @@ export const hotmartSalesSync = inngest.createFunction(
         }
       }
 
+      // Quem compra o guia vira CLIENTE, não só uma linha de venda. Sem isto,
+      // o comprador é invisível para o suporte (que identifica pela tabela de
+      // clientes) e não aparece na aba de clientes. Foi assim que 1.050
+      // pessoas ficaram fora do sistema sem ninguém perceber.
+      //
+      // Não sobrescreve ninguém: quem já é cliente fica como está. O papel vem
+      // do padrão da coluna — a permissão do banco impede que uma venda
+      // escolha papel ou grave CPF.
+      let clientesNovos = 0
+      try {
+        clientesNovos = await garantirClientesDaHotmart(rows)
+      } catch (error) {
+        // Não derruba a sincronização: a venda já está salva, e o cliente
+        // entra na próxima rodada. Mas registra, porque silêncio aqui
+        // significaria comprador invisível para sempre.
+        console.error('Falha ao criar clientes da Hotmart:', error)
+      }
+
       const payload = {
         totalFetched: items.length,
         totalUpserted,
+        clientesNovos,
         windowStart: window.windowStart,
         windowEnd: window.windowEnd,
       }
