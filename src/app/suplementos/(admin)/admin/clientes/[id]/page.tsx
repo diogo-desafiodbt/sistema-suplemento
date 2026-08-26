@@ -91,6 +91,7 @@ type ProfessionalRow = {
   id: string
   crm: string | null
   crm_state: string | null
+  conselho: string | null
   users: { full_name: string } | null
 }
 
@@ -367,7 +368,7 @@ export default async function AdminClienteDetalhePage({
       : Promise.resolve([] as PaymentRow[]),
     signerIds.length > 0
       ? sql<ProfessionalRow[]>`
-          SELECT pf.id, pf.crm, pf.crm_state,
+          SELECT pf.id, pf.crm, pf.crm_state, pf.conselho,
             CASE WHEN u.id IS NULL THEN NULL
               ELSE jsonb_build_object('full_name', u.full_name) END AS users
           FROM professionals pf
@@ -392,7 +393,7 @@ export default async function AdminClienteDetalhePage({
     if (!pro) return '—'
     const name = pro.users?.full_name
     const crm = pro.crm
-      ? ` — CRM ${pro.crm}${pro.crm_state ? `/${pro.crm_state}` : ''}`
+      ? ` — ${pro.conselho ?? 'CRM'} ${pro.crm}${pro.crm_state ? `/${pro.crm_state}` : ''}`
       : ''
     return `${name ?? '—'}${crm}`
   }

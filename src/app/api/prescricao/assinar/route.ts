@@ -41,6 +41,7 @@ type ProfessionalRow = {
   id: string
   crm: string | null
   crm_state: string | null
+  conselho: string | null
   specialty: string | null
   users: { full_name: string } | null
 }
@@ -106,7 +107,7 @@ export async function POST(request: NextRequest) {
     }
 
     const professionalRows = await sql<ProfessionalRow[]>`
-      SELECT pf.id, pf.crm, pf.crm_state, pf.specialty,
+      SELECT pf.id, pf.crm, pf.crm_state, pf.conselho, pf.specialty,
         CASE WHEN u.id IS NULL THEN NULL
           ELSE jsonb_build_object('full_name', u.full_name) END AS users
       FROM professionals pf
@@ -156,6 +157,7 @@ export async function POST(request: NextRequest) {
         full_name: professionalUser?.full_name ?? 'Médico',
         crm: professional.crm ?? '',
         crm_state: professional.crm_state ?? '',
+        conselho: professional.conselho ?? 'CRM',
         specialty: professional.specialty ?? '',
       },
       protocol: {

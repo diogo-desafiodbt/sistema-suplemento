@@ -98,6 +98,7 @@ type PrescriptionData = {
     full_name: string
     crm: string
     crm_state: string
+    conselho?: string | null
     specialty: string
   }
   protocol: {
@@ -295,7 +296,12 @@ export function PrescriptionDocument({ data }: { data: PrescriptionData }) {
               {data.professional.full_name}
             </Text>
             <Text style={styles.signatureText}>
-              CRM {data.professional.crm}/{data.professional.crm_state}
+              {/* O conselho vem do dado. Imprimir "CRM" fixo apresentaria
+                  um nutricionista como médico — e isto aqui é documento. */}
+              {data.professional.conselho ?? 'CRM'} {data.professional.crm}
+              {data.professional.crm_state
+                ? `/${data.professional.crm_state}`
+                : ''}
             </Text>
             <Text style={styles.signatureText}>
               {data.professional.specialty}

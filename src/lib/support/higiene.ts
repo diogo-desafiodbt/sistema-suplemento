@@ -1,10 +1,23 @@
 import { asNumber, getSql } from '@/lib/db'
 
+// A lista era só em inglês, e isso custou caro em 26/08/2026: configurei o
+// Cognito para mandar de `nao-responda@`, e a senha temporária de um admin
+// entrou no banco em texto puro. Remetente de máquina em português é tão
+// comum quanto em inglês — e quem escolhe o endereço nem sempre lembra do
+// filtro.
 const REMETENTES_SISTEMA = new Set([
   'noreply',
   'no-reply',
   'mailer-daemon',
   'postmaster',
+  'nao-responda',
+  'naoresponda',
+  'nao-responder',
+  'naoresponder',
+  'no-responda',
+  'automatico',
+  'notificacao',
+  'notificacoes',
 ])
 
 function localPart(email: string): string {
@@ -23,7 +36,15 @@ export function eRemetenteSistema(email: string): boolean {
   const local = localPart(email)
   if (!local) return false
   if (REMETENTES_SISTEMA.has(local)) return true
-  return local.startsWith('noreply') || local.startsWith('no-reply')
+  // Prefixo, não igualdade: `noreply-alerts@`, `nao-responda.sistema@` e
+  // parecidos são a mesma coisa com sufixo.
+  return (
+    local.startsWith('noreply') ||
+    local.startsWith('no-reply') ||
+    local.startsWith('nao-responda') ||
+    local.startsWith('naoresponda') ||
+    local.startsWith('nao-responder')
+  )
 }
 
 /** Rede: no máximo 3 respostas automáticas ao mesmo endereço em 24h. */
