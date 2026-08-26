@@ -363,7 +363,10 @@ export async function notifyNewTrackingEvents(
   newEvents: RastreamentoEvento[],
 ): Promise<void> {
   for (const evento of newEvents) {
-    if (evento.finalizado === 1) {
+    // Booleano no webhook, número na API de consulta. Comparar só com `1`
+    // mandava "seu pedido teve uma atualização" para quem acabou de receber
+    // o pacote — quarta vez que este mesmo campo mordeu hoje.
+    if (evento.finalizado === true || evento.finalizado === 1) {
       await notifyShippingUpdate({
         orderId,
         eventId: 'entregue',

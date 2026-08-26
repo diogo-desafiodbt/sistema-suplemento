@@ -112,11 +112,23 @@ export async function POST(request: NextRequest) {
       `
     }
 
-    const newEvents = getNewTrackingEvents(order.shipping_json, eventos)
-    await notifyNewTrackingEvents(
-      order.id,
-      newEvents.length > 0 ? newEvents : eventos,
-    )
+    // O rastreio já está salvo. Se avisar o cliente falhar, isso NÃO pode
+    // virar 500: a transportadora reenviaria o mesmo evento para sempre, e o
+    // reenvio não conserta o e-mail. Registramos a falha e seguimos.
+    try {
+      const newEvents = getNewTrackingEvents(order.shipping_json, eventos)
+      await notifyNewTrackingEvents(
+        order.id,
+        newEvents.length > 0 ? newEvents : eventos,
+      )
+    } catch (erro) {
+      const msg = erro instanceof Error ? erro.message : String(erro)
+      console.error('Falha ao avisar o cliente do rastreio:', msg)
+      await sql`
+        UPDATE webhook_logs SET error_message = ${`aviso ao cliente falhou: ${msg}`}
+        WHERE id = ${log.id}::uuid
+      `
+    }
 
     await sql`
       UPDATE webhook_logs SET processed = true WHERE id = ${log.id}::uuid
