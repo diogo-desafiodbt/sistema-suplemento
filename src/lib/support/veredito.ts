@@ -47,6 +47,7 @@ export async function registrarVeredito(params: {
   segundos: number | null
   categoria: string | null
   origem: string | null
+  observacao: string | null
   decididoPor: string
 }): Promise<void> {
   const sql = getSql()
@@ -57,11 +58,12 @@ export async function registrarVeredito(params: {
   await sql`
     INSERT INTO sugestao_veredito
       (thread_id, veredito, sugestao, enviado, distancia, segundos,
-       categoria, origem, decidido_por)
+       categoria, origem, observacao, decidido_por)
     VALUES (
       ${params.threadId}::uuid, ${params.veredito}, ${params.sugestao},
       ${params.enviado}, ${distancia}, ${params.segundos},
-      ${params.categoria}, ${params.origem}, ${params.decididoPor}::uuid
+      ${params.categoria}, ${params.origem}, ${params.observacao},
+      ${params.decididoPor}::uuid
     )
   `
 }

@@ -99,6 +99,10 @@ function ThreadCard({
   // carimbo — e uma taxa de acerto cheia de carimbo engana quem for decidir
   // ligar o envio automático.
   const abertoEm = useRef<number>(Date.now())
+  // O que estava errado na sugestão, nas palavras dele. O texto que ele envia
+  // mostra o que era certo; isto mostra por quê a IA errou, que é o que
+  // ensina. Obrigatório quando ele rejeita.
+  const [observacao, setObservacao] = useState('')
 
   const messages = useMemo(
     () =>
@@ -128,6 +132,7 @@ function ThreadCard({
           body_text: text,
           veredito: veredito ?? undefined,
           segundos: Math.round((Date.now() - abertoEm.current) / 1000),
+          observacao: observacao.trim() || undefined,
         }),
       })
       const data = (await res.json()) as { error?: string }
@@ -426,6 +431,33 @@ function ThreadCard({
                     ? 'Escreva a resposta certa abaixo. O que você escrever é o que ensina a IA.'
                     : 'Responda para liberar o envio.'}
               </p>
+
+              {veredito ? (
+                <div className="sugestao-obs">
+                  <label htmlFor="obs-sugestao">
+                    {veredito === 'rejeitada'
+                      ? 'O que estava errado na sugestão?'
+                      : 'Mudou alguma coisa? Conte o quê e por quê (opcional)'}
+                  </label>
+                  <textarea
+                    id="obs-sugestao"
+                    value={observacao}
+                    onChange={(e) => setObservacao(e.target.value)}
+                    rows={2}
+                    placeholder={
+                      veredito === 'rejeitada'
+                        ? 'Ex.: inventou uma falha de acesso que não existe; o sistema não controla acesso ao guia'
+                        : 'Ex.: troquei o prazo, o correto é 2 dias úteis'
+                    }
+                  />
+                  {veredito === 'rejeitada' && !observacao.trim() ? (
+                    <span className="sugestao-obs-aviso">
+                      Preencha para liberar o envio — sem isto, daqui a um mês
+                      teremos os textos e não o motivo.
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           ) : null}
 
@@ -454,7 +486,8 @@ function ThreadCard({
                 sending ||
                 closing ||
                 !text.trim() ||
-                (!!thread.suggested_reply && veredito === null)
+                (!!thread.suggested_reply && veredito === null) ||
+                (veredito === 'rejeitada' && !observacao.trim())
               }
             >
               {sending ? 'Enviando…' : 'Enviar'}

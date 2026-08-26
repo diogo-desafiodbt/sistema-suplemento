@@ -848,3 +848,34 @@
   font-size: 12px;
   color: var(--admin-tinta-fraca);
 }
+
+.sugestao-obs {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.sugestao-obs label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--admin-tinta);
+}
+.sugestao-obs textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--admin-borda);
+  border-radius: var(--admin-raio);
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--admin-tinta);
+  background: var(--admin-papel);
+}
+.sugestao-obs textarea:focus {
+  outline: 2px solid var(--admin-marinho);
+  outline-offset: 1px;
+}
+.sugestao-obs-aviso {
+  font-size: 12px;
+  color: var(--admin-tinta-fraca);
+}

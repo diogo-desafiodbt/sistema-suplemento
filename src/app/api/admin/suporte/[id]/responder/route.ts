@@ -29,6 +29,7 @@ export async function POST(
       body_text?: string
       veredito?: 'aprovada' | 'rejeitada'
       segundos?: number
+      observacao?: string
     }
     const bodyText = body.body_text?.trim()
     if (!bodyText) {
@@ -107,6 +108,7 @@ export async function POST(
               : null,
           categoria: thread.categoria,
           origem: thread.origem,
+          observacao: body.observacao?.trim() || null,
           decididoPor: auth.userId,
         })
       } catch (erro) {
