@@ -48,7 +48,11 @@ export async function POST(request: NextRequest) {
       throw new Error('webhook rastreamento: insert webhook_logs sem id')
     }
 
-    const eventos = payload.eventos ?? []
+    // Duas formas para o mesmo dado: a API que consultamos devolve
+    // `{ eventos: [...] }` e o webhook que eles empurram manda a lista pura.
+    // Aceitar só uma delas significava devolver 200 e não gravar nada — o
+    // evento sumia e o cliente nunca via o rastreio andar.
+    const eventos = Array.isArray(payload) ? payload : (payload.eventos ?? [])
     const idReq = eventos.find((e) => e.id_requisicao)?.id_requisicao
 
     if (!idReq) {
@@ -80,7 +84,16 @@ export async function POST(request: NextRequest) {
       eventos as unknown as Array<Record<string, unknown>>,
     )
 
-    if (eventos.some((e) => e.finalizado === 1)) {
+    // `finalizado` só vem na API que consultamos; o webhook não traz. Sem uma
+    // segunda forma de reconhecer a entrega, o pedido ficaria em "a caminho"
+    // para sempre. A descrição é o que sobra — e é o mesmo texto que o cliente
+    // lê no rastreio.
+    const entregue = eventos.some(
+      (e) =>
+        e.finalizado === 1 ||
+        /\bentregue\b/i.test(e.descricao ?? ''),
+    )
+    if (entregue) {
       await sql`
         UPDATE orders
         SET

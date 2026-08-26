@@ -114,7 +114,14 @@ export type RastreamentoEvento = {
   local: string | null
   cidade: string | null
   datahora: string
-  finalizado: number
+  /**
+   * Só a API que CONSULTAMOS devolve este campo. O webhook que a Envie Agora
+   * empurra não traz — confirmado por eles em 26/08/2026. Por isso é opcional,
+   * e a entrega é detectada também pela descrição.
+   */
+  finalizado?: number
+  numeroetiqueta?: string
+  notafiscal?: string
 }
 
 export type RastreamentoResponse = {
@@ -129,7 +136,14 @@ export type WebhookEtiquetaPayload = {
   url_pdf?: string
 }
 
-export type WebhookRastreamentoPayload = RastreamentoResponse
+/**
+ * A Envie Agora empurra a LISTA PURA de eventos, sem embrulho — confirmado por
+ * eles em 26/08/2026. A API que consultamos devolve `{ eventos: [...] }`. São
+ * formatos diferentes para o mesmo dado, então aceitamos os dois.
+ */
+export type WebhookRastreamentoPayload =
+  | RastreamentoResponse
+  | RastreamentoEvento[]
 
 export type PackageDimensions = {
   altura: number
