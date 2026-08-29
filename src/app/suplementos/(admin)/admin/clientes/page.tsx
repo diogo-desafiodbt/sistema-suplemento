@@ -1,3 +1,4 @@
+import { exigirAdmin } from '@/lib/auth/admin'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { CabecaDePagina } from '@/components/admin/CabecaDePagina'
@@ -7,9 +8,7 @@ import { Selo } from '@/components/admin/ui/Selo'
 import { Tabela } from '@/components/admin/ui/Tabela'
 import { Vazio } from '@/components/admin/ui/Vazio'
 import { RFM_TIER_LABEL } from '@/lib/admin/rfm-tier'
-import { getUserProfile } from '@/lib/auth/profile'
 import { asNumber, getSql } from '@/lib/db'
-import { sessaoAtual } from '@/lib/auth/sessao'
 
 const PAGE_SIZE = 20
 
@@ -44,12 +43,7 @@ export default async function AdminClientesPage({
 }: {
   searchParams: Promise<{ q?: string; page?: string }>
 }) {
-  const sessao = await sessaoAtual()
-  if (!sessao) redirect('/suplementos/login')
-
-  const profile = await getUserProfile(sessao.userId)
-
-  if (profile?.role !== 'admin') redirect('/suplementos/dashboard')
+  await exigirAdmin()
 
   const params = await searchParams
   const q = (params.q ?? '').trim()

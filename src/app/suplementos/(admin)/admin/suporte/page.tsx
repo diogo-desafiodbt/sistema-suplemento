@@ -1,19 +1,14 @@
+import { exigirAdmin } from '@/lib/auth/admin'
 import { redirect } from 'next/navigation'
 import {
   SupportThreadPanel,
   type SupportThreadView,
 } from '@/components/admin/SupportThreadPanel'
 import { CabecaDePagina } from '@/components/admin/CabecaDePagina'
-import { getUserProfile } from '@/lib/auth/profile'
 import { getSql } from '@/lib/db'
-import { sessaoAtual } from '@/lib/auth/sessao'
 
 export default async function AdminSuportePage() {
-  const sessao = await sessaoAtual()
-  if (!sessao) redirect('/suplementos/login')
-
-  const profile = await getUserProfile(sessao.userId)
-  if (profile?.role !== 'admin') redirect('/suplementos/dashboard')
+  await exigirAdmin()
 
   const sql = getSql()
 

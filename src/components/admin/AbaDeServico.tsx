@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { EsqueletoTabela } from '@/components/admin/Esqueleto'
 
 type Props = {
   src: string
@@ -13,6 +14,11 @@ export function AbaDeServico({ src, titulo }: Props) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [altura, setAltura] = useState(ALTURA_MINIMA)
   const [erro, setErro] = useState(false)
+  // O iframe so comeca a carregar depois que o HTML da moldura chega, e ai
+  // ainda espera a Lambda do satelite: ~557 ms de execucao mais ~262 ms de
+  // partida a frio em 42% das visitas, medido em 29/08. Ate aqui a tela
+  // mostrava um retangulo vazio de 480 px.
+  const [carregando, setCarregando] = useState(true)
 
   const ajustarAltura = useCallback(() => {
     const iframe = iframeRef.current
@@ -34,6 +40,7 @@ export function AbaDeServico({ src, titulo }: Props) {
 
   useEffect(() => {
     setErro(false)
+    setCarregando(true)
     setAltura(ALTURA_MINIMA)
   }, [src])
 
@@ -44,6 +51,7 @@ export function AbaDeServico({ src, titulo }: Props) {
     let observer: ResizeObserver | undefined
 
     const onLoad = () => {
+      setCarregando(false)
       try {
         const doc = iframe.contentDocument
         if (!doc?.body) {
@@ -69,25 +77,34 @@ export function AbaDeServico({ src, titulo }: Props) {
 
   if (erro) {
     return (
-      <div className="admin-card" style={{ textAlign: 'center', padding: '40px 24px' }}>
-        <p className="admin-vazio-titulo" style={{ marginBottom: 12 }}>
-          Não conseguimos carregar esta aba agora.
+      <div className="admin-card admin-vazio">
+        <p className="admin-vazio-titulo">Não conseguimos carregar esta aba agora.</p>
+        <p className="admin-vazio-texto">
+          O serviço não respondeu. Tentar de novo costuma resolver.
         </p>
-        <a href={src} className="admin-btn admin-btn--primario">
-          Tentar de novo
-        </a>
+        <div className="admin-vazio-acao">
+          <a href={src} className="admin-btn admin-btn--primario">
+            Tentar de novo
+          </a>
+        </div>
       </div>
     )
   }
 
   return (
-    <iframe
-      ref={iframeRef}
-      src={src}
-      title={titulo}
-      className="w-full border-0 block"
-      style={{ height: altura, overflow: 'hidden' }}
-      scrolling="no"
-    />
+    <div className="admin-quadro-servico" style={{ minHeight: altura }}>
+      <iframe
+        ref={iframeRef}
+        src={src}
+        title={titulo}
+        style={{ height: altura, overflow: 'hidden', opacity: carregando ? 0 : 1 }}
+        scrolling="no"
+      />
+      {carregando ? (
+        <div className="admin-quadro-esqueleto" aria-hidden>
+          <EsqueletoTabela linhas={6} />
+        </div>
+      ) : null}
+    </div>
   )
 }

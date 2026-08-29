@@ -1,92 +1,182 @@
-/* Casca visual do admin — tokens do plano (não negociáveis). */
+/* Casca visual do admin.
+   ---------------------------------------------------------------------------
+   Linguagem: a da Apple, decidida pelo Diogo em 29/08/2026, no lugar do
+   FlowDash escuro. O que isso quer dizer em decisões concretas:
+
+   - Tipografia do sistema. No Mac isso entrega a SF Pro de verdade, sem
+     baixar fonte nenhuma. É o que a propria Apple faz nos seus sites.
+   - Barra lateral clara. O marinho #13244f saiu do fundo e ficou so onde
+     ainda e informacao: traco de grafico e marca de projeto.
+   - Peso 500-600 no lugar de 700, e nada de versalete em rotulo. Hierarquia
+     vem de tamanho e espaco.
+   - Raio grande, borda quase invisivel, sombra difusa. O card se separa do
+     fundo pela sombra, nao por um traco preto.
+   - O vermelho #f4001e continua sendo o unico acento, porque e a marca.
+     As cores de estado seguem semanticas e nao se confundem com ela.
+
+   Os nomes de classe sao os mesmos de antes de proposito: a troca inteira
+   acontece aqui, sem editar as telas. */
 
 .admin-shell {
-  --admin-marinho: #13244f;
-  --admin-vermelho: #f4001e;
-  --admin-fundo: #fafbfe;
+  /* superficies */
+  --admin-fundo: #f5f5f7;
   --admin-papel: #ffffff;
-  --admin-borda: #e2e8ee;
-  --admin-tinta: #212529;
-  --admin-tinta-fraca: #6c757d;
-  --admin-ok: #7dc668;
-  --admin-perigo: #ff7076;
-  --admin-atencao: #f5b666;
-  --admin-raio: 4px;
-  --admin-lateral: 232px;
-  --admin-cabecalho: 64px;
+  --admin-papel-2: #fbfbfd;
+  --admin-lateral-fundo: #f9f9fb;
+
+  /* tinta */
+  --admin-tinta: #1d1d1f;
+  --admin-tinta-media: #55565a;
+  --admin-tinta-fraca: #86868b;
+
+  /* traco */
+  --admin-borda: rgba(0, 0, 0, 0.09);
+  --admin-borda-fraca: rgba(0, 0, 0, 0.05);
+
+  /* acento unico: a marca */
+  --admin-vermelho: #f4001e;
+  --admin-vermelho-suave: rgba(244, 0, 30, 0.08);
+
+  /* azul da marca: sobrou para grafico e marca de projeto, nao para fundo */
+  --admin-marinho: #13244f;
+
+  /* estado — semanticas, legiveis sobre papel */
+  --admin-ok: #2b7a55;
+  --admin-ok-fundo: rgba(43, 122, 85, 0.1);
+  --admin-atencao: #9a6612;
+  --admin-atencao-fundo: rgba(154, 102, 18, 0.1);
+  --admin-perigo: #b3261e;
+  --admin-perigo-fundo: rgba(179, 38, 30, 0.09);
+
+  /* forma */
+  --admin-raio: 10px;
+  --admin-raio-g: 14px;
+  --admin-raio-p: 7px;
+  --admin-sombra: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 14px rgba(0, 0, 0, 0.04);
+  --admin-sombra-alta: 0 2px 6px rgba(0, 0, 0, 0.06), 0 12px 32px rgba(0, 0, 0, 0.07);
+  --admin-osso: rgba(0, 0, 0, 0.07);
+
+  --admin-lateral: 236px;
+  --admin-cabecalho: 52px;
 
   display: flex;
   min-height: 100vh;
   background: var(--admin-fundo);
   color: var(--admin-tinta);
-  font-family: var(--font-roboto), Roboto, system-ui, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI',
+    system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+  -webkit-font-smoothing: antialiased;
 }
+
+/* --------------------------------------------------------------------------
+   Barra lateral
+-------------------------------------------------------------------------- */
 
 .admin-lateral {
   width: var(--admin-lateral);
   flex-shrink: 0;
-  background: var(--admin-marinho);
-  color: #fff;
+  background: var(--admin-lateral-fundo);
+  border-right: 1px solid var(--admin-borda-fraca);
+  color: var(--admin-tinta);
   position: fixed;
   inset: 0 auto 0 0;
   z-index: 40;
   display: flex;
   flex-direction: column;
+  gap: 20px;
+  padding: 16px 12px;
   overflow-y: auto;
 }
 
 .admin-lateral-marca {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 20px 18px 8px;
+  gap: 9px;
+  padding: 4px 8px 0;
 }
 
 .admin-lateral-marca span {
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #ffffff59;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--admin-tinta);
 }
 
 .admin-nav-secao {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #ffffff59;
+  font-size: 11px;
+  font-weight: 590;
+  letter-spacing: -0.005em;
+  text-transform: none;
+  color: var(--admin-tinta-fraca);
+  padding: 0 8px 6px;
 }
 
 .admin-nav-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 12px 9px 14px;
-  border-radius: var(--admin-raio);
-  font-size: 14px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.72);
+  gap: 9px;
+  padding: 6px 8px;
+  border-radius: var(--admin-raio-p);
+  border-left: 0;
+  font-size: 13.5px;
+  font-weight: 450;
+  color: var(--admin-tinta-media);
   text-decoration: none;
-  border-left: 3px solid transparent;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .admin-nav-icone {
   flex-shrink: 0;
-  opacity: inherit;
+  opacity: 0.85;
 }
 
 .admin-nav-item:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--admin-tinta);
+  background: var(--admin-borda-fraca);
 }
 
 .admin-nav-item--ativo {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.1);
-  border-left-color: var(--admin-vermelho);
+  color: var(--admin-vermelho);
+  background: var(--admin-vermelho-suave);
+  font-weight: 550;
+  border-left-color: transparent;
 }
+
+.admin-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.admin-nav-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.admin-nav-conteudo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+}
+
+/* Marca a navegacao que ainda esta a caminho. Sem isso o clique fica sem
+   resposta ate a tela inteira trocar — que e o pior momento do admin. */
+.admin-nav-conteudo--pendente .admin-nav-icone {
+  animation: admin-pulsar 1.1s ease-in-out infinite;
+}
+
+/* --------------------------------------------------------------------------
+   Corpo e cabecalho
+-------------------------------------------------------------------------- */
 
 .admin-corpo {
   margin-left: var(--admin-lateral);
@@ -99,12 +189,14 @@
 .admin-topo {
   height: var(--admin-cabecalho);
   flex-shrink: 0;
-  background: var(--admin-papel);
-  border-bottom: 1px solid var(--admin-borda);
+  background: color-mix(in srgb, var(--admin-fundo) 78%, transparent);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid var(--admin-borda-fraca);
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 0 24px;
+  gap: 14px;
+  padding: 0 26px;
   position: sticky;
   top: 0;
   z-index: 30;
@@ -112,15 +204,16 @@
 
 .admin-busca {
   flex: 1;
-  max-width: 420px;
-  height: 36px;
+  max-width: 300px;
+  height: 30px;
   border: 1px solid var(--admin-borda);
-  border-radius: var(--admin-raio);
-  padding: 0 12px;
-  font-size: 14px;
+  border-radius: 8px;
+  padding: 0 11px;
+  font-size: 13px;
   color: var(--admin-tinta);
-  background: var(--admin-fundo);
+  background: var(--admin-papel);
   font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .admin-busca::placeholder {
@@ -129,61 +222,39 @@
 
 .admin-busca:focus {
   outline: none;
-  border-color: color-mix(in srgb, var(--admin-marinho) 35%, var(--admin-borda));
+  border-color: color-mix(in srgb, var(--admin-vermelho) 45%, var(--admin-borda));
+  box-shadow: 0 0 0 3.5px var(--admin-vermelho-suave);
 }
 
 .admin-topo-direita {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 14px;
-}
-
-.admin-sino {
-  position: relative;
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--admin-borda);
-  border-radius: var(--admin-raio);
-  background: var(--admin-papel);
-  color: var(--admin-tinta-fraca);
-  display: grid;
-  place-items: center;
-  cursor: default;
-}
-
-.admin-sino-ponto {
-  position: absolute;
-  top: 7px;
-  right: 8px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--admin-vermelho);
+  gap: 12px;
 }
 
 .admin-usuario {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
 }
 
 .admin-usuario-iniciais {
-  width: 32px;
-  height: 32px;
+  width: 27px;
+  height: 27px;
   border-radius: 50%;
-  background: var(--admin-marinho);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
+  background: var(--admin-tinta);
+  color: var(--admin-papel);
+  font-size: 11px;
+  font-weight: 600;
   display: grid;
   place-items: center;
 }
 
 .admin-usuario-nome {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--admin-tinta);
+  font-size: 13px;
+  font-weight: 450;
+  color: var(--admin-tinta-media);
   max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -198,6 +269,7 @@
   cursor: pointer;
   font-family: inherit;
   padding: 0;
+  transition: color 0.15s ease;
 }
 
 .admin-sair:hover {
@@ -206,7 +278,8 @@
 
 .admin-conteudo {
   flex: 1;
-  padding: 24px;
+  padding: 26px 26px 64px;
+  max-width: 1160px;
 }
 
 .admin-cabeca {
@@ -218,19 +291,21 @@
   flex-wrap: wrap;
 }
 
+/* A trilha vira uma linha de contexto normal, nao um chapeu em versalete. */
 .admin-cabeca-trilha {
   margin: 0 0 4px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 12.5px;
+  font-weight: 450;
+  letter-spacing: -0.003em;
+  text-transform: none;
   color: var(--admin-tinta-fraca);
 }
 
 .admin-cabeca-titulo {
   margin: 0;
-  font-size: 28px;
-  font-weight: 700;
+  font-size: 25px;
+  font-weight: 600;
+  letter-spacing: -0.021em;
   color: var(--admin-tinta);
   line-height: 1.15;
 }
@@ -239,64 +314,68 @@
   flex-shrink: 0;
 }
 
-/* —— Vocabulário —— */
+/* --------------------------------------------------------------------------
+   Vocabulario
+-------------------------------------------------------------------------- */
 
 .admin-card {
   background: var(--admin-papel);
-  border: 1px solid var(--admin-borda);
-  border-radius: var(--admin-raio);
-  padding: 20px;
-  box-shadow: 0 1px 2px rgba(19, 36, 79, 0.04);
+  border: 1px solid var(--admin-borda-fraca);
+  border-radius: var(--admin-raio-g);
+  padding: 17px 18px 18px;
+  box-shadow: var(--admin-sombra);
 }
 
 .admin-card-topo {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .admin-card-rotulo {
   margin: 0;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--admin-tinta-fraca);
+  font-size: 15px;
+  font-weight: 590;
+  letter-spacing: -0.012em;
+  text-transform: none;
+  color: var(--admin-tinta);
 }
 
 .admin-card-ver {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12.5px;
+  font-weight: 450;
   color: var(--admin-tinta-fraca);
   text-decoration: none;
+  transition: color 0.15s ease;
 }
 
 .admin-card-ver:hover {
-  color: var(--admin-marinho);
+  color: var(--admin-vermelho);
 }
 
 .admin-indicador-valor {
-  margin: 4px 0 0;
-  font-size: 32px;
-  font-weight: 700;
+  margin: 3px 0 0;
+  font-size: 27px;
+  font-weight: 590;
+  letter-spacing: -0.028em;
   font-variant-numeric: tabular-nums;
   color: var(--admin-tinta);
-  line-height: 1.1;
+  line-height: 1.15;
 }
 
 .admin-indicador-variacao {
-  margin: 6px 0 0;
-  font-size: 13px;
-  font-weight: 600;
+  margin: 5px 0 0;
+  font-size: 12.5px;
+  font-weight: 500;
 }
 
 .admin-indicador-detalhes {
   list-style: none;
-  margin: 10px 0 0;
+  margin: 9px 0 0;
   padding: 0;
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--admin-tinta-fraca);
 }
 
@@ -309,76 +388,117 @@
   min-height: 40px;
 }
 
+/* --------------------------------------------------------------------------
+   Tabela
+-------------------------------------------------------------------------- */
+
 .admin-tabela-wrap {
   overflow-x: auto;
   width: 100%;
+  border-radius: var(--admin-raio-g);
 }
 
 .admin-tabela {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: 13.5px;
 }
 
 .admin-tabela th {
   text-align: left;
-  padding: 12px 16px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  padding: 0 16px 9px;
+  font-size: 12px;
+  font-weight: 550;
+  letter-spacing: -0.003em;
+  text-transform: none;
   color: var(--admin-tinta-fraca);
-  border-bottom: 1px solid var(--admin-borda);
+  border-bottom: 0;
+  white-space: nowrap;
 }
 
 .admin-tabela td {
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--admin-borda);
+  padding: 11px 16px;
+  border-bottom: 0;
+  border-top: 1px solid var(--admin-borda-fraca);
   vertical-align: middle;
 }
 
+.admin-tabela tbody tr {
+  transition: background 0.12s ease;
+}
+
+.admin-tabela tbody tr:hover {
+  background: var(--admin-papel-2);
+}
+
+/* --------------------------------------------------------------------------
+   Selo — pilula com ponto, em caixa normal
+-------------------------------------------------------------------------- */
+
 .admin-selo {
-  display: inline-block;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  border-radius: var(--admin-raio);
-  padding: 3px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.003em;
+  text-transform: none;
+  border-radius: 20px;
+  padding: 2.5px 9px;
+  white-space: nowrap;
+}
+
+.admin-selo::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
 }
 
 .admin-selo--ok {
-  background: color-mix(in srgb, var(--admin-ok) 22%, white);
-  color: #2f6b24;
+  background: var(--admin-ok-fundo);
+  color: var(--admin-ok);
 }
 
 .admin-selo--perigo {
-  background: color-mix(in srgb, var(--admin-perigo) 22%, white);
-  color: #9b2c2c;
+  background: var(--admin-perigo-fundo);
+  color: var(--admin-perigo);
 }
 
 .admin-selo--atencao {
-  background: color-mix(in srgb, var(--admin-atencao) 28%, white);
-  color: #8a5a12;
+  background: var(--admin-atencao-fundo);
+  color: var(--admin-atencao);
 }
 
 .admin-selo--neutro {
-  background: #f0f2f5;
+  background: var(--admin-borda-fraca);
   color: var(--admin-tinta-fraca);
 }
+
+/* --------------------------------------------------------------------------
+   Botao
+-------------------------------------------------------------------------- */
 
 .admin-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 0;
-  border-radius: var(--admin-raio);
-  padding: 10px 18px;
-  font-size: 14px;
-  font-weight: 700;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   font-family: inherit;
   text-decoration: none;
+  transition: background 0.15s ease, filter 0.15s ease, transform 0.08s ease;
+}
+
+.admin-btn:active {
+  transform: scale(0.975);
 }
 
 .admin-btn--primario {
@@ -387,42 +507,50 @@
 }
 
 .admin-btn--primario:hover {
-  filter: brightness(0.92);
+  filter: brightness(1.07);
 }
 
 .admin-btn--secundario {
   background: var(--admin-papel);
-  color: var(--admin-marinho);
-  border: 1px solid var(--admin-borda);
+  color: var(--admin-tinta);
+  border-color: var(--admin-borda);
 }
 
 .admin-btn--secundario:hover {
-  background: rgba(19, 36, 79, 0.04);
+  background: var(--admin-papel-2);
 }
+
+/* --------------------------------------------------------------------------
+   Vazio
+-------------------------------------------------------------------------- */
 
 .admin-vazio {
   text-align: center;
-  padding: 48px 20px;
+  padding: 52px 24px;
 }
 
 .admin-vazio-titulo {
-  margin: 0 0 8px;
-  font-size: 16px;
-  font-weight: 700;
+  margin: 0 0 5px;
+  font-size: 15px;
+  font-weight: 550;
   color: var(--admin-tinta);
 }
 
 .admin-vazio-texto {
   margin: 0 auto;
   max-width: 36rem;
-  font-size: 14px;
+  font-size: 13.5px;
   line-height: 1.5;
   color: var(--admin-tinta-fraca);
 }
 
 .admin-vazio-acao {
-  margin-top: 16px;
+  margin-top: 18px;
 }
+
+/* --------------------------------------------------------------------------
+   Utilitarios e formulario
+-------------------------------------------------------------------------- */
 
 .admin-num {
   font-variant-numeric: tabular-nums;
@@ -430,76 +558,86 @@
 
 .admin-form-busca {
   display: flex;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 10px;
+  margin-bottom: 18px;
   flex-wrap: wrap;
 }
 
 .admin-input {
   flex: 1;
   min-width: 200px;
-  height: 40px;
+  height: 32px;
   border: 1px solid var(--admin-borda);
-  border-radius: var(--admin-raio);
-  padding: 0 12px;
-  font-size: 14px;
+  border-radius: 8px;
+  padding: 0 11px;
+  font-size: 13px;
   font-family: inherit;
   color: var(--admin-tinta);
   background: var(--admin-papel);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .admin-input:focus {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(19, 36, 79, 0.15);
+  border-color: color-mix(in srgb, var(--admin-vermelho) 45%, var(--admin-borda));
+  box-shadow: 0 0 0 3.5px var(--admin-vermelho-suave);
 }
 
 .admin-link-suave {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--admin-marinho);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--admin-tinta-media);
   text-decoration: none;
 }
 
 .admin-link-suave:hover {
-  text-decoration: underline;
+  color: var(--admin-vermelho);
 }
 
 .admin-paginacao {
-  margin-top: 20px;
+  margin-top: 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--admin-tinta-fraca);
 }
 
 .admin-periodo {
   display: flex;
-  gap: 4px;
-  background: var(--admin-fundo);
-  border: 1px solid var(--admin-borda);
-  border-radius: var(--admin-raio);
-  padding: 3px;
+  gap: 2px;
+  background: var(--admin-borda-fraca);
+  border: 0;
+  border-radius: 9px;
+  padding: 2px;
 }
 
 .admin-periodo a {
-  padding: 6px 12px;
-  border-radius: calc(var(--admin-raio) - 1px);
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--admin-tinta-fraca);
+  padding: 5px 11px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--admin-tinta-media);
   text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .admin-periodo a:hover {
   color: var(--admin-tinta);
 }
 
+/* Segmento escolhido sobe como pastilha branca, do jeito do seletor do iOS. */
 .admin-periodo a.ativo {
-  background: var(--admin-marinho);
-  color: #fff;
+  background: var(--admin-papel);
+  color: var(--admin-tinta);
+  font-weight: 550;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
+
+/* --------------------------------------------------------------------------
+   Funil
+-------------------------------------------------------------------------- */
 
 .admin-funil {
   list-style: none;
@@ -509,7 +647,7 @@
 
 .admin-funil-item {
   display: flex;
-  gap: 16px;
+  gap: 14px;
 }
 
 .admin-funil-eixo {
@@ -519,18 +657,19 @@
 }
 
 .admin-funil-ponto {
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
-  background: var(--admin-marinho);
-  margin-top: 8px;
+  background: var(--admin-vermelho);
+  opacity: 0.85;
+  margin-top: 7px;
   flex-shrink: 0;
 }
 
 .admin-funil-linha {
   width: 1px;
   flex: 1;
-  background: color-mix(in srgb, var(--admin-marinho) 20%, transparent);
+  background: var(--admin-borda);
   margin: 4px 0;
 }
 
@@ -539,8 +678,8 @@
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 8px 12px;
-  padding-bottom: 20px;
+  gap: 6px 12px;
+  padding-bottom: 18px;
 }
 
 .admin-funil-item:last-child .admin-funil-corpo {
@@ -548,43 +687,48 @@
 }
 
 .admin-funil-count {
-  font-size: 32px;
-  font-weight: 700;
+  font-size: 27px;
+  font-weight: 590;
+  letter-spacing: -0.028em;
   font-variant-numeric: tabular-nums;
   color: var(--admin-tinta);
   line-height: 1;
 }
 
 .admin-funil-label {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--admin-tinta);
+  font-size: 13.5px;
+  font-weight: 450;
+  color: var(--admin-tinta-media);
 }
 
 .admin-nome {
   margin: 0;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--admin-tinta);
 }
 
 .admin-sub {
   margin: 2px 0 0;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--admin-tinta-fraca);
 }
 
 .admin-mono {
-  font-family: ui-monospace, monospace;
+  font-family: ui-monospace, 'SF Mono', monospace;
   font-size: 12px;
   color: var(--admin-tinta-fraca);
   word-break: break-all;
 }
 
+/* --------------------------------------------------------------------------
+   Abas
+-------------------------------------------------------------------------- */
+
 .admin-abas {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  border-bottom: 1px solid var(--admin-borda);
+  gap: 2px;
+  border-bottom: 1px solid var(--admin-borda-fraca);
   padding-bottom: 0;
 }
 
@@ -594,46 +738,48 @@
   background: transparent;
   cursor: pointer;
   font: inherit;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13.5px;
+  font-weight: 450;
   color: var(--admin-tinta-fraca);
-  padding: 10px 14px;
+  padding: 9px 12px;
   margin-bottom: -1px;
   border-bottom: 2px solid transparent;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
+  transition: color 0.15s ease;
 }
 
 .admin-aba:hover {
-  color: var(--admin-marinho);
+  color: var(--admin-tinta);
 }
 
 .admin-aba--ativa {
-  color: var(--admin-marinho);
-  border-bottom-color: var(--admin-marinho);
+  color: var(--admin-tinta);
+  font-weight: 550;
+  border-bottom-color: var(--admin-vermelho);
 }
 
 .admin-aba-contagem {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11.5px;
+  font-weight: 550;
   font-variant-numeric: tabular-nums;
   color: var(--admin-tinta-fraca);
-  background: var(--admin-fundo);
-  border: 1px solid var(--admin-borda);
+  background: var(--admin-borda-fraca);
+  border: 0;
   border-radius: 999px;
-  padding: 1px 8px;
+  padding: 1px 7px;
 }
 
 .admin-aba--ativa .admin-aba-contagem {
-  color: var(--admin-marinho);
-  border-color: color-mix(in srgb, var(--admin-marinho) 25%, var(--admin-borda));
+  color: var(--admin-vermelho);
+  background: var(--admin-vermelho-suave);
 }
 
 .admin-grid-2 {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 16px;
+  gap: 14px;
 }
 
 @media (min-width: 960px) {
@@ -650,46 +796,122 @@
   .admin-corpo {
     margin-left: 0;
   }
+
+  .admin-conteudo {
+    padding: 18px 16px 48px;
+  }
 }
 
-/* ---------------------------------------------------------------------------
-   Histórico de desenvolvimento
-   A escala de cor sai do marinho da marca, não de um verde genérico: o mapa
-   fica ao lado do resto do admin e precisa parecer da mesma casa.
---------------------------------------------------------------------------- */
+/* --------------------------------------------------------------------------
+   Esqueleto de carregamento
+   O ganho de percepcao medido em 29/08: a tela do nucleo leva ~450 ms e a de
+   satelite ~1.350 ms. Nenhum desses numeros muda aqui. O que muda e que o
+   clique passa a ter resposta imediata em vez de tela parada.
+-------------------------------------------------------------------------- */
+
+.admin-osso {
+  display: block;
+  background: var(--admin-osso);
+  border-radius: 6px;
+  animation: admin-pulsar 1.6s ease-in-out infinite;
+}
+
+@keyframes admin-pulsar {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-osso,
+  .admin-nav-conteudo--pendente .admin-nav-icone {
+    animation: none;
+  }
+}
+
+.admin-esqueleto-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+/* O iframe do satelite ficava como retangulo vazio de 480px enquanto a Lambda
+   acordava. Agora o esqueleto ocupa esse tempo e sai no `load`. */
+.admin-quadro-servico {
+  position: relative;
+  min-height: 480px;
+}
+
+.admin-quadro-servico iframe {
+  display: block;
+  width: 100%;
+  border: 0;
+}
+
+.admin-quadro-esqueleto {
+  position: absolute;
+  inset: 0;
+  padding: 4px;
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   Foco visivel — vale para tudo
+-------------------------------------------------------------------------- */
+
+.admin-shell :focus-visible {
+  outline: 2px solid var(--admin-vermelho);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* --------------------------------------------------------------------------
+   Historico de desenvolvimento
+   A escala de cor sai do marinho da marca, que aqui continua sendo
+   informacao: e a cor do traco, nao mais a do fundo da lateral.
+-------------------------------------------------------------------------- */
 
 .historia-numeros {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
   margin: 18px 0 24px;
 }
 .historia-numeros > div {
   background: var(--admin-papel);
-  border: 1px solid var(--admin-borda);
-  border-radius: var(--admin-raio);
-  padding: 16px 18px;
+  border: 1px solid var(--admin-borda-fraca);
+  border-radius: var(--admin-raio-g);
+  box-shadow: var(--admin-sombra);
+  padding: 15px 17px 16px;
 }
 .historia-numeros b {
   display: block;
-  font-size: 26px;
-  line-height: 1.1;
-  color: var(--admin-marinho);
+  font-size: 27px;
+  font-weight: 590;
+  letter-spacing: -0.028em;
+  line-height: 1.15;
+  color: var(--admin-tinta);
   font-variant-numeric: tabular-nums;
 }
 .historia-numeros span {
   display: block;
-  margin-top: 4px;
-  font-size: 12px;
+  margin-top: 3px;
+  font-size: 12.5px;
   color: var(--admin-tinta-fraca);
 }
 
 .historia-grafico-caixa {
   background: var(--admin-papel);
-  border: 1px solid var(--admin-borda);
-  border-radius: var(--admin-raio);
-  padding: 18px 20px 14px;
-  margin-bottom: 28px;
+  border: 1px solid var(--admin-borda-fraca);
+  border-radius: var(--admin-raio-g);
+  box-shadow: var(--admin-sombra);
+  padding: 17px 18px 14px;
+  margin-bottom: 26px;
 }
 .historia-grafico-topo {
   display: flex;
@@ -701,34 +923,48 @@
 }
 .historia-grafico-topo h2 {
   margin: 0;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--admin-marinho);
+  font-size: 15px;
+  font-weight: 590;
+  letter-spacing: -0.012em;
+  color: var(--admin-tinta);
 }
 .historia-grafico-topo span {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--admin-tinta-fraca);
 }
-/* Altura fixa e largura livre: o gráfico é sobre a forma da curva no tempo,
-   não sobre ler valor exato — por isso o preserveAspectRatio="none". */
+/* Altura fixa e largura livre: o grafico e sobre a forma da curva no tempo,
+   nao sobre ler valor exato — por isso o preserveAspectRatio="none". */
 .historia-grafico {
   display: block;
   width: 100%;
   height: 250px;
 }
-.historia-grade   { stroke: var(--admin-borda); stroke-width: 1; }
-.historia-area    { fill: rgba(19, 36, 79, 0.10); stroke: none; }
-/* A média é a protagonista: é ela que conta a evolução. O dia a dia fica
-   como sombra atrás. */
-.historia-media   { fill: none; stroke: var(--admin-marinho); stroke-width: 2.5;
-                    stroke-linejoin: round; stroke-linecap: round; }
-.historia-ponto   { fill: var(--admin-vermelho); opacity: .55; }
-.historia-eixo-y  { fill: var(--admin-tinta-fraca); font-size: 11px; text-anchor: end;
-                    font-variant-numeric: tabular-nums; }
-.historia-eixo-x  { fill: var(--admin-tinta-fraca); font-size: 11px; text-anchor: middle; }
+.historia-grade { stroke: var(--admin-borda-fraca); stroke-width: 1; }
+.historia-area { fill: rgba(19, 36, 79, 0.08); stroke: none; }
+/* A media e a protagonista: e ela que conta a evolucao. O dia a dia fica
+   como sombra atras. */
+.historia-media {
+  fill: none;
+  stroke: var(--admin-marinho);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.historia-ponto { fill: var(--admin-vermelho); opacity: 0.5; }
+.historia-eixo-y {
+  fill: var(--admin-tinta-fraca);
+  font-size: 11px;
+  text-anchor: end;
+  font-variant-numeric: tabular-nums;
+}
+.historia-eixo-x {
+  fill: var(--admin-tinta-fraca);
+  font-size: 11px;
+  text-anchor: middle;
+}
 .historia-grafico-pe {
   margin: 10px 0 0;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--admin-tinta-fraca);
 }
 
@@ -739,8 +975,9 @@
 }
 .historia-dia {
   background: var(--admin-papel);
-  border: 1px solid var(--admin-borda);
-  border-radius: var(--admin-raio);
+  border: 1px solid var(--admin-borda-fraca);
+  border-radius: var(--admin-raio-g);
+  box-shadow: var(--admin-sombra);
   padding: 14px 16px;
 }
 .historia-dia-topo {
@@ -753,12 +990,13 @@
 }
 .historia-dia-topo h2 {
   font-size: 14px;
-  font-weight: 700;
-  color: var(--admin-marinho);
+  font-weight: 590;
+  letter-spacing: -0.012em;
+  color: var(--admin-tinta);
   margin: 0;
 }
 .historia-dia-topo span {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--admin-tinta-fraca);
   font-variant-numeric: tabular-nums;
 }
@@ -772,7 +1010,7 @@
 }
 .historia-dia li {
   font-size: 13px;
-  color: var(--admin-tinta);
+  color: var(--admin-tinta-media);
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -783,7 +1021,7 @@
   font-style: italic;
 }
 /* Cada projeto tem sua marca. Sem isso, uma lista de 28 commits num dia vira
-   uma parede de texto e some a informação de onde o trabalho aconteceu. */
+   uma parede de texto e some a informacao de onde o trabalho aconteceu. */
 .historia-marca {
   width: 6px;
   height: 6px;
@@ -793,27 +1031,27 @@
   background: var(--admin-tinta-fraca);
 }
 .historia-marca[data-projeto='sistema-suplemento'] { background: var(--admin-marinho); }
-.historia-marca[data-projeto='site']               { background: var(--admin-vermelho); }
-.historia-marca[data-projeto='blog']               { background: var(--admin-atencao); }
-.historia-marca[data-projeto='lp-primeiro-passo']  { background: var(--admin-ok); }
+.historia-marca[data-projeto='site'] { background: var(--admin-vermelho); }
+.historia-marca[data-projeto='blog'] { background: var(--admin-atencao); }
+.historia-marca[data-projeto='lp-primeiro-passo'] { background: var(--admin-ok); }
 
-/* ---------------------------------------------------------------------------
-   Veredito sobre a sugestão da IA
-   Fica entre o rascunho e os botões de ação, no caminho de quem vai enviar —
-   não numa barra lateral que dá para ignorar. O envio depende dele.
---------------------------------------------------------------------------- */
+/* --------------------------------------------------------------------------
+   Veredito sobre a sugestao da IA
+   Fica entre o rascunho e os botoes de acao, no caminho de quem vai enviar —
+   nao numa barra lateral que da para ignorar. O envio depende dele.
+-------------------------------------------------------------------------- */
 .sugestao-veredito {
   margin-top: 14px;
-  padding: 12px 14px;
-  border: 1px solid var(--admin-borda);
+  padding: 13px 15px;
+  border: 1px solid var(--admin-borda-fraca);
   border-radius: var(--admin-raio);
-  background: #f7f9fc;
+  background: var(--admin-papel-2);
 }
 .sugestao-veredito-pergunta {
-  margin: 0 0 8px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--admin-marinho);
+  margin: 0 0 9px;
+  font-size: 13.5px;
+  font-weight: 550;
+  color: var(--admin-tinta);
 }
 .sugestao-veredito-botoes {
   display: flex;
@@ -824,28 +1062,29 @@
   border: 1px solid var(--admin-borda);
   background: var(--admin-papel);
   color: var(--admin-tinta);
-  border-radius: var(--admin-raio);
-  padding: 7px 14px;
+  border-radius: 8px;
+  padding: 6px 13px;
   font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
-  transition: background .12s, border-color .12s, color .12s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
-.sugestao-btn:hover { border-color: var(--admin-marinho); }
-/* Só o escolhido ganha cor. Dois botões coloridos lado a lado empurram para
-   um dos dois, e aqui a resposta honesta importa mais que a rápida. */
+.sugestao-btn:hover { background: var(--admin-papel-2); }
+/* So o escolhido ganha cor. Dois botoes coloridos lado a lado empurram para
+   um dos dois, e aqui a resposta honesta importa mais que a rapida. */
 .sugestao-btn--ativo.sugestao-btn--sim {
   background: var(--admin-ok);
   border-color: var(--admin-ok);
   color: #fff;
 }
 .sugestao-btn--ativo.sugestao-btn--nao {
-  background: var(--admin-marinho);
-  border-color: var(--admin-marinho);
+  background: var(--admin-tinta);
+  border-color: var(--admin-tinta);
   color: #fff;
 }
 .sugestao-veredito-nota {
   margin: 8px 0 0;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--admin-tinta-fraca);
 }
 
@@ -856,26 +1095,27 @@
   gap: 5px;
 }
 .sugestao-obs label {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 12.5px;
+  font-weight: 500;
   color: var(--admin-tinta);
 }
 .sugestao-obs textarea {
   width: 100%;
   resize: vertical;
   border: 1px solid var(--admin-borda);
-  border-radius: var(--admin-raio);
-  padding: 8px 10px;
+  border-radius: 8px;
+  padding: 9px 11px;
   font: inherit;
   font-size: 13px;
   color: var(--admin-tinta);
   background: var(--admin-papel);
 }
 .sugestao-obs textarea:focus {
-  outline: 2px solid var(--admin-marinho);
-  outline-offset: 1px;
+  outline: none;
+  border-color: color-mix(in srgb, var(--admin-vermelho) 45%, var(--admin-borda));
+  box-shadow: 0 0 0 3.5px var(--admin-vermelho-suave);
 }
 .sugestao-obs-aviso {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--admin-tinta-fraca);
 }

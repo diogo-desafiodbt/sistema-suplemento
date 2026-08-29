@@ -1,8 +1,7 @@
-import { redirect } from 'next/navigation'
+import { exigirAdmin } from '@/lib/auth/admin'
+import { CabecaDePagina } from '@/components/admin/CabecaDePagina'
 import { PedidosActions } from '@/components/admin/PedidosActions'
-import { getUserProfile } from '@/lib/auth/profile'
 import { asNumber, getSql } from '@/lib/db'
-import { sessaoAtual } from '@/lib/auth/sessao'
 
 type OrderRow = {
   id: string
@@ -19,12 +18,7 @@ type OrderRow = {
 }
 
 export default async function AdminPedidosNucleoPage() {
-  const sessao = await sessaoAtual()
-  if (!sessao) redirect('/suplementos/login')
-
-  const profile = await getUserProfile(sessao.userId)
-
-  if (profile?.role !== 'admin') redirect('/suplementos/dashboard')
+  await exigirAdmin()
 
   const sql = getSql()
   const orders = await sql<OrderRow[]>`
@@ -44,20 +38,17 @@ export default async function AdminPedidosNucleoPage() {
   }))
 
   return (
-    <main className="max-w-6xl mx-auto px-6 py-8">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-1">
-            Operações
-          </p>
-          <h1 className="text-2xl font-bold text-[#13244f]">Pedidos (núcleo)</h1>
-        </div>
-        <span className="text-sm text-gray-400">
-          {orderList.length} registros
-        </span>
-      </div>
-
+    <>
+      <CabecaDePagina
+        trilha="Operações"
+        titulo="Pedidos"
+        acao={
+          <span className="admin-sub admin-num">
+            {orderList.length} {orderList.length === 1 ? 'pedido' : 'pedidos'}
+          </span>
+        }
+      />
       <PedidosActions orders={orderList} />
-    </main>
+    </>
   )
 }

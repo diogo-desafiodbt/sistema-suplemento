@@ -1,16 +1,15 @@
+import { exigirAdmin } from '@/lib/auth/admin'
 import { redirect } from 'next/navigation'
 import { CabecaDePagina } from '@/components/admin/CabecaDePagina'
 import { Card } from '@/components/admin/ui/Card'
 import { Selo } from '@/components/admin/ui/Selo'
 import { Tabela } from '@/components/admin/ui/Tabela'
 import { Vazio } from '@/components/admin/ui/Vazio'
-import { getUserProfile } from '@/lib/auth/profile'
 import { getSql } from '@/lib/db'
 import {
   type IntegridadePdf,
   verificarIntegridadePdf,
 } from '@/lib/pdf/verificar-integridade'
-import { sessaoAtual } from '@/lib/auth/sessao'
 
 type AuditLogRow = {
   id: string
@@ -42,12 +41,7 @@ function tomIntegridade(
 }
 
 export default async function AdminAuditoriaPage() {
-  const sessao = await sessaoAtual()
-  if (!sessao) redirect('/suplementos/login')
-
-  const profile = await getUserProfile(sessao.userId)
-
-  if (profile?.role !== 'admin') redirect('/suplementos/dashboard')
+  await exigirAdmin()
 
   const sql = getSql()
   const auditLogs = await sql<AuditLogRow[]>`

@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useLinkStatus } from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { ReactNode } from 'react'
 
@@ -170,25 +171,43 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
+/**
+ * Conteudo do item. Fica num filho do `Link` de proposito: e a unica posicao
+ * de onde `useLinkStatus` enxerga a navegacao em curso.
+ *
+ * Sem isso o clique nao tem resposta nenhuma ate a tela inteira trocar — que
+ * e o pior momento do admin, medido em ~450 ms nas telas do nucleo e ~1.350 ms
+ * nas abas de satelite.
+ */
+function ConteudoItem({ item }: { item: Item }) {
+  const { pending } = useLinkStatus()
+  return (
+    <span className={`admin-nav-conteudo ${pending ? 'admin-nav-conteudo--pendente' : ''}`.trim()}>
+      {item.icone}
+      <span>{item.label}</span>
+    </span>
+  )
+}
+
 export function AdminNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="admin-nav flex flex-col gap-6 px-3 py-5">
+    <nav className="admin-nav">
       {grupos.map((grupo) => (
-        <div key={grupo.titulo}>
-          <p className="admin-nav-secao px-3 mb-2">{grupo.titulo}</p>
-          <ul className="flex flex-col gap-0.5">
+        <div key={grupo.titulo} className="admin-nav-grupo">
+          <p className="admin-nav-secao">{grupo.titulo}</p>
+          <ul className="admin-nav-lista">
             {grupo.itens.map((item) => {
               const ativo = isActive(pathname, item.href)
               return (
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className={`admin-nav-item ${ativo ? 'admin-nav-item--ativo' : ''}`}
+                    aria-current={ativo ? 'page' : undefined}
+                    className={`admin-nav-item ${ativo ? 'admin-nav-item--ativo' : ''}`.trim()}
                   >
-                    {item.icone}
-                    <span>{item.label}</span>
+                    <ConteudoItem item={item} />
                   </Link>
                 </li>
               )

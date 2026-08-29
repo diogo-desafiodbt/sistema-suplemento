@@ -1,18 +1,12 @@
 import Image from 'next/image'
-import { Roboto } from 'next/font/google'
-import { redirect } from 'next/navigation'
-import imgLogoBranca from '@/../public/logo-branca.png'
+import imgLogoAzul from '@/../public/logo-azul.png'
 import { AdminNav } from '@/components/admin/AdminNav'
-import { getUserProfile } from '@/lib/auth/profile'
-import { sessaoAtual } from '@/lib/auth/sessao'
+import { BuscaGlobal } from '@/components/admin/BuscaGlobal'
+import { exigirAdmin } from '@/lib/auth/admin'
 import './admin.css'
 
-const roboto = Roboto({
-  weight: ['400', '500', '700'],
-  subsets: ['latin'],
-  variable: '--font-roboto',
-  display: 'swap',
-})
+// A tipografia e a do sistema — no Mac isso entrega a SF Pro. Alem de ser a
+// escolha visual, some com o download da Roboto em toda navegacao.
 
 function iniciais(nome: string | null | undefined, email: string | null): string {
   const base = (nome && nome.trim()) || (email && email.trim()) || '?'
@@ -28,22 +22,18 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
-  const sessao = await sessaoAtual()
-  if (!sessao) redirect('/suplementos/login')
+  const admin = await exigirAdmin()
 
-  const profile = await getUserProfile(sessao.userId)
-  if (profile?.role !== 'admin') redirect('/suplementos/dashboard')
-
-  const nome =
-    profile?.full_name?.trim() || sessao.email?.trim() || 'Admin'
-  const letras = iniciais(profile?.full_name, sessao.email)
+  const nome = admin.fullName?.trim() || admin.email?.trim() || 'Admin'
+  const letras = iniciais(admin.fullName, admin.email)
 
   return (
-    <div className={`admin-shell ${roboto.variable} ${roboto.className}`}>
+    <div className="admin-shell">
       <aside className="admin-lateral" aria-label="Menu do admin">
         <div className="admin-lateral-marca">
+          {/* A logo branca sumiria na lateral clara. */}
           <Image
-            src={imgLogoBranca}
+            src={imgLogoAzul}
             alt="Desafio Diabetes"
             width={455}
             height={355}
@@ -56,30 +46,8 @@ export default async function AdminLayout({
 
       <div className="admin-corpo">
         <header className="admin-topo">
-          <input
-            type="search"
-            className="admin-busca"
-            placeholder="Buscar…"
-            aria-label="Buscar"
-            disabled
-            title="Em breve"
-          />
+          <BuscaGlobal />
           <div className="admin-topo-direita">
-            {/* Contador de alertas omitido: consulta a cada navegação. Cache depois. */}
-            <span className="admin-sino" aria-label="Notificações" title="Alertas">
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                aria-hidden
-              >
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-              </svg>
-            </span>
             <div className="admin-usuario">
               <span className="admin-usuario-iniciais" aria-hidden>
                 {letras}

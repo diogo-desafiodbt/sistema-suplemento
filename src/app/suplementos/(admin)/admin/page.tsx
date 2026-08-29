@@ -1,11 +1,10 @@
+import { exigirAdmin } from '@/lib/auth/admin'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { CabecaDePagina } from '@/components/admin/CabecaDePagina'
 import { Card } from '@/components/admin/ui/Card'
 import { Selo } from '@/components/admin/ui/Selo'
-import { getUserProfile } from '@/lib/auth/profile'
 import { asNumber, getSql } from '@/lib/db'
-import { sessaoAtual } from '@/lib/auth/sessao'
 
 type PeriodKey = '7' | '30' | '90' | 'all'
 
@@ -42,12 +41,7 @@ export default async function AdminVisaoGeralPage({
 }: {
   searchParams: Promise<{ periodo?: string }>
 }) {
-  const sessao = await sessaoAtual()
-  if (!sessao) redirect('/suplementos/login')
-
-  const profile = await getUserProfile(sessao.userId)
-
-  if (profile?.role !== 'admin') redirect('/suplementos/dashboard')
+  await exigirAdmin()
 
   const params = await searchParams
   const periodo: PeriodKey =
