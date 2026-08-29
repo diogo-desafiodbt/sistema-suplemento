@@ -1,5 +1,6 @@
 import { ImapFlow } from 'imapflow'
 import { simpleParser, type ParsedMail } from 'mailparser'
+import { htmlParaTexto } from '@/lib/support/corpo-email'
 import postgres from 'postgres'
 import { getSql } from '@/lib/db'
 import { claimOnce, markClaimCompleted, releaseClaim } from '@/lib/idempotency'
@@ -240,9 +241,7 @@ export const supportInboxPoll = inngest.createFunction(
 
         const toAddress = Array.isArray(parsed.to) ? parsed.to[0] : parsed.to
         const htmlBody =
-          typeof parsed.html === 'string'
-            ? parsed.html.replace(/<[^>]+>/g, ' ')
-            : null
+          typeof parsed.html === 'string' ? htmlParaTexto(parsed.html) : null
 
         const messageRow = {
           message_id: messageId,

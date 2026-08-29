@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from 'react'
 import { Botao } from '@/components/admin/ui/Botao'
 import { Card } from '@/components/admin/ui/Card'
 import { Selo } from '@/components/admin/ui/Selo'
+import { TextoDobravel } from '@/components/admin/TextoDobravel'
 import { Vazio } from '@/components/admin/ui/Vazio'
 import type { Triagem } from '@/lib/support/triage'
 
@@ -223,45 +224,30 @@ function ThreadCard({
           </p>
         ) : (
           inbound.map((m) => (
-            <div
-              key={m.id}
-              style={{
-                marginBottom: 12,
-                padding: '16px 18px',
-                borderRadius: 'var(--admin-raio)',
-                background: 'var(--admin-fundo)',
-                border: '1px solid var(--admin-borda)',
-                whiteSpace: 'pre-wrap',
-                fontSize: 16,
-                lineHeight: 1.55,
-                color: 'var(--admin-tinta)',
-              }}
-            >
-              <p className="admin-sub" style={{ marginBottom: 8 }}>
+            <div key={m.id} style={{ marginBottom: 12 }}>
+              <p className="admin-sub" style={{ marginBottom: 6 }}>
                 {formatDate(m.created_at)}
               </p>
-              {m.body_text || '(vazio)'}
+              <TextoDobravel texto={m.body_text} />
             </div>
           ))
         )}
       </div>
 
-      {/* Interpretação da IA — subordinada, nunca como fato. */}
-      <div
-        style={{
-          marginBottom: 20,
-          padding: '14px 16px',
-          borderRadius: 'var(--admin-raio)',
-          border: '1px dashed var(--admin-borda)',
-          background: 'color-mix(in srgb, var(--admin-marinho) 3%, white)',
-        }}
-      >
-        <p
-          className="admin-card-rotulo"
-          style={{ marginBottom: 10, letterSpacing: '0.06em' }}
-        >
-          Leitura da IA — interpretação, não fato
-        </p>
+      {/* Interpretação da IA — subordinada, nunca como fato. Fechada por
+          padrão: é palpite de máquina, e não deve ocupar a tela antes de
+          alguém pedir. O resumo dela fica no cabeçalho, que já basta na
+          maioria das conversas. */}
+      <details className="admin-recolhivel">
+        <summary>
+          <span>Leitura da IA</span>
+          <span className="admin-recolhivel-resumo">
+            {triagem?.pergunta_resumida
+              ? `— ${triagem.pergunta_resumida}`
+              : '— sem triagem'}
+          </span>
+        </summary>
+        <div className="admin-recolhivel-corpo">
 
         {triagem ? (
           <ul
@@ -345,7 +331,8 @@ function ThreadCard({
         ) : (
           <p className="admin-sub">Ainda sem decisão gravada.</p>
         )}
-      </div>
+        </div>
+      </details>
 
       </div>
 
@@ -355,24 +342,13 @@ function ThreadCard({
       {outbound.length > 0 ? (
         <>
           <p className="admin-card-rotulo">Já enviado nesta conversa</p>
-          <div style={{ maxHeight: 180, overflowY: 'auto', marginBottom: 16 }}>
+          <div style={{ marginBottom: 16 }}>
             {outbound.map((m) => (
-              <div
-                key={m.id}
-                style={{
-                  marginBottom: 8,
-                  padding: '8px 12px',
-                  borderRadius: 'var(--admin-raio)',
-                  background:
-                    'color-mix(in srgb, var(--admin-marinho) 6%, white)',
-                  whiteSpace: 'pre-wrap',
-                  fontSize: 13,
-                }}
-              >
+              <div key={m.id} style={{ marginBottom: 8 }}>
                 <p className="admin-sub" style={{ marginBottom: 4 }}>
                   {formatDate(m.created_at)}
                 </p>
-                {m.body_text || '(vazio)'}
+                <TextoDobravel texto={m.body_text} linhas={4} />
               </div>
             ))}
           </div>

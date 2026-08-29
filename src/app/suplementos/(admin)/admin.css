@@ -1519,3 +1519,126 @@ a.admin-pendencia-titulo:hover {
     font-size: 16px; /* abaixo de 16px o iOS dá zoom ao focar */
   }
 }
+
+/* --------------------------------------------------------------------------
+   Texto dobrável
+   O e-mail do cliente e a leitura da IA vinham abertos por inteiro em toda
+   conversa da fila. Rolar para achar a próxima era o trabalho.
+-------------------------------------------------------------------------- */
+
+.dobravel {
+  margin-bottom: 12px;
+}
+
+.dobravel-corpo {
+  white-space: pre-wrap;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--admin-tinta);
+  padding: 15px 17px;
+  border: 1px solid var(--admin-borda-fraca);
+  border-radius: var(--admin-raio);
+  background: var(--admin-papel-2);
+  overflow: hidden;
+  position: relative;
+}
+
+/* O desvanecimento no pé é o que diz que há mais texto embaixo. Sem ele, o
+   corte parece o fim da mensagem. */
+.dobravel-corpo--fechado::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 3em;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--admin-papel-2) 85%
+  );
+  pointer-events: none;
+}
+
+.dobravel-botao {
+  margin-top: 7px;
+  border: 0;
+  background: none;
+  padding: 2px 0;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--admin-tinta-media);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.dobravel-botao:hover {
+  color: var(--admin-vermelho);
+}
+
+/* --------------------------------------------------------------------------
+   Bloco recolhido — a leitura da IA
+   Ela é interpretação, não fato, e por isso não precisa ocupar a tela antes de
+   alguém pedir. Fechada por padrão, com o resumo da IA no cabeçalho.
+-------------------------------------------------------------------------- */
+
+.admin-recolhivel {
+  border: 1px solid var(--admin-borda-fraca);
+  border-radius: var(--admin-raio);
+  background: var(--admin-papel-2);
+  margin-bottom: 18px;
+}
+
+.admin-recolhivel > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 11px 14px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 13px;
+  color: var(--admin-tinta-media);
+}
+
+.admin-recolhivel > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Seta desenhada aqui, para girar ao abrir sem depender do estilo do sistema. */
+.admin-recolhivel > summary::before {
+  content: '';
+  width: 0;
+  height: 0;
+  flex-shrink: 0;
+  border-left: 5px solid var(--admin-tinta-fraca);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transform: translateY(1px);
+  transition: transform 0.15s ease;
+}
+
+.admin-recolhivel[open] > summary::before {
+  transform: rotate(90deg) translateX(1px);
+}
+
+.admin-recolhivel > summary:hover {
+  color: var(--admin-tinta);
+}
+
+.admin-recolhivel-resumo {
+  color: var(--admin-tinta-fraca);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.admin-recolhivel-corpo {
+  padding: 0 14px 14px;
+  font-size: 13.5px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-recolhivel > summary::before {
+    transition: none;
+  }
+}
