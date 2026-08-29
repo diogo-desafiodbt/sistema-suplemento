@@ -539,6 +539,25 @@ export const pharmacyOrder = inngest.createFunction(
       'completed_at',
     )
 
+    // A etiqueta é criada a partir daqui, e não do `pagamento/confirmado`.
+    // As duas funções escutavam o mesmo evento e corriam em paralelo: a da
+    // etiqueta só não quebrava porque dormia dois dias antes de procurar o
+    // pedido. Com a emissão imediata, o encadeamento tem que ser explícito.
+    //
+    // Falhar aqui não desfaz o pedido, que já está gravado. O vigia cobra
+    // pedido sem etiqueta.
+    try {
+      await inngest.send({
+        name: 'pedido/criado',
+        data: { order_id: orderId, subscription_id, user_id },
+      })
+    } catch (eventError) {
+      console.error(
+        `[pharmacy-order] pedido ${orderId} criado, evento pedido/criado não enviado:`,
+        eventError,
+      )
+    }
+
     await registrarFim(jobId, {
       status: 'completed',
       affectedRows: 1,

@@ -1,100 +1,47 @@
-import { getSql } from '@/lib/db'
 import { registrarFim, registrarInicio } from '@/lib/jobs/registro'
 import { createShippingLabelForOrder } from '@/lib/shipping/create-label'
-import { addBusinessDays } from '@/lib/shipping/estimate'
 import { inngest } from '../client'
-
-const PICKUP_DAYS_AFTER_PURCHASE = 2
 
 export const createShippingLabel = inngest.createFunction(
   {
     id: 'create-shipping-label',
-    name: 'Criar etiqueta Envie Agora (D+2 úteis da compra)',
-    triggers: [{ event: 'pagamento/confirmado' }],
+    name: 'Criar etiqueta Envie Agora (assim que o pedido existe)',
+    // Escuta o pedido, não o pagamento. As duas coisas nascem do mesmo evento
+    // e em paralelo — esperar o pagamento significaria procurar um pedido que
+    // ainda não foi gravado.
+    //
+    // O atraso de D+2 para a coleta é configurado na conta da Envie Agora
+    // (confirmado com eles em 27/08/2026). Antes disso o sistema produzia esse
+    // intervalo dormindo dois dias antes de chamar a API, o que deixava a
+    // etiqueta invisível e sem cobrança durante todo esse tempo.
+    triggers: [{ event: 'pedido/criado' }],
   },
   async ({ event, step }) => {
     const jobId = await step.run('registrar-inicio', () =>
       registrarInicio('create_shipping_label'),
     )
     try {
-    const { subscription_id, user_id } = event.data as {
-      subscription_id: string
-      user_id: string
-    }
-
-    if (!subscription_id || !user_id) {
-      throw new Error(
-        'Evento pagamento/confirmado sem subscription_id ou user_id',
-      )
-    }
-
-    const pickupDateIso = await step.run('calcular-data-retirada', async () => {
-      const sql = getSql()
-      const rows = await sql<{ created_at: string | Date }[]>`
-        SELECT created_at FROM subscriptions
-        WHERE id = ${subscription_id}::uuid AND user_id = ${user_id}::uuid
-      `
-      const sub = rows[0]
-      if (!sub?.created_at) {
-        throw new Error(`Assinatura sem created_at: ${subscription_id}`)
+      const { order_id, subscription_id } = event.data as {
+        order_id: string
+        subscription_id?: string
       }
 
-      const pickup = addBusinessDays(
-        new Date(sub.created_at),
-        PICKUP_DAYS_AFTER_PURCHASE,
+      if (!order_id) {
+        throw new Error('Evento pedido/criado sem order_id')
+      }
+
+      const result = await step.run('criar-etiqueta', () =>
+        createShippingLabelForOrder(order_id),
       )
-      return pickup.toISOString()
-    })
-
-    await step.sleepUntil('aguardar-data-retirada', new Date(pickupDateIso))
-
-    try {
-      const result = await step.run('criar-etiqueta', async () => {
-        const sql = getSql()
-        const orderRows = await sql<{ id: string }[]>`
-          SELECT id FROM orders
-          WHERE subscription_id = ${subscription_id}::uuid
-          ORDER BY created_at DESC
-          LIMIT 1
-        `
-        const order = orderRows[0] ?? null
-
-        if (!order) {
-          throw new Error(
-            `Pedido não encontrado para subscription ${subscription_id}`,
-          )
-        }
-
-        return createShippingLabelForOrder(order.id)
-      })
 
       await registrarFim(jobId, {
         status: 'completed',
         affectedRows: 1,
-        payload: { subscription_id, ok: true },
+        payload: { order_id, subscription_id, ok: true },
       })
-      return { ok: true, pickupDate: pickupDateIso, ...result }
+      return { ok: true, order_id, ...result }
     } catch (error) {
-      console.error(
-        `[create-shipping-label] Falha na subscription ${subscription_id}:`,
-        error,
-      )
-      await registrarFim(jobId, {
-        status: 'failed',
-        affectedRows: 0,
-        payload: {
-          subscription_id,
-          ok: false,
-          error: error instanceof Error ? error.message : String(error),
-        },
-      })
-      return {
-        ok: false,
-        pickupDate: pickupDateIso,
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
-    } catch (error) {
+      console.error('[create-shipping-label] falhou:', error)
       await registrarFim(jobId, {
         status: 'failed',
         payload: {

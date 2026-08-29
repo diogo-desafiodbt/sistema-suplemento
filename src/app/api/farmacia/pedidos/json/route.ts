@@ -5,6 +5,7 @@ import {
   injectPrescriptionPdfUrl,
 } from '@/lib/pdf/signed-url'
 import { isFarmaciaAuthorized, parseDateRange } from '@/lib/pharmacy/pull-api'
+import { getPdfEtiqueta } from '@/lib/shipping/envie-agora/etiqueta'
 
 type OrderRow = {
   id: string
@@ -12,6 +13,8 @@ type OrderRow = {
   status: string
   pharmacy_json: unknown
   prescription_pdf_path: string | null
+  shipping_label_url: string | null
+  shipping_request_id: string | null
 }
 
 export async function GET(request: NextRequest) {
@@ -31,7 +34,7 @@ export async function GET(request: NextRequest) {
 
     const orders = await sql<OrderRow[]>`
       SELECT o.id, to_jsonb(o.created_at) #>> '{}' AS created_at, o.status, o.pharmacy_json,
-             p.prescription_pdf_path
+             p.prescription_pdf_path, o.shipping_label_url, o.shipping_request_id
       FROM orders o
       JOIN subscriptions s ON s.id = o.subscription_id
       JOIN protocols p ON p.id = s.protocol_id
@@ -47,10 +50,37 @@ export async function GET(request: NextRequest) {
         const signedUrl = await createPrescriptionPdfSignedUrl(
           o.prescription_pdf_path,
         )
+        // A etiqueta é emitida junto com o pedido, então quase sempre já
+        // está aqui. Quando não estiver — falha na hora de criar, pedido
+        // antigo — busca uma vez e grava, para a próxima leitura não repetir
+        // a ida à Envie Agora.
+        let etiquetaUrl = o.shipping_label_url
+        if (!etiquetaUrl && o.shipping_request_id) {
+          try {
+            const pdf = await getPdfEtiqueta(o.shipping_request_id)
+            if (pdf?.url) {
+              etiquetaUrl = pdf.url
+              await sql`
+                UPDATE orders SET shipping_label_url = ${pdf.url}
+                WHERE id = ${o.id}::uuid
+              `
+            }
+          } catch (error) {
+            console.error(
+              `[farmacia/json] PDF da etiqueta indisponível para ${o.id}:`,
+              error,
+            )
+          }
+        }
+
         return {
           numero_pedido: o.id,
           data_compra: o.created_at,
           status: o.status,
+          // Fora do `pedido` de propósito: aquele objeto segue o formato que
+          // a farmácia importa, e campo novo dentro dele é risco de quebrar
+          // a importação deles. Aqui é o nosso envelope.
+          etiqueta_url: etiquetaUrl,
           pedido: injectPrescriptionPdfUrl(o.pharmacy_json, signedUrl),
         }
       }),

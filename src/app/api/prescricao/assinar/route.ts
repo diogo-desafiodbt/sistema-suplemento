@@ -230,9 +230,13 @@ export async function POST(request: NextRequest) {
 
     if (linkedSubscription) {
       const pendingRows = await sql<
-        { id: string; pharmacy_json: unknown }[]
+        {
+          id: string
+          pharmacy_json: unknown
+          shipping_label_url: string | null
+        }[]
       >`
-        SELECT id, pharmacy_json FROM orders
+        SELECT id, pharmacy_json, shipping_label_url FROM orders
         WHERE subscription_id = ${linkedSubscription.id}::uuid
           AND pharmacy_sent_at IS NULL
         ORDER BY created_at DESC
@@ -245,6 +249,7 @@ export async function POST(request: NextRequest) {
           await sendToPharmacyWithPdf(
             pendingOrder.pharmacy_json as PharmacyOrder,
             buffer,
+            pendingOrder.shipping_label_url,
           )
           await sql`
             UPDATE orders

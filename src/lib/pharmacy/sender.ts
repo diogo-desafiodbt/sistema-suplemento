@@ -21,6 +21,7 @@ function jsonAttachment(json: PharmacyOrder) {
 export async function sendToPharmacyWithPdf(
   json: PharmacyOrder,
   pdfBuffer: Buffer,
+  etiquetaUrl?: string | null,
 ): Promise<void> {
   const resendApiKey = process.env.RESEND_API_KEY
   if (!resendApiKey) {
@@ -59,6 +60,11 @@ export async function sendToPharmacyWithPdf(
   <p><strong>Pedido externo:</strong> ${escapeHtml(json.CodigoPedidoExterno)}</p>
   <p><strong>Endereço:</strong> ${endereco}</p>
   <p><strong>Prescrição:</strong> ${escapeHtml(json.Observacoes)}</p>
+  ${
+    etiquetaUrl
+      ? `<p><strong>Etiqueta de envio:</strong> <a href="${escapeHtml(etiquetaUrl)}">${escapeHtml(etiquetaUrl)}</a></p>`
+      : '<p><strong>Etiqueta de envio:</strong> ainda não emitida — consultar pela API.</p>'
+  }
   <p><strong>Itens:</strong></p>
   <pre style="background:#f5f5f5;padding:12px;border-radius:4px;">${escapeHtml(itens)}</pre>
   <hr>

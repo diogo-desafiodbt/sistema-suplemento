@@ -168,6 +168,20 @@ WHERE s.protocol_id IS NULL
   AND p.paid_at < now() - interval '30 minutes'
 GROUP BY s.id, u.email;
 
+-- 10) pedido sem etiqueta
+-- A etiqueta passou a ser emitida logo depois que o pedido é gravado
+-- (27/08/2026), disparada pelo evento `pedido/criado`. Antes a função dormia
+-- dois dias antes de agir, e por isso não dava para cobrar prazo.
+INSERT INTO achados
+SELECT 'pedido-sem-etiqueta:' || o.id, 'pedido-sem-etiqueta',
+       jsonb_build_object('pedido', o.id, 'email', u.email,
+         'minutos', round(extract(epoch FROM (now() - o.created_at))/60))
+FROM orders o
+JOIN users u ON u.id = o.user_id
+WHERE o.shipping_request_id IS NULL
+  AND o.created_at < now() - interval '30 minutes'
+  AND o.status <> 'failed';
+
 -- ---------------------------------------------------------------------------
 -- Contabilidade
 -- ---------------------------------------------------------------------------

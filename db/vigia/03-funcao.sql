@@ -179,6 +179,27 @@ BEGIN
     AND p.paid_at < now() - interval '30 minutes'
   GROUP BY s.id, u.email;
 
+  -- 10) pedido sem etiqueta
+  -- A etiqueta passou a ser emitida logo depois que o pedido é gravado
+  -- (27/08/2026), disparada pelo evento `pedido/criado`. Antes, a função
+  -- dormia dois dias antes de agir, e por isso não dava para cobrar prazo:
+  -- pedido sem etiqueta era o estado normal quase o tempo todo.
+  --
+  -- Agora dá. Se passou meia hora e não existe requisição na Envie Agora, ou
+  -- o evento se perdeu ou a API recusou — nos dois casos o pacote não sai e
+  -- ninguém fica sabendo.
+  INSERT INTO achados
+  SELECT 'pedido-sem-etiqueta:' || o.id, 'pedido-sem-etiqueta',
+         jsonb_build_object('pedido', o.id, 'email', u.email,
+           'minutos', round(extract(epoch FROM (now() - o.created_at))/60))
+  FROM orders o
+  JOIN users u ON u.id = o.user_id
+  WHERE o.shipping_request_id IS NULL
+    AND o.created_at < now() - interval '30 minutes'
+    -- `failed` é pedido que já morreu; cobrar etiqueta dele seria ruído.
+    -- O enum não tem 'cancelled'.
+    AND o.status <> 'failed';
+
   -- ---------------------------------------------------------------------------
   -- Contabilidade
   -- ---------------------------------------------------------------------------
@@ -200,17 +221,18 @@ BEGIN
      SELECT 1 FROM alertas a WHERE a.digital = x.digital AND a.resolvido_em IS NULL
    );
 
-
-
-  UPDATE alertas SET notificado_em = now()
-   WHERE notificado_em IS NULL AND resolvido_em IS NULL;
-
-
-
-
-
-
-
+  -- A ordem aqui é o que faz o vigia falar.
+  --
+  -- Existia um `UPDATE alertas SET notificado_em = now()` ANTES do RETURN
+  -- QUERY abaixo, que filtra justamente por `notificado_em IS NULL`. O
+  -- resultado era sempre vazio: cada alerta nascia já marcado como avisado, e
+  -- o job de hora em hora imprimia nada desde sempre. Os alertas continuavam
+  -- na tabela, então a tela do admin mostrava — mas ninguém era avisado fora
+  -- dela. Corrigido em 27/08/2026.
+  --
+  -- Marcar depois de retornar é o que garante que cada alerta apareça uma vez
+  -- e só uma: enquanto o problema persistir, ele fica na tabela sem gritar de
+  -- novo; quando sumir, é fechado sozinho lá em cima.
   RETURN QUERY
   SELECT 'ALERTA ' || a.tipo, a.detalhe
     FROM alertas a

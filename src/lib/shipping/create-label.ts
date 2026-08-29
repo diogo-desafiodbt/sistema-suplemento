@@ -1,6 +1,9 @@
 import { asNumber, getSql } from '@/lib/db'
 import { getCotacao } from '@/lib/shipping/envie-agora/cotacao'
-import { criarEtiqueta } from '@/lib/shipping/envie-agora/etiqueta'
+import {
+  criarEtiqueta,
+  getPdfEtiqueta,
+} from '@/lib/shipping/envie-agora/etiqueta'
 import {
   computePackageDimensions,
   type PackageItem,
@@ -214,6 +217,25 @@ export async function createShippingLabelForOrder(orderId: string): Promise<{
       shipping_json = ${sql.json(response as never)}
     WHERE id = ${orderId}::uuid
   `
+
+  // A URL do PDF é buscada aqui para a farmácia recebê-la junto da prescrição
+  // sem uma ida à Envie Agora por leitura. Falhar aqui não pode perder a
+  // etiqueta, que já existe e já foi gravada acima: a leitura busca de novo.
+  try {
+    const pdf = await getPdfEtiqueta(response.id_requisicao)
+    if (pdf?.url) {
+      await sql`
+        UPDATE orders
+        SET shipping_label_url = ${pdf.url}
+        WHERE id = ${orderId}::uuid
+      `
+    }
+  } catch (error) {
+    console.error(
+      `[create-label] etiqueta ${response.id_requisicao} criada, PDF não obtido:`,
+      error,
+    )
+  }
 
   return { id_requisicao: response.id_requisicao }
 }
