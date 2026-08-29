@@ -1119,3 +1119,100 @@
   font-size: 12.5px;
   color: var(--admin-tinta-fraca);
 }
+
+/* --------------------------------------------------------------------------
+   Ficha do cliente
+   Ela era a unica tela grande fora do sistema: 1.042 linhas, 34 usos de
+   classe solta e zero do vocabulario. E a tela mais aberta do admin, entao
+   era tambem a que mais destoava. Estas classes sao o que faltava para ela
+   falar a mesma lingua das outras.
+-------------------------------------------------------------------------- */
+
+/* Caixa dentro de um card: um pedido, uma assinatura, um protocolo. */
+.admin-item {
+  border: 1px solid var(--admin-borda-fraca);
+  border-radius: var(--admin-raio);
+  padding: 14px 16px;
+  background: var(--admin-papel);
+}
+
+.admin-lista-itens {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-pilha {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Rotulo + valor. O rotulo era versalete em negrito; virou texto comum, e a
+   hierarquia passa a vir do tamanho e da cor. */
+.admin-campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px 20px;
+}
+
+.admin-campo-rotulo {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 450;
+  text-transform: none;
+  letter-spacing: -0.003em;
+  color: var(--admin-tinta-fraca);
+}
+
+.admin-campo-valor {
+  margin: 1px 0 0;
+  font-size: 13.5px;
+  color: var(--admin-tinta);
+  word-break: break-word;
+}
+
+.admin-linha-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 9px;
+}
+
+.admin-linha-item .admin-sub {
+  margin: 0;
+}
+
+.admin-empurra {
+  margin-left: auto;
+}
+
+/* Aviso dentro de uma tela — usado quando a Hotmart nao responde e o resto da
+   ficha continua servindo. */
+.admin-aviso {
+  font-size: 13px;
+  color: var(--admin-atencao);
+  background: var(--admin-atencao-fundo);
+  border-radius: var(--admin-raio);
+  padding: 10px 13px;
+  margin: 0 0 14px;
+}
+
+.admin-voltar {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--admin-tinta-fraca);
+  text-decoration: none;
+  margin-bottom: 14px;
+  transition: color 0.15s ease;
+}
+
+.admin-voltar:hover {
+  color: var(--admin-tinta);
+}

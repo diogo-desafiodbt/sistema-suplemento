@@ -2,7 +2,10 @@ import { exigirAdmin } from '@/lib/auth/admin'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { CopyButton } from '@/components/CopyButton'
-import { RFM_TIER_BADGE, RFM_TIER_LABEL } from '@/lib/admin/rfm-tier'
+import { RFM_TIER_LABEL, RFM_TIER_TOM } from '@/lib/admin/rfm-tier'
+import { CabecaDePagina } from '@/components/admin/CabecaDePagina'
+import { Card } from '@/components/admin/ui/Card'
+import { Selo } from '@/components/admin/ui/Selo'
 import {
   buscarComprasHotmartPorEmail,
   formatarValorCompra,
@@ -109,12 +112,18 @@ type TermsRow = {
   accepted_at: string
 }
 
-const SUB_STATUS_BADGE: Record<string, string> = {
-  active: 'bg-green-50 text-green-700',
-  past_due: 'bg-amber-50 text-amber-700',
-  grace_period: 'bg-orange-50 text-orange-700',
-  canceled: 'bg-gray-100 text-gray-600',
-  expired: 'bg-red-50 text-red-700',
+/**
+ * Tom do selo, nao classe de cor. A ficha tinha seis mapas de cor Tailwind,
+ * cada um inventando a propria escala: `bg-orange-50` para um estado,
+ * `bg-amber-50` para outro que quer dizer a mesma coisa. Agora sao quatro
+ * tons semanticos, e a cor mora no `admin.css` com o resto.
+ */
+const SUB_STATUS_TOM: Record<string, 'ok' | 'atencao' | 'perigo' | 'neutro'> = {
+  active: 'ok',
+  past_due: 'atencao',
+  grace_period: 'atencao',
+  canceled: 'neutro',
+  expired: 'perigo',
 }
 
 const ORDER_STATUS_LABEL: Record<string, string> = {
@@ -125,32 +134,32 @@ const ORDER_STATUS_LABEL: Record<string, string> = {
   failed: 'Falhou',
 }
 
-const ORDER_STATUS_BADGE: Record<string, string> = {
-  pending: 'bg-gray-100 text-gray-600',
-  sent_to_pharmacy: 'bg-blue-50 text-blue-700',
-  dispatched: 'bg-amber-50 text-amber-700',
-  delivered: 'bg-green-50 text-green-700',
-  failed: 'bg-red-50 text-red-700',
+const ORDER_STATUS_TOM: Record<string, 'ok' | 'atencao' | 'perigo' | 'neutro'> = {
+  pending: 'neutro',
+  sent_to_pharmacy: 'neutro',
+  dispatched: 'atencao',
+  delivered: 'ok',
+  failed: 'perigo',
 }
 
-const PAYMENT_STATUS_BADGE: Record<string, string> = {
-  paid: 'bg-green-50 text-green-700',
-  pending: 'bg-amber-50 text-amber-700',
-  failed: 'bg-red-50 text-red-700',
+const PAYMENT_STATUS_TOM: Record<string, 'ok' | 'atencao' | 'perigo' | 'neutro'> = {
+  paid: 'ok',
+  pending: 'atencao',
+  failed: 'perigo',
 }
 
-const COMPRA_ORIGEM_BADGE: Record<string, string> = {
-  guia: 'bg-amber-50 text-amber-800',
-  suplemento: 'bg-blue-50 text-blue-700',
+const COMPRA_ORIGEM_TOM: Record<string, 'ok' | 'atencao' | 'perigo' | 'neutro'> = {
+  guia: 'atencao',
+  suplemento: 'neutro',
 }
 
-const COMPRA_STATUS_BADGE: Record<string, string> = {
-  Pago: 'bg-green-50 text-green-700',
-  Aguardando: 'bg-gray-100 text-gray-600',
-  'Na farmácia': 'bg-blue-50 text-blue-700',
-  'A caminho': 'bg-amber-50 text-amber-700',
-  Entregue: 'bg-green-50 text-green-700',
-  Falhou: 'bg-red-50 text-red-700',
+const COMPRA_STATUS_TOM: Record<string, 'ok' | 'atencao' | 'perigo' | 'neutro'> = {
+  Pago: 'ok',
+  Aguardando: 'neutro',
+  'Na farmácia': 'neutro',
+  'A caminho': 'atencao',
+  Entregue: 'ok',
+  Falhou: 'perigo',
 }
 
 const PROTOCOL_STATUS_LABEL: Record<string, string> = {
@@ -159,10 +168,10 @@ const PROTOCOL_STATUS_LABEL: Record<string, string> = {
   rejected: 'Rejeitado',
 }
 
-const PROTOCOL_STATUS_BADGE: Record<string, string> = {
-  pending_signature: 'bg-amber-50 text-amber-700',
-  signed: 'bg-green-50 text-green-700',
-  rejected: 'bg-red-50 text-red-700',
+const PROTOCOL_STATUS_TOM: Record<string, 'ok' | 'atencao' | 'perigo' | 'neutro'> = {
+  pending_signature: 'atencao',
+  signed: 'ok',
+  rejected: 'perigo',
 }
 
 function fmtDate(value: string | Date | null | undefined): string {
@@ -213,29 +222,18 @@ function SectionCard({
   title: string
   children: React.ReactNode
 }) {
-  return (
-    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-      <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-4">
-        {title}
-      </p>
-      {children}
-    </section>
-  )
+  return <Card rotulo={title}>{children}</Card>
 }
 
 function Empty({ text }: { text: string }) {
-  return <p className="text-sm text-gray-400">{text}</p>
+  return <p className="admin-vazio-texto">{text}</p>
 }
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
-      <p className="text-[11px] font-bold tracking-wider text-gray-400 uppercase">
-        {label}
-      </p>
-      <p className="text-sm text-[#13244f] mt-0.5 break-words">
-        {value ?? '—'}
-      </p>
+      <p className="admin-campo-rotulo">{label}</p>
+      <p className="admin-campo-valor">{value ?? '—'}</p>
     </div>
   )
 }
@@ -447,48 +445,36 @@ export default async function AdminClienteDetalhePage({
   const tier = rfm?.tier ?? null
 
   return (
-    <main className="max-w-6xl mx-auto px-6 py-8 space-y-5">
-      <div>
-        <Link
-          href="/suplementos/admin/clientes"
-          className="text-xs text-[#13244f]/60 hover:text-[#13244f] transition"
-        >
-          ← Voltar para clientes
-        </Link>
-      </div>
+    <main className="admin-pilha">
+      <Link href="/suplementos/admin/clientes" className="admin-voltar">
+        ← Voltar para clientes
+      </Link>
 
       {/* 2.1 — Cabeçalho */}
-      <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
-          <div>
-            <p className="text-xs font-bold tracking-widest text-[#13244f]/50 uppercase mb-1">
-              Cliente 360°
-            </p>
-            <h1 className="text-2xl font-bold text-[#13244f]">
-              {client.full_name}
-            </h1>
+      <CabecaDePagina
+        trilha="Clientes"
+        titulo={client.full_name}
+        acao={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Selo tom="neutro">{client.role}</Selo>
+            {tier ? (
+              <Selo tom={RFM_TIER_TOM[tier] ?? 'neutro'}>
+                {RFM_TIER_LABEL[tier] ?? tier}
+              </Selo>
+            ) : null}
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-[#13244f]/10 text-[#13244f]">
-              {client.role}
-            </span>
-            {tier && (
-              <span
-                className={`text-xs font-bold px-2.5 py-1 rounded-full ${RFM_TIER_BADGE[tier] ?? 'bg-gray-100 text-gray-600'}`}
-              >
-                RFM: {RFM_TIER_LABEL[tier] ?? tier}
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        }
+      />
+
+      <section className="admin-card">
+        <div className="admin-campos">
           <Field label="E-mail" value={client.email} />
           <Field label="Telefone" value={client.phone ?? '—'} />
           <Field label="CPF" value={client.cpf ?? '—'} />
           <Field
             label="Código do cliente"
             value={
-              <span className="font-mono text-xs">{client.client_code}</span>
+              <span className="admin-mono">{client.client_code}</span>
             }
           />
           <Field label="Cadastro" value={fmtDateTime(client.created_at)} />
@@ -498,7 +484,7 @@ export default async function AdminClienteDetalhePage({
       {/* Compras — visão unificada (Hotmart + sistema) */}
       <SectionCard title="Compras">
         {hotmartErro ? (
-          <p className="text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 mb-4">
+          <p className="admin-aviso">
             {hotmartErro}
           </p>
         ) : null}
@@ -511,40 +497,40 @@ export default async function AdminClienteDetalhePage({
             }
           />
         ) : (
-          <ul className="space-y-3">
+          <ul className="admin-lista-itens">
             {comprasUnificadas.map((compra, i) => (
               <li
                 key={`${compra.origem}-${compra.detalhe ?? compra.produto}-${i}`}
-                className="border border-gray-100 rounded-xl p-4"
+                className="admin-item"
               >
-                <div className="flex flex-wrap items-center gap-2 mb-2">
+                <div className="admin-linha-item">
                   <span
-                    className={`text-xs font-bold px-2.5 py-1 rounded-full ${COMPRA_ORIGEM_BADGE[compra.origem] ?? 'bg-gray-100 text-gray-600'}`}
+                    className={`admin-selo admin-selo--${COMPRA_ORIGEM_TOM[compra.origem] ?? 'neutro'}`}
                   >
                     {compra.origemLabel}
                   </span>
                   <span
-                    className={`text-xs font-bold px-2.5 py-1 rounded-full ${COMPRA_STATUS_BADGE[compra.statusLabel] ?? 'bg-gray-100 text-gray-600'}`}
+                    className={`admin-selo admin-selo--${COMPRA_STATUS_TOM[compra.statusLabel] ?? 'neutro'}`}
                     title={compra.statusBruto || undefined}
                   >
                     {compra.statusLabel}
                   </span>
-                  <span className="ml-auto text-xs text-gray-400">
+                  <span className="admin-empurra admin-sub">
                     {fmtDateTime(compra.data)}
                   </span>
                 </div>
-                <p className="text-sm font-semibold text-[#13244f]">
+                <p className="admin-nome">
                   {compra.produto}
                 </p>
-                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+                <div className="admin-linha-item admin-sub" style={{ marginTop: 8, marginBottom: 0, columnGap: 16, rowGap: 4 }}>
                   <span>
                     Valor:{' '}
-                    <strong className="text-[#13244f]">
+                    <strong style={{ color: 'var(--admin-tinta)' }}>
                       {formatarValorCompra(compra.valor, compra.moeda)}
                     </strong>
                   </span>
                   {compra.detalhe ? (
-                    <span className="font-mono text-[11px] text-gray-400">
+                    <span className="admin-mono">
                       {compra.detalhe}
                     </span>
                   ) : null}
@@ -560,23 +546,23 @@ export default async function AdminClienteDetalhePage({
         {addressList.length === 0 && (
           <Empty text="Nenhum endereço cadastrado." />
         )}
-        <div className="space-y-4">
+        <div className="admin-pilha">
           {addressList.map((a, i) => (
             <div
               key={a.id ?? i}
-              className="flex items-start justify-between gap-4 border border-gray-100 rounded-xl p-4"
+              className="admin-item" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}
             >
-              <div className="text-sm text-[#13244f]">
+              <div className="admin-campo-valor">
                 <p>
                   {a.street}, {a.number}
                   {a.complement ? ` — ${a.complement}` : ''}
                 </p>
-                <p className="text-gray-500">
+                <p className="admin-sub">
                   {a.neighborhood} — {a.city}/{a.state} — CEP {a.zip_code}
                 </p>
               </div>
               {a.is_default && (
-                <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-green-50 text-green-700 shrink-0">
+                <span className="admin-selo admin-selo--ok" style={{ flexShrink: 0 }}>
                   Padrão
                 </span>
               )}
@@ -588,20 +574,20 @@ export default async function AdminClienteDetalhePage({
       {/* 2.3 — Assinatura */}
       <SectionCard title="Assinatura">
         {subList.length === 0 && <Empty text="Nenhuma assinatura." />}
-        <div className="space-y-4">
+        <div className="admin-pilha">
           {subList.map((sub) => (
-            <div key={sub.id} className="border border-gray-100 rounded-xl p-4">
-              <div className="flex flex-wrap items-center gap-2 mb-3">
-                <span className="text-sm font-bold text-[#13244f]">
+            <div key={sub.id} className="admin-item">
+              <div className="admin-linha-item">
+                <span className="admin-nome">
                   {PLAN_LABELS[sub.plan_type] ?? sub.plan_type}
                 </span>
                 <span
-                  className={`text-xs font-bold px-2.5 py-1 rounded-full ${SUB_STATUS_BADGE[sub.status] ?? 'bg-gray-100 text-gray-600'}`}
+                  className={`admin-selo admin-selo--${SUB_STATUS_TOM[sub.status] ?? 'neutro'}`}
                 >
                   {sub.status}
                 </span>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="admin-campos">
                 <Field label="Iniciada em" value={fmtDate(sub.started_at)} />
                 <Field label="Expira em" value={fmtDate(sub.expires_at)} />
                 <Field
@@ -612,7 +598,7 @@ export default async function AdminClienteDetalhePage({
                   label="Pagar.me sub"
                   value={
                     sub.pagarme_sub_id ? (
-                      <span className="font-mono text-xs">
+                      <span className="admin-mono">
                         {sub.pagarme_sub_id}
                       </span>
                     ) : (
@@ -633,7 +619,7 @@ export default async function AdminClienteDetalhePage({
       {/* 2.4 — Pedidos e entrega */}
       <SectionCard title="Pedidos e entrega">
         {orderList.length === 0 && <Empty text="Nenhum pedido." />}
-        <div className="space-y-4">
+        <div className="admin-pilha">
           {orderList.map((order) => {
             const eventos = [...(order.shipping_json?.eventos ?? [])].sort(
               (a, b) => {
@@ -646,24 +632,24 @@ export default async function AdminClienteDetalhePage({
             return (
               <div
                 key={order.id}
-                className="border border-gray-100 rounded-xl p-4"
+                className="admin-item"
               >
-                <div className="flex flex-wrap items-center gap-2 mb-3">
+                <div className="admin-linha-item">
                   <span
-                    className={`text-xs font-bold px-2.5 py-1 rounded-full ${ORDER_STATUS_BADGE[order.status] ?? 'bg-gray-100 text-gray-600'}`}
+                    className={`admin-selo admin-selo--${ORDER_STATUS_TOM[order.status] ?? 'neutro'}`}
                   >
                     {ORDER_STATUS_LABEL[order.status] ?? order.status}
                   </span>
                   {order.pharmacy_sent_at ? (
-                    <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
+                    <span className="admin-selo admin-selo--neutro">
                       ✓ Enviado à farmácia em {fmtDate(order.pharmacy_sent_at)}
                     </span>
                   ) : (
-                    <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-gray-100 text-gray-500">
+                    <span className="admin-selo admin-selo--neutro">
                       Não enviado à farmácia
                     </span>
                   )}
-                  <span className="ml-auto font-mono text-[11px] text-gray-300">
+                  <span className="admin-empurra admin-mono">
                     {order.id}
                   </span>
                 </div>
@@ -677,7 +663,7 @@ export default async function AdminClienteDetalhePage({
                     label="Rastreio"
                     value={
                       order.tracking_code ? (
-                        <span className="font-mono text-xs">
+                        <span className="admin-mono">
                           {order.tracking_code}
                         </span>
                       ) : (
@@ -709,8 +695,8 @@ export default async function AdminClienteDetalhePage({
                   />
                 </div>
                 {eventos.length > 0 && (
-                  <div className="mt-4 border-t border-gray-100 pt-3">
-                    <p className="text-[11px] font-bold tracking-wider text-gray-400 uppercase mb-2">
+                  <div style={{ marginTop: 16, borderTop: '1px solid var(--admin-borda-fraca)', paddingTop: 12 }}>
+                    <p className="admin-campo-rotulo" style={{ marginBottom: 8 }}>
                       Rastreamento
                     </p>
                     <ol className="space-y-1.5">
@@ -718,15 +704,15 @@ export default async function AdminClienteDetalhePage({
                         <li
                           // biome-ignore lint/suspicious/noArrayIndexKey: eventos vêm de um payload externo de rastreio sem id estável; a lista é somente leitura
                           key={i}
-                          className="flex gap-3 text-xs text-gray-600"
+                          className="admin-sub" style={{ display: 'flex', gap: 12, margin: 0 }}
                         >
-                          <span className="shrink-0 text-gray-400 font-mono">
+                          <span className="admin-mono" style={{ flexShrink: 0 }}>
                             {fmtDateTime(ev.datahora)}
                           </span>
                           <span>
                             {ev.descricao ?? '—'}
                             {(ev.local || ev.cidade) && (
-                              <span className="text-gray-400">
+                              <span className="admin-sub">
                                 {' '}
                                 —{' '}
                                 {[ev.local, ev.cidade]
@@ -757,38 +743,38 @@ export default async function AdminClienteDetalhePage({
         {paymentList.length > 0 && (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100">
-                <th className="text-left py-2 text-[11px] font-bold tracking-wider text-gray-400 uppercase">
+              <tr style={{ borderBottom: '1px solid var(--admin-borda-fraca)' }}>
+                <th className="admin-campo-rotulo" style={{ textAlign: 'left', paddingBottom: 8 }}>
                   Valor
                 </th>
-                <th className="text-left py-2 text-[11px] font-bold tracking-wider text-gray-400 uppercase">
+                <th className="admin-campo-rotulo" style={{ textAlign: 'left', paddingBottom: 8 }}>
                   Status
                 </th>
-                <th className="text-left py-2 text-[11px] font-bold tracking-wider text-gray-400 uppercase">
+                <th className="admin-campo-rotulo" style={{ textAlign: 'left', paddingBottom: 8 }}>
                   Data
                 </th>
-                <th className="text-left py-2 text-[11px] font-bold tracking-wider text-gray-400 uppercase">
+                <th className="admin-campo-rotulo" style={{ textAlign: 'left', paddingBottom: 8 }}>
                   Pagar.me charge
                 </th>
               </tr>
             </thead>
             <tbody>
               {paymentList.map((p, i) => (
-                <tr key={p.id ?? i} className="border-b border-gray-50">
-                  <td className="py-2.5 font-semibold text-[#13244f]">
+                <tr key={p.id ?? i} style={{ borderTop: '1px solid var(--admin-borda-fraca)' }}>
+                  <td className="admin-nome" style={{ padding: '10px 0' }}>
                     {money(p.amount)}
                   </td>
-                  <td className="py-2.5">
+                  <td style={{ padding: '10px 0' }}>
                     <span
-                      className={`text-xs font-bold px-2.5 py-1 rounded-full ${PAYMENT_STATUS_BADGE[p.status] ?? 'bg-gray-100 text-gray-600'}`}
+                      className={`admin-selo admin-selo--${PAYMENT_STATUS_TOM[p.status] ?? 'neutro'}`}
                     >
                       {p.status}
                     </span>
                   </td>
-                  <td className="py-2.5 text-gray-500 text-xs">
+                  <td className="admin-sub" style={{ padding: '10px 0' }}>
                     {fmtDateTime(p.paid_at ?? p.created_at)}
                   </td>
-                  <td className="py-2.5 font-mono text-[11px] text-gray-400">
+                  <td className="admin-mono" style={{ padding: '10px 0' }}>
                     {p.pagarme_charge_id ?? '—'}
                   </td>
                 </tr>
@@ -801,15 +787,15 @@ export default async function AdminClienteDetalhePage({
       {/* 2.6 — Protocolo e prescrição */}
       <SectionCard title="Protocolo e prescrição">
         {protocolList.length === 0 && <Empty text="Nenhum protocolo." />}
-        <div className="space-y-4">
+        <div className="admin-pilha">
           {protocolList.map((protocol) => (
             <div
               key={protocol.id}
-              className="border border-gray-100 rounded-xl p-4"
+              className="admin-item"
             >
-              <div className="flex flex-wrap items-center gap-2 mb-3">
+              <div className="admin-linha-item">
                 <span
-                  className={`text-xs font-bold px-2.5 py-1 rounded-full ${PROTOCOL_STATUS_BADGE[protocol.status] ?? 'bg-gray-100 text-gray-600'}`}
+                  className={`admin-selo admin-selo--${PROTOCOL_STATUS_TOM[protocol.status] ?? 'neutro'}`}
                 >
                   {PROTOCOL_STATUS_LABEL[protocol.status] ?? protocol.status}
                 </span>
@@ -818,7 +804,7 @@ export default async function AdminClienteDetalhePage({
                     href={protocol.prescription_pdf_signed_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs font-bold text-[#13244f] bg-[#13244f]/5 hover:bg-[#13244f]/10 px-3 py-1.5 rounded-lg transition"
+                    className="admin-btn admin-btn--secundario"
                   >
                     Ver PDF da prescrição
                   </a>
@@ -838,14 +824,14 @@ export default async function AdminClienteDetalhePage({
                   value={professionalName(protocol.signed_by)}
                 />
               </div>
-              <p className="text-[11px] font-bold tracking-wider text-gray-400 uppercase mb-2">
+              <p className="admin-campo-rotulo" style={{ marginBottom: 8 }}>
                 Itens
               </p>
               <ul className="space-y-1.5">
                 {(protocol.protocol_items ?? []).map((item) => (
                   <li
                     key={item.id}
-                    className="flex flex-wrap items-center gap-2 text-sm text-[#13244f]"
+                    className="admin-linha-item"
                   >
                     <span
                       className={
@@ -858,24 +844,24 @@ export default async function AdminClienteDetalhePage({
                         ? getProductDisplayName(item.products.name)
                         : '—'}
                       {item.products?.name && (
-                        <span className="text-gray-400 font-normal">
+                        <span className="admin-sub">
                           {' '}
                           ({item.products.name})
                         </span>
                       )}
                     </span>
                     {item.is_required && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#13244f]/10 text-[#13244f]">
+                      <span className="admin-selo admin-selo--neutro">
                         obrigatório
                       </span>
                     )}
                     {item.removed_by_patient && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-700">
+                      <span className="admin-selo admin-selo--perigo">
                         removido pelo paciente
                       </span>
                     )}
                     {item.activation_reason && (
-                      <span className="text-xs text-gray-400">
+                      <span className="admin-sub">
                         · {item.activation_reason}
                       </span>
                     )}
@@ -892,21 +878,21 @@ export default async function AdminClienteDetalhePage({
         {quizList.length === 0 && healthList.length === 0 && (
           <Empty text="Nenhuma resposta de quiz ou registro de saúde." />
         )}
-        <div className="space-y-4">
+        <div className="admin-pilha">
           {quizList.map((quiz, i) => (
             <div
               key={String(quiz.id ?? i)}
-              className="border border-gray-100 rounded-xl p-4"
+              className="admin-item"
             >
-              <p className="text-[11px] font-bold tracking-wider text-gray-400 uppercase mb-2">
+              <p className="admin-campo-rotulo" style={{ marginBottom: 8 }}>
                 Resposta de quiz{' '}
                 {quizList.length > 1 ? `#${quizList.length - i}` : ''}
               </p>
               <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5">
                 {readableEntries(quiz).map(([key, value]) => (
                   <div key={key} className="flex gap-2 text-xs">
-                    <dt className="font-mono text-gray-400 shrink-0">{key}:</dt>
-                    <dd className="text-[#13244f] break-words">{value}</dd>
+                    <dt className="admin-mono" style={{ flexShrink: 0 }}>{key}:</dt>
+                    <dd className="admin-campo-valor">{value}</dd>
                   </div>
                 ))}
               </dl>
@@ -915,17 +901,17 @@ export default async function AdminClienteDetalhePage({
           {healthList.map((record, i) => (
             <div
               key={String(record.id ?? i)}
-              className="border border-gray-100 rounded-xl p-4"
+              className="admin-item"
             >
-              <p className="text-[11px] font-bold tracking-wider text-gray-400 uppercase mb-2">
+              <p className="admin-campo-rotulo" style={{ marginBottom: 8 }}>
                 Registro de saúde{' '}
                 {healthList.length > 1 ? `#${healthList.length - i}` : ''}
               </p>
               <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5">
                 {readableEntries(record).map(([key, value]) => (
                   <div key={key} className="flex gap-2 text-xs">
-                    <dt className="font-mono text-gray-400 shrink-0">{key}:</dt>
-                    <dd className="text-[#13244f] break-words">{value}</dd>
+                    <dt className="admin-mono" style={{ flexShrink: 0 }}>{key}:</dt>
+                    <dd className="admin-campo-valor">{value}</dd>
                   </div>
                 ))}
               </dl>
@@ -946,18 +932,18 @@ export default async function AdminClienteDetalhePage({
                 key={String(n.id ?? i)}
                 className="flex flex-wrap items-center gap-2 text-xs"
               >
-                <span className="font-semibold text-[#13244f]">
+                <span className="admin-nome">
                   {String(n.type ?? '—')}
                 </span>
-                <span className="text-gray-400">
+                <span className="admin-sub">
                   via {String(n.channel ?? '—')}
                 </span>
                 <span
-                  className={`font-bold px-2 py-0.5 rounded-full ${n.status === 'sent' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}
+                  className={`admin-selo admin-selo--${n.status === 'sent' ? 'ok' : 'perigo'}`}
                 >
                   {String(n.status ?? '—')}
                 </span>
-                <span className="ml-auto text-gray-400">
+                <span className="admin-empurra admin-sub">
                   {fmtDateTime(
                     n.sent_at
                       ? String(n.sent_at)
@@ -977,14 +963,14 @@ export default async function AdminClienteDetalhePage({
             {loginList.map((l, i) => (
               <li key={String(l.id ?? i)} className="text-xs">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-semibold text-[#13244f]">
+                  <span className="admin-nome">
                     {fmtDateTime(l.logged_at ? String(l.logged_at) : null)}
                   </span>
-                  <span className="font-mono text-gray-400">
+                  <span className="admin-mono">
                     {String(l.ip_address ?? '—')}
                   </span>
                 </div>
-                <p className="text-gray-400 truncate mt-0.5">
+                <p className="admin-sub" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {String(l.user_agent ?? '—')}
                 </p>
               </li>
@@ -996,11 +982,11 @@ export default async function AdminClienteDetalhePage({
       {/* 2.9 — Conformidade */}
       <SectionCard title="Conformidade — aceite dos Termos de Uso">
         {termsList.length === 0 && <Empty text="Nenhum aceite registrado." />}
-        <div className="space-y-3">
+        <div className="admin-lista-itens">
           {termsList.map((t, i) => (
             <div
               key={t.id ?? i}
-              className="border border-gray-100 rounded-xl p-4"
+              className="admin-item"
             >
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-start">
                 <Field label="Versão" value={t.terms_version} />
@@ -1008,7 +994,7 @@ export default async function AdminClienteDetalhePage({
                   label="Hash"
                   value={
                     <span className="flex items-center gap-2">
-                      <span className="font-mono text-xs">
+                      <span className="admin-mono">
                         {t.terms_hash.slice(0, 16)}…
                       </span>
                       <CopyButton value={t.terms_hash} label="Copiar hash" />
@@ -1019,7 +1005,7 @@ export default async function AdminClienteDetalhePage({
                   label="IP"
                   value={
                     t.ip_address ? (
-                      <span className="font-mono text-xs">{t.ip_address}</span>
+                      <span className="admin-mono">{t.ip_address}</span>
                     ) : (
                       '—'
                     )
