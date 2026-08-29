@@ -75,6 +75,20 @@ const grupos: { titulo: string; itens: Item[] }[] = [
     ],
   },
   {
+    titulo: 'Comercial',
+    itens: [
+      {
+        label: 'Leads',
+        href: '/suplementos/admin/comercial',
+        icone: (
+          <Icone>
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+          </Icone>
+        ),
+      },
+    ],
+  },
+  {
     titulo: 'Clínico',
     itens: [
       {
