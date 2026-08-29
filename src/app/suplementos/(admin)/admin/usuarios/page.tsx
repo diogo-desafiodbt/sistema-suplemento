@@ -48,18 +48,23 @@ export default async function AdminUsuariosPage() {
       SELECT jsonb_agg(jsonb_build_object('plan_type', s.plan_type, 'status', s.status)
              ORDER BY s.id) AS list
       FROM subscriptions s WHERE s.user_id = u.id) sub ON true
-    ORDER BY u.created_at DESC
-    LIMIT 50
+    -- Só quem administra o sistema. Paciente fica de fora: são mais de mil,
+    -- vivem na tela de Clientes, e afogavam exatamente a informação que esta
+    -- tela existe para dar — quem tem acesso ao que aqui dentro.
+    WHERE u.role <> 'patient'
+    ORDER BY
+      CASE u.role WHEN 'admin' THEN 0 WHEN 'professional' THEN 1 ELSE 2 END,
+      u.created_at DESC
   `
 
   return (
     <div>
       <CabecaDePagina
-        trilha="Ajustes / Usuários"
-        titulo="Usuários"
+        trilha="Ajustes / Acesso"
+        titulo="Quem administra o sistema"
         acao={
           <span className="admin-num" style={{ color: 'var(--admin-tinta-fraca)', fontSize: 14 }}>
-            {userList.length} registros
+            {userList.length} {userList.length === 1 ? 'pessoa' : 'pessoas'}
           </span>
         }
       />
@@ -67,8 +72,8 @@ export default async function AdminUsuariosPage() {
       <Card className="!p-0 overflow-hidden">
         {userList.length === 0 ? (
           <Vazio
-            titulo="Nenhum usuário listado"
-            explicacao="Ainda não há cadastros nesta lista (limite das 50 contas mais recentes). Novos cadastros aparecem aqui automaticamente."
+            titulo="Ninguém com acesso interno"
+            explicacao="Esta lista mostra apenas administradores, prescritores e suporte. Pacientes ficam na tela de Clientes."
           />
         ) : (
           <Tabela>
