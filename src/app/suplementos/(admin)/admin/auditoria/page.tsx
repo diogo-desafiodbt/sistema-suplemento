@@ -87,7 +87,7 @@ export default async function AdminAuditoriaPage() {
         }
       />
 
-      <Card className="!p-0 overflow-hidden">
+      <Card className="admin-card--tabela">
         {auditLogs.length === 0 ? (
           <Vazio
             titulo="Nenhum registro de auditoria"

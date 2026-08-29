@@ -125,7 +125,7 @@ export default async function AdminClientesPage({
         ) : null}
       </form>
 
-      <Card className="!p-0 overflow-hidden">
+      <Card className="admin-card--tabela">
         {clientList.length === 0 ? (
           <Vazio
             titulo={

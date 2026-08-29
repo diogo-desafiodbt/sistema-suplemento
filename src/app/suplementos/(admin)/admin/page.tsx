@@ -266,21 +266,48 @@ export default async function AdminVisaoGeralPage({
   `
   const webhookCount = webhookCountRows[0]?.n ?? 0
 
-  // Consultas acima preservadas (critério: sem diff SQL). UI = só o funil.
-  void [
-    stuckProtocols,
-    stuckOrders,
-    reconOk,
-    reconAlertReason,
-    latestRecon,
-    reconAt,
-    failedPayments,
-    webhookCount,
-    money,
+  // Tudo abaixo já vinha sendo consultado e descartado: a tela mostrava só o
+  // funil enquanto o banco respondia sobre protocolo travado, pedido parado,
+  // reconciliação, pagamento falhado e webhook pendente. Nenhuma consulta nova
+  // foi acrescentada aqui — o que mudou é que o resultado aparece.
+  const totalFalhado = failedPayments.reduce((s, p) => s + (p.amount ?? 0), 0)
+  const pendencias = [
+    ...stuckProtocols.map((p) => ({
+      chave: `protocolo-${p.id}`,
+      titulo: `Protocolo parado há ${p.days} ${p.days === 1 ? 'dia' : 'dias'}`,
+      detalhe: p.patientName,
+      href: `/suplementos/admin/clientes/${p.user_id}`,
+      quente: p.days >= 5,
+    })),
+    ...stuckOrders.map((o) => ({
+      chave: `pedido-${o.id}`,
+      titulo: `Pedido sem despacho há ${o.days} ${o.days === 1 ? 'dia' : 'dias'}`,
+      detalhe: o.patientName,
+      href: null,
+      quente: o.days >= 4,
+    })),
+    ...(reconAlertReason
+      ? [{
+          chave: 'reconciliacao',
+          titulo: 'Reconciliação da farmácia',
+          detalhe: reconAlertReason,
+          href: null,
+          quente: false,
+        }]
+      : []),
+    ...(webhookCount > 0
+      ? [{
+          chave: 'webhooks',
+          titulo: `${webhookCount} webhook(s) sem processar`,
+          detalhe: 'Últimos 7 dias',
+          href: null,
+          quente: webhookCount > 5,
+        }]
+      : []),
   ]
 
   return (
-    <div style={{ maxWidth: 896 }}>
+    <>
       <CabecaDePagina
         trilha="Operação / Visão Geral"
         titulo="Visão Geral"
@@ -303,6 +330,38 @@ export default async function AdminVisaoGeralPage({
         }
       />
 
+      <div className="admin-grid-kpi">
+        <Card>
+          <p className="admin-card-rotulo">Aguardando assinatura</p>
+          <p className="admin-indicador-valor">{stuckProtocols.length}</p>
+          <p className="admin-sub">Protocolos parados há mais de 3 dias</p>
+        </Card>
+        <Card>
+          <p className="admin-card-rotulo">Pedidos parados</p>
+          <p className="admin-indicador-valor">{stuckOrders.length}</p>
+          <p className="admin-sub">Sem despacho há mais de 2 dias</p>
+        </Card>
+        <Card>
+          <p className="admin-card-rotulo">Pagamentos falhados</p>
+          <p className="admin-indicador-valor">{failedPayments.length}</p>
+          <p className="admin-sub">
+            {totalFalhado > 0 ? `${money(totalFalhado)} nos últimos 7 dias` : 'Últimos 7 dias'}
+          </p>
+        </Card>
+        <Card>
+          <p className="admin-card-rotulo">Reconciliação</p>
+          <p className="admin-indicador-valor">
+            <Selo tom={reconOk ? 'ok' : 'atencao'}>
+              {reconOk ? 'Em dia' : 'Atrasada'}
+            </Selo>
+          </p>
+          <p className="admin-sub">
+            {reconAt ? `Última em ${new Date(reconAt).toLocaleString('pt-BR')}` : 'Sem registro'}
+          </p>
+        </Card>
+      </div>
+
+      <div className="admin-grid-2">
       <Card>
         <div style={{ marginBottom: 20 }}>
           <p className="admin-card-rotulo">Funil de conversão</p>
@@ -347,6 +406,36 @@ export default async function AdminVisaoGeralPage({
           ))}
         </ol>
       </Card>
-    </div>
+
+      <Card rotulo="Precisa de você">
+        {pendencias.length === 0 ? (
+          <p className="admin-vazio-texto">
+            Nada parado. Protocolo, pedido, reconciliação e webhook estão em dia.
+          </p>
+        ) : (
+          <ul className="admin-lista-itens">
+            {pendencias.map((p) => (
+              <li key={p.chave} className="admin-pendencia">
+                <span
+                  className={`admin-pendencia-marca ${p.quente ? '' : 'admin-pendencia-marca--fria'}`}
+                  aria-hidden
+                />
+                <div style={{ minWidth: 0 }}>
+                  {p.href ? (
+                    <Link href={p.href} className="admin-pendencia-titulo">
+                      {p.titulo}
+                    </Link>
+                  ) : (
+                    <p className="admin-pendencia-titulo">{p.titulo}</p>
+                  )}
+                  <p className="admin-sub">{p.detalhe}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+      </div>
+    </>
   )
 }

@@ -2,6 +2,7 @@ import Image from 'next/image'
 import imgLogoAzul from '@/../public/logo-azul.png'
 import { AdminNav } from '@/components/admin/AdminNav'
 import { BuscaGlobal } from '@/components/admin/BuscaGlobal'
+import { MenuMobile } from '@/components/admin/MenuMobile'
 import { exigirAdmin } from '@/lib/auth/admin'
 import './admin.css'
 
@@ -49,6 +50,7 @@ export default async function AdminLayout({
 
       <div className="admin-corpo">
         <header className="admin-topo">
+          <MenuMobile />
           <BuscaGlobal />
           <div className="admin-topo-direita">
             <div className="admin-usuario">

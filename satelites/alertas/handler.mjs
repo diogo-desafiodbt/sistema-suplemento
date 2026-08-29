@@ -223,8 +223,9 @@ function pagina({ ultimaPassagem, abertos, resolvidos }) {
   <title>Alertas</title>
   <style>
     ${estiloBase()}
-    main { max-width: 760px; }
-    h3 { margin: 16px 0 8px; font-size: 13px; font-weight: 700; color: var(--tinta); }
+    /* Sem teto: a lista de alertas tem data, origem e detalhe na mesma linha,
+       e a 760px cada achado quebrava em tres linhas. */
+    h3 { margin: 18px 0 8px; font-size: 14px; font-weight: 590; letter-spacing: -.012em; color: var(--tinta); }
     .grupo + .grupo { margin-top: 8px; }
   </style>
 </head>

@@ -65,7 +65,7 @@ export default async function AdminUsuariosPage() {
         }
       />
 
-      <Card className="!p-0 overflow-hidden">
+      <Card className="admin-card--tabela">
         {userList.length === 0 ? (
           <Vazio
             titulo="Ninguém com acesso interno"

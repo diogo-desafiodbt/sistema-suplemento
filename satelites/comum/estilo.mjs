@@ -51,7 +51,10 @@ body {
   background: transparent;
   -webkit-font-smoothing: antialiased;
 }
-main { margin: 0 auto; max-width: 1080px; }
+/* Sem teto de largura: a tela vive dentro de um iframe que ja tem o respiro
+   da moldura do admin. Um segundo limite aqui deixava a aba de campanhas e a
+   de pedidos numa coluna estreita no meio de uma tela larga. */
+main { margin: 0; width: 100%; }
 
 .cabeca {
   display: flex;
@@ -204,8 +207,22 @@ main { margin: 0 auto; max-width: 1080px; }
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 14px;
+}
+
+/* Duas colunas onde a tela comporta: formulario de um lado, previa do outro. */
+.duas-colunas {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (min-width: 1100px) {
+  .duas-colunas {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 label {
   display: block;
@@ -327,6 +344,16 @@ input:focus, select:focus, textarea:focus {
 .sem-acao { font-size: 12.5px; color: var(--tinta-fraca); }
 
 :focus-visible { outline: 2px solid var(--vermelho); outline-offset: 2px; }
+
+@media (max-width: 859px) {
+  body { padding: 0 0 20px; font-size: 15px; }
+  .cabeca-titulo { font-size: 22px; }
+  .card { padding: 15px 15px 16px; }
+  .tabela th, .tabela td, table th, table td { padding-left: 12px; padding-right: 12px; }
+  .tabs { width: 100%; }
+  .acoes-col { min-width: 0; width: 100%; }
+  .config-linha input { min-width: 0; }
+}
 `
 }
 

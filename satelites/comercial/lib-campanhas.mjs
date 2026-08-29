@@ -76,19 +76,22 @@ function pagina(titulo, corpo, aba) {
   <title>${esc(titulo)}</title>
   <style>${estiloBase()}
     .blocos { display:flex; flex-direction:column; gap:8px; }
-    .bloco { border:1px solid var(--borda); border-radius:var(--raio); padding:10px 12px; display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap; }
-    .bloco .tipo { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--tinta-fraca); min-width:74px; padding-top:9px; }
+    .bloco { border:1px solid var(--borda-fraca); border-radius:var(--raio); padding:11px 13px; display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap; background:var(--papel); }
+    .bloco .tipo { font-size:12.5px; font-weight:500; color:var(--tinta-fraca); min-width:80px; padding-top:8px; }
     .bloco .campos { flex:1; min-width:220px; display:flex; flex-direction:column; gap:6px; }
-    .duas { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,380px); gap:20px; align-items:start; }
+    .duas { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,420px); gap:24px; align-items:start; }
+    /* Em tela larga a previa cresce junto: ela e o que se olha para decidir. */
+    @media (min-width:1500px){ .duas { grid-template-columns:minmax(0,1fr) minmax(0,560px); } }
     @media (max-width:860px){ .duas { grid-template-columns:minmax(0,1fr); } }
-    .previa-quadro { border:1px solid var(--borda); border-radius:var(--raio); overflow:hidden; background:#f4f4f6; }
-    .previa-quadro iframe { display:block; width:100%; height:520px; border:0; background:#f4f4f6; }
-    .conta-num { font-size:34px; font-weight:700; line-height:1; font-variant-numeric:tabular-nums; color:var(--marinho); }
+    .previa-quadro { border:1px solid var(--borda-fraca); border-radius:var(--raio); overflow:hidden; background:var(--papel-2); position:sticky; top:0; }
+    .previa-quadro iframe { display:block; width:100%; height:600px; border:0; background:var(--papel-2); }
+    @media (max-width:860px){ .previa-quadro iframe { height:420px; } }
+    .conta-num { font-size:34px; font-weight:590; letter-spacing:-.028em; line-height:1.05; font-variant-numeric:tabular-nums; color:var(--tinta); }
     .conta-detalhe { list-style:none; margin:14px 0 0; padding:0; font-size:13px; color:var(--tinta-fraca); display:flex; flex-direction:column; gap:5px; max-width:54ch; }
     .conta-detalhe li { display:flex; justify-content:space-between; gap:16px; }
     .origem { display:flex; align-items:center; gap:9px; font-size:14px; }
     .origem .qtd { margin-left:auto; color:var(--tinta-fraca); font-variant-numeric:tabular-nums; }
-    .passo { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--tinta-fraca); margin:0 0 10px; }
+    .passo { font-size:12.5px; font-weight:450; color:var(--tinta-fraca); margin:0 0 8px; }
     .campo-largo { width:100%; }
     .abas { display:flex; gap:8px; margin-bottom:18px; }
   </style>

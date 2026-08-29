@@ -288,8 +288,16 @@
 
 .admin-conteudo {
   flex: 1;
+  /* Sem teto de largura: em painel, tabela e grade de indicadores rendem mais
+     quanto mais largas. O respiro vem do padding, que cresce junto com a tela. */
+  width: 100%;
   padding: 26px 26px 64px;
-  max-width: 1160px;
+}
+
+@media (min-width: 1600px) {
+  .admin-conteudo {
+    padding: 32px 40px 72px;
+  }
 }
 
 .admin-cabeca {
@@ -803,15 +811,71 @@
   gap: 14px;
 }
 
-@media (min-width: 960px) {
+/* 1.55/1 e nao 1/1: o bloco da esquerda costuma ser o funil ou a tabela, que
+   ganham com largura; o da direita e uma lista curta, que nao ganha. */
+@media (min-width: 1024px) {
   .admin-grid-2 {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1.55fr 1fr;
   }
 }
 
+/* Fileira de indicadores: enche a linha, sem card orfao numa segunda fileira. */
+.admin-grid-kpi {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+/* --------------------------------------------------------------------------
+   Celular
+   A lateral sumia com `display: none` e nada tomava o lugar dela — ou seja,
+   no celular nao havia como navegar entre as telas do admin. Agora ela vira
+   gaveta, com botao no cabecalho.
+-------------------------------------------------------------------------- */
+
+.admin-menu-botao {
+  display: none;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--admin-borda);
+  border-radius: 8px;
+  background: var(--admin-papel);
+  color: var(--admin-tinta);
+  cursor: pointer;
+  padding: 0;
+}
+
+.admin-menu-veu {
+  /* Só existe no DOM quando o menu está aberto (o componente o monta por
+     portal), e só faz sentido na largura em que a gaveta existe. */
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  background: rgba(0, 0, 0, 0.28);
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  animation: admin-surgir 0.2s ease;
+}
+
+@keyframes admin-surgir {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes admin-deslizar {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
 @media (max-width: 859px) {
-  .admin-lateral {
-    display: none;
+  .admin-menu-botao {
+    display: inline-flex;
   }
 
   .admin-corpo {
@@ -820,6 +884,65 @@
 
   .admin-conteudo {
     padding: 18px 16px 48px;
+  }
+
+  .admin-topo {
+    padding: 0 16px;
+    gap: 10px;
+  }
+
+  /* O nome por extenso come a largura que a busca precisa; as iniciais ficam. */
+  .admin-usuario-nome {
+    display: none;
+  }
+
+  .admin-lateral {
+    transform: translateX(-100%);
+    /* `visibility` junto com o `transform`: sem isto os links da gaveta
+       fechada continuam recebendo foco pelo Tab, fora da tela. */
+    visibility: hidden;
+    transition: transform 0.22s ease, visibility 0.22s;
+    box-shadow: var(--admin-sombra-alta);
+    width: min(280px, 82vw);
+    z-index: 50;
+  }
+
+  .admin-shell--menu-aberto .admin-lateral {
+    transform: translateX(0);
+    visibility: visible;
+  }
+
+  .admin-menu-veu {
+    display: block;
+  }
+
+  /* Toque confortavel: 6px de altura de item vira alvo pequeno demais no dedo. */
+  .admin-nav-item {
+    padding: 10px 10px;
+    font-size: 15px;
+  }
+
+  .admin-cabeca-titulo {
+    font-size: 22px;
+  }
+
+  .admin-card {
+    padding: 15px 15px 16px;
+  }
+
+  /* Tabela larga rola dentro do proprio card, nunca empurra a pagina. */
+  .admin-tabela th,
+  .admin-tabela td {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-lateral,
+  .admin-menu-veu {
+    transition: none;
+    animation: none;
   }
 }
 
@@ -1262,4 +1385,86 @@
 
 .admin-voltar:hover {
   color: var(--admin-tinta);
+}
+
+/* Lista "Precisa de você" da visão geral. Item quente é o que passou do prazo
+   com folga; o resto fica cinza para não gritar tudo ao mesmo tempo. */
+.admin-pendencia {
+  display: grid;
+  grid-template-columns: 9px 1fr;
+  gap: 11px;
+  align-items: start;
+  padding: 11px 0;
+  border-top: 1px solid var(--admin-borda-fraca);
+}
+
+.admin-lista-itens .admin-pendencia:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.admin-pendencia-marca {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--admin-vermelho);
+  margin-top: 6px;
+}
+
+.admin-pendencia-marca--fria {
+  background: var(--admin-borda);
+}
+
+.admin-pendencia-titulo {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--admin-tinta);
+  text-decoration: none;
+  display: block;
+}
+
+a.admin-pendencia-titulo:hover {
+  color: var(--admin-vermelho);
+}
+
+/* Triagem de suporte em duas colunas.
+   Empilhado, o e-mail do cliente e o rascunho da resposta ficavam a uma
+   rolagem de distância um do outro — e são as duas coisas que precisam ser
+   lidas juntas para julgar. Abaixo de 1100px volta a empilhar, porque coluna
+   estreita com texto de e-mail é pior que rolagem. */
+.suporte-duas-colunas {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 22px;
+}
+
+@media (min-width: 1100px) {
+  .suporte-duas-colunas {
+    grid-template-columns: 1.1fr 1fr;
+    gap: 28px;
+    align-items: start;
+  }
+}
+
+/* O corpo do e-mail para de esticar: linha longa demais faz o olho perder a
+   volta. O card usa a largura toda; o texto dentro dele, não. */
+.suporte-duas-colunas p,
+.suporte-duas-colunas li {
+  max-width: 72ch;
+}
+
+/* Card que só embrulha tabela: a tabela desenha o próprio respiro. */
+.admin-card--tabela {
+  padding: 14px 0 4px;
+  overflow: hidden;
+}
+
+/* Histórico: em tela larga, um dia por coluna em vez de uma fila esticada. */
+@media (min-width: 1280px) {
+  .historia-linha {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+    align-items: start;
+  }
 }

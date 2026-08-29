@@ -224,8 +224,9 @@ function nav(abasAtiva, dentroDaMoldura) {
 function estilos() {
   return `
     ${estiloBase()}
-    main { max-width: 960px; }
-    main.estreito { max-width: 640px; }
+    /* Cupons e tabela e usa a largura toda. Configuracao e formulario: campo
+       de texto atravessando a tela inteira e pior de ler e de preencher. */
+    main.estreito { max-width: 760px; }
   `
 }
 
@@ -275,7 +276,7 @@ function paginaCupons(cupons, query) {
           .map((c) => {
             const ativo = c.is_active
             return `<tr>
-              <td class="mono" style="font-weight:700;color:var(--tinta)">${esc(c.code)}</td>
+              <td class="mono" style="font-weight:500;color:var(--tinta)">${esc(c.code)}</td>
               <td class="muted">${c.type === 'percentage' ? 'Percentual' : 'Valor fixo'}</td>
               <td class="num"><strong>${esc(formatValor(c))}</strong></td>
               <td class="num muted">${esc(c.used_count)} / ${c.max_uses ?? '∞'}</td>

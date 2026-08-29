@@ -208,6 +208,12 @@ function ThreadCard({
         </div>
       </div>
 
+      {/* Duas colunas em tela larga: a fonte de um lado, o julgamento e a
+          resposta do outro. Empilhado, o e-mail do cliente e o rascunho ficavam
+          a uma rolagem de distancia um do outro — e sao justamente as duas
+          coisas que precisam ser lidas juntas. */}
+      <div className="suporte-duas-colunas">
+      <div>
       {/* Fonte: e-mail do cliente em destaque — o Pedro julga por isto. */}
       <p className="admin-card-rotulo">E-mail do cliente</p>
       <div style={{ marginBottom: 24 }}>
@@ -240,6 +246,9 @@ function ThreadCard({
         )}
       </div>
 
+      </div>
+
+      <div>
       {/* Interpretação da IA — subordinada, nunca como fato. */}
       <div
         style={{
@@ -497,6 +506,8 @@ function ThreadCard({
           </div>
         </div>
       ) : null}
+      </div>
+      </div>
     </Card>
   )
 }

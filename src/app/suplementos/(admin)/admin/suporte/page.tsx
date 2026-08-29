@@ -96,7 +96,7 @@ export default async function AdminSuportePage() {
   ])
 
   return (
-    <div style={{ maxWidth: 896 }}>
+    <>
       <CabecaDePagina trilha="Operação / Suporte" titulo="Suporte" />
       <p className="admin-sub" style={{ marginTop: -12, marginBottom: 20 }}>
         Julgue pelo e-mail do cliente. A leitura da IA é só interpretação — nada
@@ -108,6 +108,6 @@ export default async function AdminSuportePage() {
         autoIa={autoIa}
         encerradas={encerradas}
       />
-    </div>
+    </>
   )
 }
