@@ -212,6 +212,19 @@ export const purchaseConfirmed = inngest.createFunction(
       return { ok: false, reason: 'missing_email' }
     }
 
+    // Carimba o lead como convertido. É o núcleo que avisa marketing, porque
+    // a tela de leads não pode perguntar quem comprou — ela não enxerga
+    // `public`. Falhar aqui não desfaz a compra: o pior caso é um número de
+    // conversão desatualizado no painel.
+    try {
+      await sql`SELECT marketing.marcar_conversao(${user.email})`
+    } catch (error) {
+      console.error(
+        'purchase-confirmed: conversão de lead não carimbada:',
+        error,
+      )
+    }
+
     if (!payment?.id) {
       console.error('purchase-confirmed: payment ausente', subscription_id)
       await logNotification(user_id, 'failed')

@@ -28,6 +28,9 @@ import {
 
 type TriageForm = {
   full_name: string
+  email: string
+  telefone: string
+  aceita_marketing: boolean
   age: string
   sex: Sex | null
   is_pregnant_or_breastfeeding: boolean | null
@@ -175,8 +178,54 @@ const MEDICATION_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'colesterol', label: 'Medicamentos para colesterol.' },
 ]
 
+/**
+ * Texto do consentimento de marketing. Mora aqui e no handler da Lambda, e os
+ * dois precisam bater: o que vale como prova é o que o servidor grava, e o
+ * servidor não aceita texto vindo do navegador.
+ */
+const TEXTO_CONSENTIMENTO_MARKETING =
+  'Aceito receber por e-mail conteúdos, avisos e ofertas do Desafio Diabetes ' +
+  'sobre controle e reversão do diabetes.'
+
+/** Máscara só de tela. O servidor guarda o telefone em dígitos. */
+function mascararTelefone(valor: string): string {
+  const d = valor.replace(/\D/g, '').slice(0, 11)
+  if (d.length <= 2) return d
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`
+}
+
+/**
+ * Grava o lead antes da recomendação, para quem abandona não sumir.
+ *
+ * Dispara e segue: nunca espera resposta e nunca lança. Lead perdido é ruim,
+ * venda travada por causa de captação de lead é pior.
+ */
+function registrarLead(form: TriageForm): void {
+  try {
+    void fetch('/api/lead', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      keepalive: true,
+      body: JSON.stringify({
+        nome: form.full_name.trim(),
+        email: form.email.trim(),
+        telefone: form.telefone,
+        origem: 'quiz-suplemento',
+        consentimento: form.aceita_marketing,
+      }),
+    }).catch(() => {})
+  } catch {
+    // Nada aqui pode interromper a triagem.
+  }
+}
+
 const initialForm: TriageForm = {
   full_name: '',
+  email: '',
+  telefone: '',
+  aceita_marketing: false,
   age: '',
   sex: null,
   is_pregnant_or_breastfeeding: null,
@@ -200,6 +249,7 @@ type StepId =
   | 'diabetes'
   | 'medicamentos'
   | 'alergias'
+  | 'contato'
 
 function OptionButton({
   label,
@@ -366,7 +416,14 @@ export default function QuizPage() {
   const steps: StepId[] = useMemo(() => {
     const base: StepId[] = ['nome', 'idade', 'sexo']
     if (form.sex === 'mulher') base.push('gestacao')
-    base.push('renal', 'hepatica', 'diabetes', 'medicamentos', 'alergias')
+    base.push(
+      'renal',
+      'hepatica',
+      'diabetes',
+      'medicamentos',
+      'alergias',
+      'contato',
+    )
     return base
   }, [form.sex])
 
@@ -457,6 +514,7 @@ export default function QuizPage() {
     }
 
     trackFunnelEvent('quiz_completed')
+    registrarLead(form)
     setLoading(true)
     try {
       const sessionRes = await fetch('/api/quiz/triage-session', {
@@ -909,7 +967,7 @@ export default function QuizPage() {
             title="Você tem alergia a algum suplemento?"
             subtitle="Confira abaixo os compostos que poderão fazer parte da sua suplementação e informe caso tenha alergia a algum deles."
             showContinue
-            onContinue={finishTriage}
+            onContinue={goNext}
             onBack={goBack}
             stepIndex={stepIndex}
             loading={loading}
@@ -1035,6 +1093,95 @@ export default function QuizPage() {
             </div>
           </QuestionWrapper>
         )
+
+      case 'contato': {
+        const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+          form.email.trim(),
+        )
+        const telefoneValido =
+          form.telefone.replace(/\D/g, '').length >= 10
+
+        return (
+          <QuestionWrapper
+            category="CONTATO"
+            title="Para onde enviamos a sua recomendação?"
+            subtitle="Usamos esses dados para falar com você sobre este pedido."
+            showContinue
+            continueDisabled={!emailValido || !telefoneValido}
+            onContinue={finishTriage}
+            onBack={goBack}
+            stepIndex={stepIndex}
+            loading={loading}
+          >
+            <div className="space-y-4">
+              <div>
+                <label
+                  htmlFor="quiz-email"
+                  className="block text-sm font-semibold text-[#13244f] mb-1.5"
+                >
+                  E-mail
+                </label>
+                <input
+                  id="quiz-email"
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  value={form.email}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, email: e.target.value }))
+                  }
+                  placeholder="voce@exemplo.com"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3.5 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="quiz-telefone"
+                  className="block text-sm font-semibold text-[#13244f] mb-1.5"
+                >
+                  WhatsApp com DDD
+                </label>
+                <input
+                  id="quiz-telefone"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel-national"
+                  value={form.telefone}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      telefone: mascararTelefone(e.target.value),
+                    }))
+                  }
+                  placeholder="(21) 99999-9999"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3.5 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                />
+              </div>
+
+              {/* Desmarcada de propósito. Quem preenche o quiz está pedindo
+                  uma recomendação, não pedindo newsletter — marcar por ela
+                  seria consentimento que ela não deu. */}
+              <label className="flex items-start gap-3 pt-1 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.aceita_marketing}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      aceita_marketing: e.target.checked,
+                    }))
+                  }
+                  className="mt-0.5 h-5 w-5 shrink-0 rounded border-gray-300 accent-[#13244f]"
+                />
+                <span className="text-sm leading-relaxed text-gray-600">
+                  {TEXTO_CONSENTIMENTO_MARKETING}
+                </span>
+              </label>
+            </div>
+          </QuestionWrapper>
+        )
+      }
 
       default:
         return null

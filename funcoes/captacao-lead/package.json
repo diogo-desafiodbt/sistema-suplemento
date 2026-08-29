@@ -1,0 +1,9 @@
+{
+  "name": "captacao-lead",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "postgres": "^3.4.9",
+    "@aws-sdk/rds-signer": "^3.658.0"
+  }
+}
