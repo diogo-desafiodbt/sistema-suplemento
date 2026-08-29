@@ -1,6 +1,4 @@
-import { exigirAdmin } from '@/lib/auth/admin'
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
 import { CabecaDePagina } from '@/components/admin/CabecaDePagina'
 import { Botao } from '@/components/admin/ui/Botao'
 import { Card } from '@/components/admin/ui/Card'
@@ -8,6 +6,7 @@ import { Selo } from '@/components/admin/ui/Selo'
 import { Tabela } from '@/components/admin/ui/Tabela'
 import { Vazio } from '@/components/admin/ui/Vazio'
 import { RFM_TIER_LABEL } from '@/lib/admin/rfm-tier'
+import { exigirAdmin } from '@/lib/auth/admin'
 import { asNumber, getSql } from '@/lib/db'
 
 const PAGE_SIZE = 20
@@ -91,7 +90,10 @@ export default async function AdminClientesPage({
         trilha="Clínico / Clientes"
         titulo="Clientes"
         acao={
-          <span className="admin-num" style={{ color: 'var(--admin-tinta-fraca)', fontSize: 14 }}>
+          <span
+            className="admin-num"
+            style={{ color: 'var(--admin-tinta-fraca)', fontSize: 14 }}
+          >
             {total} registros
           </span>
         }
@@ -113,7 +115,11 @@ export default async function AdminClientesPage({
           Buscar
         </Botao>
         {q ? (
-          <Link href="/suplementos/admin/clientes" className="admin-link-suave" style={{ alignSelf: 'center' }}>
+          <Link
+            href="/suplementos/admin/clientes"
+            className="admin-link-suave"
+            style={{ alignSelf: 'center' }}
+          >
             Limpar
           </Link>
         ) : null}
@@ -122,7 +128,9 @@ export default async function AdminClientesPage({
       <Card className="!p-0 overflow-hidden">
         {clientList.length === 0 ? (
           <Vazio
-            titulo={q ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'}
+            titulo={
+              q ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'
+            }
             explicacao={
               q
                 ? `A busca por “${q}” não retornou ninguém. Confira o nome, e-mail, CPF ou código e tente de novo.`
@@ -181,7 +189,10 @@ export default async function AdminClientesPage({
       {totalPages > 1 ? (
         <div className="admin-paginacao">
           {page > 1 ? (
-            <Link href={pageHref(page - 1)} className="admin-btn admin-btn--secundario">
+            <Link
+              href={pageHref(page - 1)}
+              className="admin-btn admin-btn--secundario"
+            >
               ← Anterior
             </Link>
           ) : (
@@ -191,7 +202,10 @@ export default async function AdminClientesPage({
             Página {page} de {totalPages}
           </span>
           {page < totalPages ? (
-            <Link href={pageHref(page + 1)} className="admin-btn admin-btn--secundario">
+            <Link
+              href={pageHref(page + 1)}
+              className="admin-btn admin-btn--secundario"
+            >
               Próxima →
             </Link>
           ) : (

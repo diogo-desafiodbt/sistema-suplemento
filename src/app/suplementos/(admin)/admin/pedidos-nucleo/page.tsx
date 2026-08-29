@@ -1,6 +1,6 @@
-import { exigirAdmin } from '@/lib/auth/admin'
 import { CabecaDePagina } from '@/components/admin/CabecaDePagina'
 import { PedidosActions } from '@/components/admin/PedidosActions'
+import { exigirAdmin } from '@/lib/auth/admin'
 import { asNumber, getSql } from '@/lib/db'
 
 type OrderRow = {

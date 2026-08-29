@@ -86,7 +86,8 @@ export function PedidosActions({ orders }: { orders: OrderRow[] }) {
             {orders.map((order) => {
               const busy = busyId === order.id
               const canGenerate =
-                order.status === 'sent_to_pharmacy' && !order.shipping_request_id
+                order.status === 'sent_to_pharmacy' &&
+                !order.shipping_request_id
               const hasLabel = !!order.shipping_request_id
 
               return (
@@ -130,7 +131,9 @@ export function PedidosActions({ orders }: { orders: OrderRow[] }) {
                           <Botao
                             variante="secundario"
                             disabled={busy}
-                            onClick={() => callAction(order.id, 'atualizar-rastreio')}
+                            onClick={() =>
+                              callAction(order.id, 'atualizar-rastreio')
+                            }
                           >
                             Atualizar rastreio
                           </Botao>
@@ -138,7 +141,9 @@ export function PedidosActions({ orders }: { orders: OrderRow[] }) {
                             variante="secundario"
                             disabled={busy}
                             onClick={() =>
-                              callAction(order.id, 'pdf-etiqueta', { openUrl: true })
+                              callAction(order.id, 'pdf-etiqueta', {
+                                openUrl: true,
+                              })
                             }
                           >
                             Baixar PDF da etiqueta

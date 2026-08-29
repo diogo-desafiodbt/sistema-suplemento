@@ -53,7 +53,8 @@
   --admin-raio-g: 14px;
   --admin-raio-p: 7px;
   --admin-sombra: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 14px rgba(0, 0, 0, 0.04);
-  --admin-sombra-alta: 0 2px 6px rgba(0, 0, 0, 0.06), 0 12px 32px rgba(0, 0, 0, 0.07);
+  --admin-sombra-alta:
+    0 2px 6px rgba(0, 0, 0, 0.06), 0 12px 32px rgba(0, 0, 0, 0.07);
   --admin-osso: rgba(0, 0, 0, 0.07);
 
   --admin-lateral: 236px;
@@ -63,8 +64,9 @@
   min-height: 100vh;
   background: var(--admin-fundo);
   color: var(--admin-tinta);
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI',
-    system-ui, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui,
+    sans-serif;
   font-size: 14px;
   line-height: 1.45;
   letter-spacing: -0.005em;
@@ -126,7 +128,9 @@
   font-weight: 450;
   color: var(--admin-tinta-media);
   text-decoration: none;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .admin-nav-icone {
@@ -213,7 +217,9 @@
   color: var(--admin-tinta);
   background: var(--admin-papel);
   font-family: inherit;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .admin-busca::placeholder {
@@ -222,7 +228,11 @@
 
 .admin-busca:focus {
   outline: none;
-  border-color: color-mix(in srgb, var(--admin-vermelho) 45%, var(--admin-borda));
+  border-color: color-mix(
+    in srgb,
+    var(--admin-vermelho) 45%,
+    var(--admin-borda)
+  );
   box-shadow: 0 0 0 3.5px var(--admin-vermelho-suave);
 }
 
@@ -449,7 +459,7 @@
 }
 
 .admin-selo::before {
-  content: '';
+  content: "";
   width: 5px;
   height: 5px;
   border-radius: 50%;
@@ -494,7 +504,10 @@
   cursor: pointer;
   font-family: inherit;
   text-decoration: none;
-  transition: background 0.15s ease, filter 0.15s ease, transform 0.08s ease;
+  transition:
+    background 0.15s ease,
+    filter 0.15s ease,
+    transform 0.08s ease;
 }
 
 .admin-btn:active {
@@ -574,12 +587,18 @@
   font-family: inherit;
   color: var(--admin-tinta);
   background: var(--admin-papel);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .admin-input:focus {
   outline: none;
-  border-color: color-mix(in srgb, var(--admin-vermelho) 45%, var(--admin-borda));
+  border-color: color-mix(
+    in srgb,
+    var(--admin-vermelho) 45%,
+    var(--admin-borda)
+  );
   box-shadow: 0 0 0 3.5px var(--admin-vermelho-suave);
 }
 
@@ -620,7 +639,9 @@
   font-weight: 500;
   color: var(--admin-tinta-media);
   text-decoration: none;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .admin-periodo a:hover {
@@ -714,7 +735,7 @@
 }
 
 .admin-mono {
-  font-family: ui-monospace, 'SF Mono', monospace;
+  font-family: ui-monospace, "SF Mono", monospace;
   font-size: 12px;
   color: var(--admin-tinta-fraca);
   word-break: break-all;
@@ -939,8 +960,14 @@
   width: 100%;
   height: 250px;
 }
-.historia-grade { stroke: var(--admin-borda-fraca); stroke-width: 1; }
-.historia-area { fill: rgba(19, 36, 79, 0.08); stroke: none; }
+.historia-grade {
+  stroke: var(--admin-borda-fraca);
+  stroke-width: 1;
+}
+.historia-area {
+  fill: rgba(19, 36, 79, 0.08);
+  stroke: none;
+}
 /* A media e a protagonista: e ela que conta a evolucao. O dia a dia fica
    como sombra atras. */
 .historia-media {
@@ -950,7 +977,10 @@
   stroke-linejoin: round;
   stroke-linecap: round;
 }
-.historia-ponto { fill: var(--admin-vermelho); opacity: 0.5; }
+.historia-ponto {
+  fill: var(--admin-vermelho);
+  opacity: 0.5;
+}
 .historia-eixo-y {
   fill: var(--admin-tinta-fraca);
   font-size: 11px;
@@ -1030,10 +1060,18 @@
   transform: translateY(-1px);
   background: var(--admin-tinta-fraca);
 }
-.historia-marca[data-projeto='sistema-suplemento'] { background: var(--admin-marinho); }
-.historia-marca[data-projeto='site'] { background: var(--admin-vermelho); }
-.historia-marca[data-projeto='blog'] { background: var(--admin-atencao); }
-.historia-marca[data-projeto='lp-primeiro-passo'] { background: var(--admin-ok); }
+.historia-marca[data-projeto="sistema-suplemento"] {
+  background: var(--admin-marinho);
+}
+.historia-marca[data-projeto="site"] {
+  background: var(--admin-vermelho);
+}
+.historia-marca[data-projeto="blog"] {
+  background: var(--admin-atencao);
+}
+.historia-marca[data-projeto="lp-primeiro-passo"] {
+  background: var(--admin-ok);
+}
 
 /* --------------------------------------------------------------------------
    Veredito sobre a sugestao da IA
@@ -1067,9 +1105,14 @@
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
 }
-.sugestao-btn:hover { background: var(--admin-papel-2); }
+.sugestao-btn:hover {
+  background: var(--admin-papel-2);
+}
 /* So o escolhido ganha cor. Dois botoes coloridos lado a lado empurram para
    um dos dois, e aqui a resposta honesta importa mais que a rapida. */
 .sugestao-btn--ativo.sugestao-btn--sim {
@@ -1112,7 +1155,11 @@
 }
 .sugestao-obs textarea:focus {
   outline: none;
-  border-color: color-mix(in srgb, var(--admin-vermelho) 45%, var(--admin-borda));
+  border-color: color-mix(
+    in srgb,
+    var(--admin-vermelho) 45%,
+    var(--admin-borda)
+  );
   box-shadow: 0 0 0 3.5px var(--admin-vermelho-suave);
 }
 .sugestao-obs-aviso {

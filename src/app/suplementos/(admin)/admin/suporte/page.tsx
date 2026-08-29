@@ -1,10 +1,9 @@
-import { exigirAdmin } from '@/lib/auth/admin'
-import { redirect } from 'next/navigation'
+import { CabecaDePagina } from '@/components/admin/CabecaDePagina'
 import {
   SupportThreadPanel,
   type SupportThreadView,
 } from '@/components/admin/SupportThreadPanel'
-import { CabecaDePagina } from '@/components/admin/CabecaDePagina'
+import { exigirAdmin } from '@/lib/auth/admin'
 import { getSql } from '@/lib/db'
 
 export default async function AdminSuportePage() {
@@ -100,8 +99,8 @@ export default async function AdminSuportePage() {
     <div style={{ maxWidth: 896 }}>
       <CabecaDePagina trilha="Operação / Suporte" titulo="Suporte" />
       <p className="admin-sub" style={{ marginTop: -12, marginBottom: 20 }}>
-        Julgue pelo e-mail do cliente. A leitura da IA é só interpretação —
-        nada sai sozinho enquanto a chave estiver em off.
+        Julgue pelo e-mail do cliente. A leitura da IA é só interpretação — nada
+        sai sozinho enquanto a chave estiver em off.
       </p>
       <SupportThreadPanel
         fila={fila}

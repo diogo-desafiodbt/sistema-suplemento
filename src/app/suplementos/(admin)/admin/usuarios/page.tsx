@@ -1,11 +1,10 @@
-import { exigirAdmin } from '@/lib/auth/admin'
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
 import { CabecaDePagina } from '@/components/admin/CabecaDePagina'
 import { Card } from '@/components/admin/ui/Card'
 import { Selo } from '@/components/admin/ui/Selo'
 import { Tabela } from '@/components/admin/ui/Tabela'
 import { Vazio } from '@/components/admin/ui/Vazio'
+import { exigirAdmin } from '@/lib/auth/admin'
 import { getSql } from '@/lib/db'
 
 type UserRow = {
@@ -57,7 +56,10 @@ export default async function AdminUsuariosPage() {
         trilha="Ajustes / Acesso"
         titulo="Quem administra o sistema"
         acao={
-          <span className="admin-num" style={{ color: 'var(--admin-tinta-fraca)', fontSize: 14 }}>
+          <span
+            className="admin-num"
+            style={{ color: 'var(--admin-tinta-fraca)', fontSize: 14 }}
+          >
             {userList.length} {userList.length === 1 ? 'pessoa' : 'pessoas'}
           </span>
         }

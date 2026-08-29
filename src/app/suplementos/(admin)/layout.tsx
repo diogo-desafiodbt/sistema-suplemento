@@ -8,7 +8,10 @@ import './admin.css'
 // A tipografia e a do sistema — no Mac isso entrega a SF Pro. Alem de ser a
 // escolha visual, some com o download da Roboto em toda navegacao.
 
-function iniciais(nome: string | null | undefined, email: string | null): string {
+function iniciais(
+  nome: string | null | undefined,
+  email: string | null,
+): string {
   const base = (nome && nome.trim()) || (email && email.trim()) || '?'
   const partes = base.split(/\s+/).filter(Boolean)
   if (partes.length >= 2) {

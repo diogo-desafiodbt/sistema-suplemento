@@ -1,17 +1,17 @@
-import { exigirAdmin } from '@/lib/auth/admin'
 import Link from 'next/link'
-import { notFound, redirect } from 'next/navigation'
-import { CopyButton } from '@/components/CopyButton'
-import { RFM_TIER_LABEL, RFM_TIER_TOM } from '@/lib/admin/rfm-tier'
+import { notFound } from 'next/navigation'
 import { CabecaDePagina } from '@/components/admin/CabecaDePagina'
 import { Card } from '@/components/admin/ui/Card'
 import { Selo } from '@/components/admin/ui/Selo'
+import { CopyButton } from '@/components/CopyButton'
 import {
   buscarComprasHotmartPorEmail,
   formatarValorCompra,
-  montarComprasUnificadas,
   type HotmartSaleRow,
+  montarComprasUnificadas,
 } from '@/lib/admin/compras-cliente'
+import { RFM_TIER_LABEL, RFM_TIER_TOM } from '@/lib/admin/rfm-tier'
+import { exigirAdmin } from '@/lib/auth/admin'
 import { asNumber, getSql } from '@/lib/db'
 import { createPrescriptionPdfSignedUrl } from '@/lib/pdf/signed-url'
 import { PLAN_LABELS } from '@/lib/plans'
@@ -134,26 +134,36 @@ const ORDER_STATUS_LABEL: Record<string, string> = {
   failed: 'Falhou',
 }
 
-const ORDER_STATUS_TOM: Record<string, 'ok' | 'atencao' | 'perigo' | 'neutro'> = {
-  pending: 'neutro',
-  sent_to_pharmacy: 'neutro',
-  dispatched: 'atencao',
-  delivered: 'ok',
-  failed: 'perigo',
-}
+const ORDER_STATUS_TOM: Record<string, 'ok' | 'atencao' | 'perigo' | 'neutro'> =
+  {
+    pending: 'neutro',
+    sent_to_pharmacy: 'neutro',
+    dispatched: 'atencao',
+    delivered: 'ok',
+    failed: 'perigo',
+  }
 
-const PAYMENT_STATUS_TOM: Record<string, 'ok' | 'atencao' | 'perigo' | 'neutro'> = {
+const PAYMENT_STATUS_TOM: Record<
+  string,
+  'ok' | 'atencao' | 'perigo' | 'neutro'
+> = {
   paid: 'ok',
   pending: 'atencao',
   failed: 'perigo',
 }
 
-const COMPRA_ORIGEM_TOM: Record<string, 'ok' | 'atencao' | 'perigo' | 'neutro'> = {
+const COMPRA_ORIGEM_TOM: Record<
+  string,
+  'ok' | 'atencao' | 'perigo' | 'neutro'
+> = {
   guia: 'atencao',
   suplemento: 'neutro',
 }
 
-const COMPRA_STATUS_TOM: Record<string, 'ok' | 'atencao' | 'perigo' | 'neutro'> = {
+const COMPRA_STATUS_TOM: Record<
+  string,
+  'ok' | 'atencao' | 'perigo' | 'neutro'
+> = {
   Pago: 'ok',
   Aguardando: 'neutro',
   'Na farmácia': 'neutro',
@@ -168,7 +178,10 @@ const PROTOCOL_STATUS_LABEL: Record<string, string> = {
   rejected: 'Rejeitado',
 }
 
-const PROTOCOL_STATUS_TOM: Record<string, 'ok' | 'atencao' | 'perigo' | 'neutro'> = {
+const PROTOCOL_STATUS_TOM: Record<
+  string,
+  'ok' | 'atencao' | 'perigo' | 'neutro'
+> = {
   pending_signature: 'atencao',
   signed: 'ok',
   rejected: 'perigo',
@@ -473,9 +486,7 @@ export default async function AdminClienteDetalhePage({
           <Field label="CPF" value={client.cpf ?? '—'} />
           <Field
             label="Código do cliente"
-            value={
-              <span className="admin-mono">{client.client_code}</span>
-            }
+            value={<span className="admin-mono">{client.client_code}</span>}
           />
           <Field label="Cadastro" value={fmtDateTime(client.created_at)} />
         </div>
@@ -483,11 +494,7 @@ export default async function AdminClienteDetalhePage({
 
       {/* Compras — visão unificada (Hotmart + sistema) */}
       <SectionCard title="Compras">
-        {hotmartErro ? (
-          <p className="admin-aviso">
-            {hotmartErro}
-          </p>
-        ) : null}
+        {hotmartErro ? <p className="admin-aviso">{hotmartErro}</p> : null}
         {comprasUnificadas.length === 0 ? (
           <Empty
             text={
@@ -519,10 +526,16 @@ export default async function AdminClienteDetalhePage({
                     {fmtDateTime(compra.data)}
                   </span>
                 </div>
-                <p className="admin-nome">
-                  {compra.produto}
-                </p>
-                <div className="admin-linha-item admin-sub" style={{ marginTop: 8, marginBottom: 0, columnGap: 16, rowGap: 4 }}>
+                <p className="admin-nome">{compra.produto}</p>
+                <div
+                  className="admin-linha-item admin-sub"
+                  style={{
+                    marginTop: 8,
+                    marginBottom: 0,
+                    columnGap: 16,
+                    rowGap: 4,
+                  }}
+                >
                   <span>
                     Valor:{' '}
                     <strong style={{ color: 'var(--admin-tinta)' }}>
@@ -530,9 +543,7 @@ export default async function AdminClienteDetalhePage({
                     </strong>
                   </span>
                   {compra.detalhe ? (
-                    <span className="admin-mono">
-                      {compra.detalhe}
-                    </span>
+                    <span className="admin-mono">{compra.detalhe}</span>
                   ) : null}
                 </div>
               </li>
@@ -550,7 +561,13 @@ export default async function AdminClienteDetalhePage({
           {addressList.map((a, i) => (
             <div
               key={a.id ?? i}
-              className="admin-item" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}
+              className="admin-item"
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                gap: 16,
+              }}
             >
               <div className="admin-campo-valor">
                 <p>
@@ -562,7 +579,10 @@ export default async function AdminClienteDetalhePage({
                 </p>
               </div>
               {a.is_default && (
-                <span className="admin-selo admin-selo--ok" style={{ flexShrink: 0 }}>
+                <span
+                  className="admin-selo admin-selo--ok"
+                  style={{ flexShrink: 0 }}
+                >
                   Padrão
                 </span>
               )}
@@ -598,9 +618,7 @@ export default async function AdminClienteDetalhePage({
                   label="Pagar.me sub"
                   value={
                     sub.pagarme_sub_id ? (
-                      <span className="admin-mono">
-                        {sub.pagarme_sub_id}
-                      </span>
+                      <span className="admin-mono">{sub.pagarme_sub_id}</span>
                     ) : (
                       '—'
                     )
@@ -630,10 +648,7 @@ export default async function AdminClienteDetalhePage({
             )
             const quote = order.shipping_quote_json
             return (
-              <div
-                key={order.id}
-                className="admin-item"
-              >
+              <div key={order.id} className="admin-item">
                 <div className="admin-linha-item">
                   <span
                     className={`admin-selo admin-selo--${ORDER_STATUS_TOM[order.status] ?? 'neutro'}`}
@@ -649,9 +664,7 @@ export default async function AdminClienteDetalhePage({
                       Não enviado à farmácia
                     </span>
                   )}
-                  <span className="admin-empurra admin-mono">
-                    {order.id}
-                  </span>
+                  <span className="admin-empurra admin-mono">{order.id}</span>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <Field
@@ -695,8 +708,17 @@ export default async function AdminClienteDetalhePage({
                   />
                 </div>
                 {eventos.length > 0 && (
-                  <div style={{ marginTop: 16, borderTop: '1px solid var(--admin-borda-fraca)', paddingTop: 12 }}>
-                    <p className="admin-campo-rotulo" style={{ marginBottom: 8 }}>
+                  <div
+                    style={{
+                      marginTop: 16,
+                      borderTop: '1px solid var(--admin-borda-fraca)',
+                      paddingTop: 12,
+                    }}
+                  >
+                    <p
+                      className="admin-campo-rotulo"
+                      style={{ marginBottom: 8 }}
+                    >
                       Rastreamento
                     </p>
                     <ol className="space-y-1.5">
@@ -704,9 +726,13 @@ export default async function AdminClienteDetalhePage({
                         <li
                           // biome-ignore lint/suspicious/noArrayIndexKey: eventos vêm de um payload externo de rastreio sem id estável; a lista é somente leitura
                           key={i}
-                          className="admin-sub" style={{ display: 'flex', gap: 12, margin: 0 }}
+                          className="admin-sub"
+                          style={{ display: 'flex', gap: 12, margin: 0 }}
                         >
-                          <span className="admin-mono" style={{ flexShrink: 0 }}>
+                          <span
+                            className="admin-mono"
+                            style={{ flexShrink: 0 }}
+                          >
                             {fmtDateTime(ev.datahora)}
                           </span>
                           <span>
@@ -743,24 +769,41 @@ export default async function AdminClienteDetalhePage({
         {paymentList.length > 0 && (
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--admin-borda-fraca)' }}>
-                <th className="admin-campo-rotulo" style={{ textAlign: 'left', paddingBottom: 8 }}>
+              <tr
+                style={{ borderBottom: '1px solid var(--admin-borda-fraca)' }}
+              >
+                <th
+                  className="admin-campo-rotulo"
+                  style={{ textAlign: 'left', paddingBottom: 8 }}
+                >
                   Valor
                 </th>
-                <th className="admin-campo-rotulo" style={{ textAlign: 'left', paddingBottom: 8 }}>
+                <th
+                  className="admin-campo-rotulo"
+                  style={{ textAlign: 'left', paddingBottom: 8 }}
+                >
                   Status
                 </th>
-                <th className="admin-campo-rotulo" style={{ textAlign: 'left', paddingBottom: 8 }}>
+                <th
+                  className="admin-campo-rotulo"
+                  style={{ textAlign: 'left', paddingBottom: 8 }}
+                >
                   Data
                 </th>
-                <th className="admin-campo-rotulo" style={{ textAlign: 'left', paddingBottom: 8 }}>
+                <th
+                  className="admin-campo-rotulo"
+                  style={{ textAlign: 'left', paddingBottom: 8 }}
+                >
                   Pagar.me charge
                 </th>
               </tr>
             </thead>
             <tbody>
               {paymentList.map((p, i) => (
-                <tr key={p.id ?? i} style={{ borderTop: '1px solid var(--admin-borda-fraca)' }}>
+                <tr
+                  key={p.id ?? i}
+                  style={{ borderTop: '1px solid var(--admin-borda-fraca)' }}
+                >
                   <td className="admin-nome" style={{ padding: '10px 0' }}>
                     {money(p.amount)}
                   </td>
@@ -789,10 +832,7 @@ export default async function AdminClienteDetalhePage({
         {protocolList.length === 0 && <Empty text="Nenhum protocolo." />}
         <div className="admin-pilha">
           {protocolList.map((protocol) => (
-            <div
-              key={protocol.id}
-              className="admin-item"
-            >
+            <div key={protocol.id} className="admin-item">
               <div className="admin-linha-item">
                 <span
                   className={`admin-selo admin-selo--${PROTOCOL_STATUS_TOM[protocol.status] ?? 'neutro'}`}
@@ -829,10 +869,7 @@ export default async function AdminClienteDetalhePage({
               </p>
               <ul className="space-y-1.5">
                 {(protocol.protocol_items ?? []).map((item) => (
-                  <li
-                    key={item.id}
-                    className="admin-linha-item"
-                  >
+                  <li key={item.id} className="admin-linha-item">
                     <span
                       className={
                         item.removed_by_patient
@@ -880,10 +917,7 @@ export default async function AdminClienteDetalhePage({
         )}
         <div className="admin-pilha">
           {quizList.map((quiz, i) => (
-            <div
-              key={String(quiz.id ?? i)}
-              className="admin-item"
-            >
+            <div key={String(quiz.id ?? i)} className="admin-item">
               <p className="admin-campo-rotulo" style={{ marginBottom: 8 }}>
                 Resposta de quiz{' '}
                 {quizList.length > 1 ? `#${quizList.length - i}` : ''}
@@ -891,7 +925,9 @@ export default async function AdminClienteDetalhePage({
               <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5">
                 {readableEntries(quiz).map(([key, value]) => (
                   <div key={key} className="flex gap-2 text-xs">
-                    <dt className="admin-mono" style={{ flexShrink: 0 }}>{key}:</dt>
+                    <dt className="admin-mono" style={{ flexShrink: 0 }}>
+                      {key}:
+                    </dt>
                     <dd className="admin-campo-valor">{value}</dd>
                   </div>
                 ))}
@@ -899,10 +935,7 @@ export default async function AdminClienteDetalhePage({
             </div>
           ))}
           {healthList.map((record, i) => (
-            <div
-              key={String(record.id ?? i)}
-              className="admin-item"
-            >
+            <div key={String(record.id ?? i)} className="admin-item">
               <p className="admin-campo-rotulo" style={{ marginBottom: 8 }}>
                 Registro de saúde{' '}
                 {healthList.length > 1 ? `#${healthList.length - i}` : ''}
@@ -910,7 +943,9 @@ export default async function AdminClienteDetalhePage({
               <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5">
                 {readableEntries(record).map(([key, value]) => (
                   <div key={key} className="flex gap-2 text-xs">
-                    <dt className="admin-mono" style={{ flexShrink: 0 }}>{key}:</dt>
+                    <dt className="admin-mono" style={{ flexShrink: 0 }}>
+                      {key}:
+                    </dt>
                     <dd className="admin-campo-valor">{value}</dd>
                   </div>
                 ))}
@@ -932,9 +967,7 @@ export default async function AdminClienteDetalhePage({
                 key={String(n.id ?? i)}
                 className="flex flex-wrap items-center gap-2 text-xs"
               >
-                <span className="admin-nome">
-                  {String(n.type ?? '—')}
-                </span>
+                <span className="admin-nome">{String(n.type ?? '—')}</span>
                 <span className="admin-sub">
                   via {String(n.channel ?? '—')}
                 </span>
@@ -970,7 +1003,14 @@ export default async function AdminClienteDetalhePage({
                     {String(l.ip_address ?? '—')}
                   </span>
                 </div>
-                <p className="admin-sub" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <p
+                  className="admin-sub"
+                  style={{
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
                   {String(l.user_agent ?? '—')}
                 </p>
               </li>
@@ -984,10 +1024,7 @@ export default async function AdminClienteDetalhePage({
         {termsList.length === 0 && <Empty text="Nenhum aceite registrado." />}
         <div className="admin-lista-itens">
           {termsList.map((t, i) => (
-            <div
-              key={t.id ?? i}
-              className="admin-item"
-            >
+            <div key={t.id ?? i} className="admin-item">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-start">
                 <Field label="Versão" value={t.terms_version} />
                 <Field

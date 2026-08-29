@@ -78,7 +78,9 @@ export function AbaDeServico({ src, titulo }: Props) {
   if (erro) {
     return (
       <div className="admin-card admin-vazio">
-        <p className="admin-vazio-titulo">Não conseguimos carregar esta aba agora.</p>
+        <p className="admin-vazio-titulo">
+          Não conseguimos carregar esta aba agora.
+        </p>
         <p className="admin-vazio-texto">
           O serviço não respondeu. Tentar de novo costuma resolver.
         </p>
@@ -97,7 +99,11 @@ export function AbaDeServico({ src, titulo }: Props) {
         ref={iframeRef}
         src={src}
         title={titulo}
-        style={{ height: altura, overflow: 'hidden', opacity: carregando ? 0 : 1 }}
+        style={{
+          height: altura,
+          overflow: 'hidden',
+          opacity: carregando ? 0 : 1,
+        }}
         scrolling="no"
       />
       {carregando ? (

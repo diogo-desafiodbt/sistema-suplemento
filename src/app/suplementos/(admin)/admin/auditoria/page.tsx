@@ -1,10 +1,9 @@
-import { exigirAdmin } from '@/lib/auth/admin'
-import { redirect } from 'next/navigation'
 import { CabecaDePagina } from '@/components/admin/CabecaDePagina'
 import { Card } from '@/components/admin/ui/Card'
 import { Selo } from '@/components/admin/ui/Selo'
 import { Tabela } from '@/components/admin/ui/Tabela'
 import { Vazio } from '@/components/admin/ui/Vazio'
+import { exigirAdmin } from '@/lib/auth/admin'
 import { getSql } from '@/lib/db'
 import {
   type IntegridadePdf,
@@ -69,10 +68,9 @@ export default async function AdminAuditoriaPage() {
       return [protocolId, estado] as const
     }),
   )
-  const integridadePorProtocolo = Object.fromEntries(integridadeEntries) as Record<
-    string,
-    IntegridadePdf
-  >
+  const integridadePorProtocolo = Object.fromEntries(
+    integridadeEntries,
+  ) as Record<string, IntegridadePdf>
 
   return (
     <div>
@@ -80,7 +78,10 @@ export default async function AdminAuditoriaPage() {
         trilha="Clínico / Auditoria"
         titulo="Auditoria"
         acao={
-          <span className="admin-num" style={{ color: 'var(--admin-tinta-fraca)', fontSize: 14 }}>
+          <span
+            className="admin-num"
+            style={{ color: 'var(--admin-tinta-fraca)', fontSize: 14 }}
+          >
             {auditLogs.length} registros
           </span>
         }

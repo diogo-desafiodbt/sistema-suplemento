@@ -212,7 +212,9 @@ function ThreadCard({
       <p className="admin-card-rotulo">E-mail do cliente</p>
       <div style={{ marginBottom: 24 }}>
         {inbound.length === 0 ? (
-          <p className="admin-sub">Nenhuma mensagem do cliente nesta conversa.</p>
+          <p className="admin-sub">
+            Nenhuma mensagem do cliente nesta conversa.
+          </p>
         ) : (
           inbound.map((m) => (
             <div
@@ -547,8 +549,7 @@ export function SupportThreadPanel({
   const [aba, setAba] = useState<Aba>('fila')
   const [hidden, setHidden] = useState<Set<string>>(new Set())
 
-  const ocultar = (id: string) =>
-    setHidden((prev) => new Set(prev).add(id))
+  const ocultar = (id: string) => setHidden((prev) => new Set(prev).add(id))
 
   const listaFila = fila.filter((t) => !hidden.has(t.id))
   const listaComSuporte = comSuporte.filter((t) => !hidden.has(t.id))

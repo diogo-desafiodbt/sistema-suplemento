@@ -55,7 +55,10 @@ export default async function HistoricoPage() {
   const fmt = (s: string) =>
     s
       ? new Date(s + 'T12:00:00Z').toLocaleDateString('pt-BR', {
-          day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC',
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          timeZone: 'UTC',
         })
       : ''
 
@@ -112,7 +115,8 @@ export default async function HistoricoPage() {
       meses.push({
         i,
         texto: new Date(p.dia + 'T12:00:00Z').toLocaleDateString('pt-BR', {
-          month: 'short', timeZone: 'UTC',
+          month: 'short',
+          timeZone: 'UTC',
         }),
       })
     }
@@ -130,15 +134,26 @@ export default async function HistoricoPage() {
       </header>
 
       <section className="historia-numeros">
-        <div><b>{totais.commits}</b><span>commits</span></div>
-        <div><b>{totais.publicacoes}</b><span>publicações</span></div>
-        <div><b>{totais.linhas.toLocaleString('pt-BR')}</b><span>linhas mexidas</span></div>
+        <div>
+          <b>{totais.commits}</b>
+          <span>commits</span>
+        </div>
+        <div>
+          <b>{totais.publicacoes}</b>
+          <span>publicações</span>
+        </div>
+        <div>
+          <b>{totais.linhas.toLocaleString('pt-BR')}</b>
+          <span>linhas mexidas</span>
+        </div>
       </section>
 
       <section className="historia-grafico-caixa">
         <div className="historia-grafico-topo">
           <h2>Intensidade de desenvolvimento</h2>
-          <span>linhas mexidas por dia · a linha cheia é a média de 7 dias</span>
+          <span>
+            linhas mexidas por dia · a linha cheia é a média de 7 dias
+          </span>
         </div>
 
         <svg
@@ -149,11 +164,22 @@ export default async function HistoricoPage() {
           aria-label={`Evolução da intensidade de desenvolvimento de ${fmt(serie[0]?.dia ?? '')} até ${fmt(serie[serie.length - 1]?.dia ?? '')}`}
         >
           {[0, 0.25, 0.5, 0.75, 1].map((f) => (
-            <line key={f} className="historia-grade"
-                  x1={PAD.e} x2={L - PAD.d} y1={y(topo * f)} y2={y(topo * f)} />
+            <line
+              key={f}
+              className="historia-grade"
+              x1={PAD.e}
+              x2={L - PAD.d}
+              y1={y(topo * f)}
+              y2={y(topo * f)}
+            />
           ))}
           {[0, 0.5, 1].map((f) => (
-            <text key={f} className="historia-eixo-y" x={PAD.e - 10} y={y(topo * f) + 4}>
+            <text
+              key={f}
+              className="historia-eixo-y"
+              x={PAD.e - 10}
+              y={y(topo * f) + 4}
+            >
               {Math.round(topo * f).toLocaleString('pt-BR')}
             </text>
           ))}
@@ -166,8 +192,13 @@ export default async function HistoricoPage() {
           ))}
           {serie.map((p, i) =>
             p.valor > 0 ? (
-              <circle key={p.dia} className="historia-ponto"
-                      cx={x(i)} cy={y(p.valor)} r={2.5}>
+              <circle
+                key={p.dia}
+                className="historia-ponto"
+                cx={x(i)}
+                cy={y(p.valor)}
+                r={2.5}
+              >
                 <title>{`${fmt(p.dia)} — ${p.valor.toLocaleString('pt-BR')} linhas`}</title>
               </circle>
             ) : null,
@@ -193,7 +224,8 @@ export default async function HistoricoPage() {
               <div className="historia-dia-topo">
                 <h2>{fmt(dia)}</h2>
                 <span>
-                  {nPubs > 0 && `${nPubs} publicaç${nPubs === 1 ? 'ão' : 'ões'} · `}
+                  {nPubs > 0 &&
+                    `${nPubs} publicaç${nPubs === 1 ? 'ão' : 'ões'} · `}
                   {Number(resumo?.linhas ?? 0).toLocaleString('pt-BR')} linhas
                 </span>
               </div>

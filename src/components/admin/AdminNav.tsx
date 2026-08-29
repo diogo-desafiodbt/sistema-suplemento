@@ -1,7 +1,6 @@
 'use client'
 
-import Link from 'next/link'
-import { useLinkStatus } from 'next/link'
+import Link, { useLinkStatus } from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { ReactNode } from 'react'
 
@@ -182,7 +181,9 @@ function isActive(pathname: string, href: string): boolean {
 function ConteudoItem({ item }: { item: Item }) {
   const { pending } = useLinkStatus()
   return (
-    <span className={`admin-nav-conteudo ${pending ? 'admin-nav-conteudo--pendente' : ''}`.trim()}>
+    <span
+      className={`admin-nav-conteudo ${pending ? 'admin-nav-conteudo--pendente' : ''}`.trim()}
+    >
       {item.icone}
       <span>{item.label}</span>
     </span>

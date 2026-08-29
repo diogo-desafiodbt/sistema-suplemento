@@ -22,7 +22,8 @@ function Osso({
     <span
       className="admin-osso"
       style={{
-        width: typeof largura === 'number' ? `${largura}%` : (largura ?? '100%'),
+        width:
+          typeof largura === 'number' ? `${largura}%` : (largura ?? '100%'),
         height: altura,
         margin: margem,
       }}
@@ -45,8 +46,8 @@ export function EsqueletoCabeca() {
 export function EsqueletoIndicadores({ quantos = 4 }: { quantos?: number }) {
   return (
     <div className="admin-esqueleto-grade">
-      {Array.from({ length: quantos }, (_, i) => (
-        <div key={i} className="admin-card">
+      {Array.from({ length: quantos }, (_, i) => `kpi-${i}`).map((chave) => (
+        <div key={chave} className="admin-card">
           <Osso largura={58} altura={12} margem="0 0 10px" />
           <Osso largura={40} altura={26} />
         </div>
@@ -60,9 +61,9 @@ export function EsqueletoTabela({ linhas = 8 }: { linhas?: number }) {
   return (
     <div className="admin-card">
       <Osso largura={170} altura={14} margem="0 0 18px" />
-      {Array.from({ length: linhas }, (_, i) => (
+      {Array.from({ length: linhas }, (_, i) => i).map((i) => (
         <div
-          key={i}
+          key={`linha-${i}`}
           style={{
             display: 'grid',
             gridTemplateColumns: '1.6fr 1fr 1fr 0.8fr',
@@ -86,8 +87,12 @@ export function EsqueletoBloco({ linhas = 4 }: { linhas?: number }) {
   return (
     <div className="admin-card">
       <Osso largura={150} altura={14} margem="0 0 16px" />
-      {Array.from({ length: linhas }, (_, i) => (
-        <Osso key={i} largura={i === linhas - 1 ? 63 : 100 - i * 6} margem="0 0 11px" />
+      {Array.from({ length: linhas }, (_, i) => i).map((i) => (
+        <Osso
+          key={`texto-${i}`}
+          largura={i === linhas - 1 ? 63 : 100 - i * 6}
+          margem="0 0 11px"
+        />
       ))}
     </div>
   )

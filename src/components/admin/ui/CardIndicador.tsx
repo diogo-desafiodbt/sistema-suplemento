@@ -45,7 +45,9 @@ export function CardIndicador({
           ))}
         </ul>
       ) : null}
-      {grafico ? <div className="admin-indicador-grafico">{grafico}</div> : null}
+      {grafico ? (
+        <div className="admin-indicador-grafico">{grafico}</div>
+      ) : null}
     </section>
   )
 }

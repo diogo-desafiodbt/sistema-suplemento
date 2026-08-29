@@ -7,7 +7,11 @@
 
 export function BuscaGlobal() {
   return (
-    <form action="/suplementos/admin/clientes" method="GET" style={{ flex: 1, display: 'flex' }}>
+    <form
+      action="/suplementos/admin/clientes"
+      method="GET"
+      style={{ flex: 1, display: 'flex' }}
+    >
       <input
         type="search"
         name="q"

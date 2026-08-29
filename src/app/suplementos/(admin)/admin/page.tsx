@@ -1,9 +1,8 @@
-import { exigirAdmin } from '@/lib/auth/admin'
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
 import { CabecaDePagina } from '@/components/admin/CabecaDePagina'
 import { Card } from '@/components/admin/ui/Card'
 import { Selo } from '@/components/admin/ui/Selo'
+import { exigirAdmin } from '@/lib/auth/admin'
 import { asNumber, getSql } from '@/lib/db'
 
 type PeriodKey = '7' | '30' | '90' | 'all'
@@ -132,18 +131,16 @@ export default async function AdminVisaoGeralPage({
   const oneDayAgo = daysAgoIso(1)
   const sql = getSql()
 
-  const [
-    stuckProtocolsRaw,
-    stuckOrdersRaw,
-    reconRows,
-    failedPaymentsRaw,
-  ] = await Promise.all([
-    sql<{
-      id: string
-      user_id: string
-      generated_at: string | Date
-      users: { full_name: string } | null
-    }[]>`
+  const [stuckProtocolsRaw, stuckOrdersRaw, reconRows, failedPaymentsRaw] =
+    await Promise.all([
+      sql<
+        {
+          id: string
+          user_id: string
+          generated_at: string | Date
+          users: { full_name: string } | null
+        }[]
+      >`
       SELECT p.id, p.user_id, p.generated_at,
         CASE WHEN u.id IS NULL THEN NULL
           ELSE jsonb_build_object('full_name', u.full_name) END AS users
@@ -153,11 +150,13 @@ export default async function AdminVisaoGeralPage({
       ORDER BY p.generated_at ASC
       LIMIT 20
     `,
-    sql<{
-      id: string
-      created_at: string | Date
-      users: { full_name: string } | null
-    }[]>`
+      sql<
+        {
+          id: string
+          created_at: string | Date
+          users: { full_name: string } | null
+        }[]
+      >`
       SELECT o.id, o.created_at,
         CASE WHEN u.id IS NULL THEN NULL
           ELSE jsonb_build_object('full_name', u.full_name) END AS users
@@ -167,29 +166,33 @@ export default async function AdminVisaoGeralPage({
       ORDER BY o.created_at ASC
       LIMIT 20
     `,
-    sql<{
-      id: string
-      status: string
-      completed_at: string | Date | null
-      started_at: string | Date | null
-      payload: unknown
-    }[]>`
+      sql<
+        {
+          id: string
+          status: string
+          completed_at: string | Date | null
+          started_at: string | Date | null
+          payload: unknown
+        }[]
+      >`
       SELECT id, status, completed_at, started_at, payload
       FROM background_jobs
       WHERE job_type = 'pharmacy_reconciliation'
       ORDER BY completed_at DESC NULLS LAST
       LIMIT 1
     `,
-    sql<{
-      id: string
-      amount: string | number | null
-      created_at: string | Date
-      subscription_id: string | null
-      subscriptions: {
-        user_id: string
-        users: { full_name: string } | null
-      } | null
-    }[]>`
+      sql<
+        {
+          id: string
+          amount: string | number | null
+          created_at: string | Date
+          subscription_id: string | null
+          subscriptions: {
+            user_id: string
+            users: { full_name: string } | null
+          } | null
+        }[]
+      >`
       SELECT pay.id, pay.amount, pay.created_at, pay.subscription_id,
         CASE WHEN s.id IS NULL THEN NULL ELSE jsonb_build_object(
           'user_id', s.user_id,
@@ -202,7 +205,7 @@ export default async function AdminVisaoGeralPage({
       ORDER BY pay.created_at DESC
       LIMIT 20
     `,
-  ])
+    ])
 
   const stuckProtocols = stuckProtocolsRaw.map((p) => ({
     id: p.id,
