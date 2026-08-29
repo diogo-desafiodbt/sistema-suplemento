@@ -850,7 +850,7 @@ export default async function AdminClienteDetalhePage({
                   </a>
                 )}
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-3">
+              <div className="admin-campos" style={{ marginBottom: 12 }}>
                 <Field
                   label="Gerado em"
                   value={fmtDateTime(protocol.generated_at)}
@@ -871,10 +871,11 @@ export default async function AdminClienteDetalhePage({
                 {(protocol.protocol_items ?? []).map((item) => (
                   <li key={item.id} className="admin-linha-item">
                     <span
-                      className={
+                      className={item.removed_by_patient ? 'admin-sub' : ''}
+                      style={
                         item.removed_by_patient
-                          ? 'line-through text-gray-400'
-                          : ''
+                          ? { textDecoration: 'line-through' }
+                          : undefined
                       }
                     >
                       {item.products?.name
