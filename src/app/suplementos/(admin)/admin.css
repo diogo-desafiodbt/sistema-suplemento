@@ -1441,7 +1441,9 @@ a.admin-pendencia-titulo:hover {
 
 @media (min-width: 1100px) {
   .suporte-duas-colunas {
-    grid-template-columns: 1.1fr 1fr;
+    /* A direita leva a vantagem: é onde se escreve, e escrever numa coluna
+       mais estreita que a de leitura é o que fazia o rascunho parecer pequeno. */
+    grid-template-columns: 1fr 1.15fr;
     gap: 28px;
     align-items: start;
   }
@@ -1466,5 +1468,54 @@ a.admin-pendencia-titulo:hover {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
     align-items: start;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Área de texto
+   O rascunho da resposta ao suporte usava `.admin-input`, que é o campo de uma
+   linha: 32 px de altura e `min-width: 200px`. Um `height: auto` inline
+   desfazia a altura, mas a caixa onde se escreve o e-mail para o cliente nunca
+   teve estilo próprio — e é o campo mais usado da tela.
+-------------------------------------------------------------------------- */
+
+.admin-area {
+  width: 100%;
+  min-height: 320px;
+  border: 1px solid var(--admin-borda);
+  border-radius: var(--admin-raio);
+  padding: 13px 15px;
+  /* Maior que o resto da interface de propósito: aqui se lê e se escreve texto
+     corrido, não se preenche formulário. */
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--admin-tinta);
+  background: var(--admin-papel);
+  resize: vertical;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.admin-area::placeholder {
+  color: var(--admin-tinta-fraca);
+}
+
+.admin-area:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--admin-vermelho) 45%, var(--admin-borda));
+  box-shadow: 0 0 0 3.5px var(--admin-vermelho-suave);
+}
+
+/* Tela alta: o rascunho cresce junto, em vez de ficar num quinto da altura. */
+@media (min-height: 900px) {
+  .admin-area {
+    min-height: 420px;
+  }
+}
+
+@media (max-width: 859px) {
+  .admin-area {
+    min-height: 240px;
+    font-size: 16px; /* abaixo de 16px o iOS dá zoom ao focar */
   }
 }

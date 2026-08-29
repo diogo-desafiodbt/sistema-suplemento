@@ -246,9 +246,6 @@ function ThreadCard({
         )}
       </div>
 
-      </div>
-
-      <div>
       {/* Interpretação da IA — subordinada, nunca como fato. */}
       <div
         style={{
@@ -350,6 +347,11 @@ function ThreadCard({
         )}
       </div>
 
+      </div>
+
+      {/* Direita: o que o Pedro faz. O rascunho é a primeira coisa da coluna
+          porque é onde ele passa o tempo. */}
+      <div>
       {outbound.length > 0 ? (
         <>
           <p className="admin-card-rotulo">Já enviado nesta conversa</p>
@@ -383,9 +385,7 @@ function ThreadCard({
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            rows={8}
-            className="admin-input"
-            style={{ height: 'auto', padding: 12, resize: 'vertical' }}
+            className="admin-area"
             placeholder="Escreva ou edite a resposta ao cliente…"
           />
           {error ? (
