@@ -811,6 +811,15 @@
   gap: 14px;
 }
 
+/* Todo item de grade que possa receber texto largo precisa de `min-width: 0`:
+   sem isso ele se recusa a encolher abaixo do proprio conteudo e come a
+   largura do vizinho. Foi o que espremeu o rascunho do suporte a 90 px. */
+.admin-grid-2 > *,
+.admin-grid-kpi > *,
+.admin-campos > * {
+  min-width: 0;
+}
+
 /* 1.55/1 e nao 1/1: o bloco da esquerda costuma ser o funil ou a tabela, que
    ganham com largura; o da direita e uma lista curta, que nao ganha. */
 @media (min-width: 1024px) {
@@ -1439,6 +1448,15 @@ a.admin-pendencia-titulo:hover {
   gap: 22px;
 }
 
+/* Item de grade nasce com `min-width: auto`, ou seja, recusa encolher abaixo
+   do conteúdo mais largo que tem dentro. Uma URL sem espaços no corpo do
+   e-mail — `Obter o Outlook para iOS<https://aka.ms/...>` — esticava a coluna
+   da esquerda e esmagava a da direita a uns 90 px, com o rascunho saindo letra
+   por letra. `min-width: 0` é o que devolve o controle para o `1fr`. */
+.suporte-duas-colunas > * {
+  min-width: 0;
+}
+
 @media (min-width: 1100px) {
   .suporte-duas-colunas {
     /* A direita leva a vantagem: é onde se escreve, e escrever numa coluna
@@ -1481,6 +1499,7 @@ a.admin-pendencia-titulo:hover {
 
 .admin-area {
   width: 100%;
+  min-width: 0;
   min-height: 320px;
   border: 1px solid var(--admin-borda);
   border-radius: var(--admin-raio);
@@ -1532,6 +1551,9 @@ a.admin-pendencia-titulo:hover {
 
 .dobravel-corpo {
   white-space: pre-wrap;
+  /* E-mail vem cheio de URL longa e de rodapé de cliente de e-mail. Sem isto
+     a linha estoura o container em vez de quebrar. */
+  overflow-wrap: anywhere;
   font-size: 15px;
   line-height: 1.55;
   color: var(--admin-tinta);
@@ -1592,6 +1614,7 @@ a.admin-pendencia-titulo:hover {
   display: flex;
   align-items: baseline;
   gap: 8px;
+  min-width: 0;
   padding: 11px 14px;
   cursor: pointer;
   list-style: none;
@@ -1622,6 +1645,10 @@ a.admin-pendencia-titulo:hover {
 
 .admin-recolhivel > summary:hover {
   color: var(--admin-tinta);
+}
+
+.admin-recolhivel > summary > span:first-of-type {
+  white-space: nowrap;
 }
 
 .admin-recolhivel-resumo {
