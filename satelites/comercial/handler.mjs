@@ -330,13 +330,15 @@ export async function handler(event) {
     }
     if (method !== 'GET') return notFound()
     if (path === CAMPANHAS) return listar(db)
-    if (path === `${CAMPANHAS}/nova`) return editor(db, null, null)
+    const previaCelular = event?.queryStringParameters?.previa === 'celular'
+    const ok = event?.queryStringParameters?.ok ?? null
+    if (path === `${CAMPANHAS}/nova`) return editor(db, null, null, previaCelular)
 
     const resto = path.slice(CAMPANHAS.length + 1)
     const id = Number.parseInt(resto, 10)
     if (!Number.isFinite(id)) return notFound()
     const aviso = event?.queryStringParameters?.aviso ?? null
-    return editor(db, id, aviso)
+    return editor(db, id, aviso, previaCelular, ok)
   }
 
   if (method !== 'GET' || path !== LISTA) return notFound()

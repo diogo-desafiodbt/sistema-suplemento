@@ -83,7 +83,15 @@ function pagina(titulo, corpo, aba) {
     /* Em tela larga a previa cresce junto: ela e o que se olha para decidir. */
     @media (min-width:1500px){ .duas { grid-template-columns:minmax(0,1fr) minmax(0,560px); } }
     @media (max-width:860px){ .duas { grid-template-columns:minmax(0,1fr); } }
-    .previa-quadro { border:1px solid var(--borda-fraca); border-radius:var(--raio); overflow:hidden; background:var(--papel-2); position:sticky; top:0; }
+    .previa { position:sticky; top:0; }
+    .previa-abas { display:inline-flex; gap:2px; background:var(--borda-fraca); border-radius:9px; padding:2px; margin-bottom:10px; }
+    .previa-abas input { position:absolute; opacity:0; width:0; height:0; }
+    .previa-abas label { display:inline-block; margin:0; padding:5px 13px; border-radius:7px; font-size:12.5px; font-weight:500; color:var(--tinta-media); cursor:pointer; text-transform:none; letter-spacing:normal; transition:background .15s ease, color .15s ease; }
+    .previa-abas input:checked + label { background:var(--papel); color:var(--tinta); font-weight:550; box-shadow:0 1px 2px rgba(0,0,0,.08); }
+    .previa-abas input:focus-visible + label { outline:2px solid var(--vermelho); outline-offset:2px; }
+    .previa-quadro { border:1px solid var(--borda-fraca); border-radius:var(--raio); overflow:hidden; background:var(--papel-2); transition:max-width .2s ease; }
+    /* 390px e a largura util de um iPhone moderno. O e-mail que quebra, quebra aqui. */
+    .previa:has(#previa-celular:checked) .previa-quadro { max-width:390px; margin:0 auto; }
     .previa-quadro iframe { display:block; width:100%; height:600px; border:0; background:var(--papel-2); }
     @media (max-width:860px){ .previa-quadro iframe { height:420px; } }
     .conta-num { font-size:34px; font-weight:590; letter-spacing:-.028em; line-height:1.05; font-variant-numeric:tabular-nums; color:var(--tinta); }
@@ -104,6 +112,32 @@ function pagina(titulo, corpo, aba) {
     </div>
     ${corpo}
   </main>
+  <script>
+    // A regra do compositor e nao ter estado no navegador — e ela continua de
+    // pe: nada aqui guarda dado nem monta tela. Isto so avisa que o clique foi
+    // recebido enquanto o servidor fala com a Resend, que leva segundos. Sem
+    // isso o botao fica parado e a pessoa clica de novo.
+    document.addEventListener('submit', function (e) {
+      var b = e.submitter
+      if (!b || b.tagName !== 'BUTTON') return
+      var rotulo = { teste: 'Enviando…', publicar: 'Criando…', salvar: 'Salvando…' }[b.value]
+      if (!rotulo) return
+      // O nome e o valor do botao precisam chegar ao servidor, e botao
+      // desabilitado nao e enviado. Por isso um campo escondido no lugar.
+      var campo = document.createElement('input')
+      campo.type = 'hidden'
+      campo.name = b.name
+      campo.value = b.value
+      e.target.appendChild(campo)
+      b.disabled = true
+      b.textContent = rotulo
+      // Voltar da navegacao reaproveita a pagina do cache: sem isto o botao
+      // fica desabilitado para sempre.
+      window.addEventListener('pageshow', function () {
+        b.disabled = false
+      })
+    })
+  </script>
 </body>
 </html>`
 }
@@ -183,7 +217,7 @@ function contaPublico(total, semConsentimento, suprimidos, acimaDoTeto, final) {
     </ul>`
 }
 
-export async function editor(db, campanhaId, aviso) {
+export async function editor(db, campanhaId, aviso, previaCelular = false, ok = null) {
   const origens = await db`
     SELECT o.codigo, o.descricao, count(l.id) AS total
     FROM marketing.origem o LEFT JOIN marketing.lead l ON l.origem = o.codigo
@@ -257,7 +291,8 @@ export async function editor(db, campanhaId, aviso) {
     <span class="cabeca-meta">${c.situacao === 'publicada' ? 'Publicada na Resend' : 'Rascunho · não enviado'}</span>
   </div>
 
-  ${aviso ? `<div class="card" style="border-color:var(--atencao)"><p style="margin:0">${esc(aviso)}</p></div>` : ''}
+  ${ok ? `<p class="flash-ok">${esc(ok)}</p>` : ''}
+  ${aviso ? `<p class="flash-erro">${esc(aviso)}</p>` : ''}
 
   <form method="POST" action="${CAMPANHAS}/salvar">
     ${idCampo}
@@ -285,10 +320,29 @@ export async function editor(db, campanhaId, aviso) {
             <button class="btn btn-compacto" type="submit" name="acao" value="add_imagem">+ Imagem</button>
             <button class="btn btn-compacto" type="submit" name="acao" value="add_botao">+ Botão</button>
           </div>
+
+          <!-- O que se digita num bloco so ia para o banco no proximo envio
+               do formulario. Na pratica o ultimo bloco escrito nunca aparecia
+               na previa, e o jeito de ver era adicionar um bloco a mais e
+               depois apagar. Este botao envia sem mexer na lista. -->
+          <div class="acoes" style="margin-top:14px">
+            <button class="btn btn-primario" type="submit" name="acao" value="salvar">Salvar e ver na prévia</button>
+          </div>
         </div>
 
-        <div class="previa-quadro">
-          <iframe title="Prévia do e-mail" srcdoc="${esc(previaHtml(c.blocos ?? []))}"></iframe>
+        <div class="previa">
+          <!-- Alternancia em CSS puro, sem script. O campo viaja junto no
+               envio e o servidor o ignora: o compositor so le os campos de
+               bloco e o filtro. -->
+          <div class="previa-abas" role="group" aria-label="Largura da prévia">
+            <input type="radio" name="_previa" id="previa-desktop" value="desktop" ${previaCelular ? '' : 'checked'}>
+            <label for="previa-desktop">Computador</label>
+            <input type="radio" name="_previa" id="previa-celular" value="celular" ${previaCelular ? 'checked' : ''}>
+            <label for="previa-celular">Celular</label>
+          </div>
+          <div class="previa-quadro">
+            <iframe title="Prévia do e-mail" srcdoc="${esc(previaHtml(c.blocos ?? []))}"></iframe>
+          </div>
         </div>
       </div>
     </div>
@@ -440,12 +494,19 @@ export async function salvar(db, event) {
     id = nova.id
   }
 
-  if (acao === 'teste') return enviarTesteDaCampanha(db, id, campos.teste_para)
+  // A escolha entre computador e celular viaja no redirect: sem isto ela
+  // voltaria ao padrao a cada salvamento, que e justamente quando se quer
+  // olhar a previa.
+  const previa = campos._previa === 'celular' ? '?previa=celular' : ''
+
+  if (acao === 'teste') {
+    return enviarTesteDaCampanha(db, id, campos.teste_para, previa)
+  }
   if (acao === 'publicar') return publicar(db, id)
-  return paraOnde(`${CAMPANHAS}/${id}`)
+  return paraOnde(`${CAMPANHAS}/${id}${previa}`)
 }
 
-async function enviarTesteDaCampanha(db, id, para) {
+async function enviarTesteDaCampanha(db, id, para, previa = '') {
   const destino = String(para ?? '').trim()
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(destino)) {
     return paraOnde(`${CAMPANHAS}/${id}?aviso=${encodeURIComponent('Informe um e-mail válido para o teste.')}`)
@@ -470,7 +531,9 @@ async function enviarTesteDaCampanha(db, id, para) {
       INSERT INTO marketing.campanha_teste (campanha_id, email, resend_email_id)
       VALUES (${id}, ${destino}, ${enviado?.id ?? null})
     `
-    return paraOnde(`${CAMPANHAS}/${id}`)
+    return paraOnde(
+      `${CAMPANHAS}/${id}?ok=${encodeURIComponent(`Teste enviado para ${destino}.`)}${previa ? '&previa=celular' : ''}`,
+    )
   } catch (erro) {
     return paraOnde(`${CAMPANHAS}/${id}?aviso=${encodeURIComponent(`Teste não saiu: ${erro.message}`)}`)
   }
