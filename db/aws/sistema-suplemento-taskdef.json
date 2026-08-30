@@ -216,6 +216,14 @@
         {
           "name": "YOUTUBE_REFRESH_TOKEN",
           "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/YOUTUBE_REFRESH_TOKEN-uxyWdc"
+        },
+        {
+          "name": "DATABASE_URL_MARKETING",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/DATABASE_URL_MARKETING-308iUz"
+        },
+        {
+          "name": "RESEND_MARKETING_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/RESEND_MARKETING_API_KEY-GoRxq5"
         }
       ],
       "logConfiguration": {

@@ -350,10 +350,17 @@ export async function editor(db, campanhaId, aviso, previaCelular = false, ok = 
     <div class="card" style="margin-bottom:20px">
       <p class="passo">Passo 2 de 3</p>
       <h2 style="margin:0 0 2px;font-size:16px">Veja como chega antes de qualquer pessoa ver</h2>
-      <p class="muted" style="margin:0 0 16px">Confira duas coisas: se o layout se comporta no celular e no Outlook, e se caiu na caixa de entrada ou em promoções.</p>
+      <p class="muted" style="margin:0 0 16px">Confira duas coisas: se o layout se comporta no celular e no Outlook, e se caiu na caixa de entrada ou em promoções. O teste usa a <strong>versão salva</strong> — se você acabou de mexer nos blocos, salve antes.</p>
       <div class="acoes">
+        <input type="hidden" name="campanha_id" value="${esc(c.id ?? '')}">
         <input class="campo" style="min-width:280px" type="email" name="teste_para" placeholder="seu@email.com" value="">
-        <button class="btn" type="submit" name="acao" value="teste" ${c.id ? '' : 'title="Salve o rascunho primeiro"'}>Enviar teste</button>
+        <!-- Este botao sai para o nucleo, nao para o satelite. A Lambda roda na
+             VPC sem saida para a internet e nao alcanca a Resend; o nucleo
+             alcanca. Quem faz a requisicao e o navegador de quem esta logado,
+             entao o satelite continua sem rota de rede para o nucleo. -->
+        <button class="btn btn-primario" type="submit" name="acao" value="teste"
+          formaction="/api/admin/campanhas/teste"
+          ${c.id ? '' : 'disabled title="Salve o rascunho primeiro"'}>Enviar teste</button>
       </div>
       ${
         testes.length
