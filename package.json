@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "conferir:isolamento": "node scripts/conferir-isolamento.mjs",
+    "prebuild": "node scripts/conferir-isolamento.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
