@@ -28,11 +28,18 @@ export async function POST(request: Request) {
     // pode escrever — passa por /api/contrato/auth/vincular depois do login.
     await criarUsuario(email, password)
 
-    const tokens = await entrar(email, password)
-    if (!tokens) {
-      return NextResponse.json({ error: 'Erro ao entrar' }, { status: 500 })
+    // Quem acabou de se cadastrar é paciente, e MFA vale só para admin — mas
+    // se um dia o desafio aparecer aqui, é melhor mandar para o login do que
+    // dizer "erro ao entrar" sem explicação.
+    const resultado = await entrar(email, password)
+    if (resultado.tipo !== 'ok') {
+      return NextResponse.json(
+        { ok: true, precisaEntrar: true },
+        { status: 200 },
+      )
     }
 
+    const tokens = resultado.tokens
     const response = NextResponse.json({ ok: true })
     gravarTokens(response, tokens)
     await pedirVinculoNoNucleo(tokens.idToken, fullName ?? null)

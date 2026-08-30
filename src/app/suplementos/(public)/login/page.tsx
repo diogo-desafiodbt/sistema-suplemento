@@ -12,6 +12,51 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  // Quando o Cognito pede o segundo fator, a senha já foi aceita e o que falta
+  // é o código. Guardamos a sessão do desafio, que vale poucos minutos e não dá
+  // acesso a nada sozinha.
+  const [desafio, setDesafio] = useState<{
+    sessao: string
+    usuario: string
+  } | null>(null)
+  const [codigo, setCodigo] = useState('')
+
+  async function seguirDepoisDeEntrar() {
+    await fetch('/api/auth/login-event', { method: 'POST' })
+
+    const profileRes = await fetch('/api/auth/profile')
+    const { profile } = await profileRes.json()
+
+    if (profile?.role === 'professional') {
+      router.push('/suplementos/profissional/fila')
+    } else if (profile?.role === 'admin') {
+      router.push('/suplementos/admin')
+    } else {
+      router.push('/suplementos/dashboard')
+    }
+  }
+
+  async function handleCodigo(e: React.FormEvent) {
+    e.preventDefault()
+    if (!desafio) return
+    setLoading(true)
+
+    const res = await fetch('/api/auth/mfa/codigo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...desafio, codigo }),
+    })
+
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({ error: null }))
+      toast.error(error ?? 'Código incorreto')
+      setCodigo('')
+      setLoading(false)
+      return
+    }
+
+    await seguirDepoisDeEntrar()
+  }
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -26,6 +71,18 @@ export default function LoginPage() {
     if (!res.ok) {
       toast.error('Email ou senha incorretos')
       setLoading(false)
+      return
+    }
+
+    const dados = await res.json().catch(() => ({}))
+    if (dados.mfa) {
+      setDesafio({ sessao: dados.sessao, usuario: dados.usuario })
+      setLoading(false)
+      if (dados.mfa === 'cadastrar') {
+        toast.error(
+          'Este acesso exige autenticador e ele ainda não foi cadastrado. Fale com o administrador.',
+        )
+      }
       return
     }
 
@@ -74,6 +131,47 @@ export default function LoginPage() {
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+            {desafio ? (
+              <form onSubmit={handleCodigo} className="space-y-3">
+                <p className="text-sm text-[#13244f]">
+                  Digite o código de seis dígitos do seu aplicativo
+                  autenticador.
+                </p>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  pattern="\d{6}"
+                  maxLength={6}
+                  placeholder="000000"
+                  value={codigo}
+                  onChange={(e) =>
+                    setCodigo(e.target.value.replace(/\D/g, '').slice(0, 6))
+                  }
+                  required
+                  // biome-ignore lint/a11y/noAutofocus: o campo é a única coisa na tela neste passo
+                  autoFocus
+                  className="w-full h-12 rounded-xl border border-gray-200 px-4 text-center text-xl tracking-[0.4em] font-semibold text-[#13244f] outline-none focus:border-[#13244f]"
+                />
+                <button
+                  type="submit"
+                  disabled={loading || codigo.length !== 6}
+                  className="w-full h-12 rounded-xl bg-[#f4001e] text-white font-bold disabled:opacity-50"
+                >
+                  {loading ? 'Conferindo…' : 'Entrar'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDesafio(null)
+                    setCodigo('')
+                  }}
+                  className="w-full text-sm text-gray-500"
+                >
+                  Voltar
+                </button>
+              </form>
+            ) : (
             <form onSubmit={handleLogin} className="space-y-3">
               <input
                 type="email"
@@ -101,6 +199,7 @@ export default function LoginPage() {
                 {loading ? 'Entrando...' : 'Entrar'}
               </button>
             </form>
+            )}
 
             <div className="text-center pt-1">
               <Link

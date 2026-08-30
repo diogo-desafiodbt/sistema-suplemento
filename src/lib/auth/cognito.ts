@@ -8,6 +8,10 @@ import {
   ForgotPasswordCommand,
   GlobalSignOutCommand,
   InitiateAuthCommand,
+  RespondToAuthChallengeCommand,
+  AssociateSoftwareTokenCommand,
+  VerifySoftwareTokenCommand,
+  SetUserMFAPreferenceCommand,
   UsernameExistsException,
 } from '@aws-sdk/client-cognito-identity-provider'
 
@@ -42,10 +46,30 @@ export class EmailJaCadastradoError extends Error {
   }
 }
 
+export type Tokens = {
+  idToken: string
+  accessToken: string
+  refreshToken: string
+}
+
+/**
+ * O que o login devolve.
+ *
+ * `mfa` não é erro: é o Cognito dizendo que a senha estava certa e falta o
+ * segundo fator. Antes, qualquer resposta sem tokens virava `null`, e a tela
+ * mostrava "e-mail ou senha incorretos" — ligar MFA no console teria derrubado
+ * o login de todos sem nenhuma pista do motivo.
+ */
+export type ResultadoEntrar =
+  | { tipo: 'ok'; tokens: Tokens }
+  | { tipo: 'mfa'; sessao: string; usuario: string }
+  | { tipo: 'cadastrar_mfa'; sessao: string; usuario: string }
+  | { tipo: 'erro' }
+
 export async function entrar(
   email: string,
   senha: string,
-): Promise<{ idToken: string; accessToken: string; refreshToken: string } | null> {
+): Promise<ResultadoEntrar> {
   const { clientId, clientSecret } = configuracao()
   try {
     const resultado = await cliente().send(
@@ -60,6 +84,57 @@ export async function entrar(
       }),
     )
     const auth = resultado.AuthenticationResult
+    if (auth?.IdToken && auth.AccessToken && auth.RefreshToken) {
+      return {
+        tipo: 'ok',
+        tokens: {
+          idToken: auth.IdToken,
+          accessToken: auth.AccessToken,
+          refreshToken: auth.RefreshToken,
+        },
+      }
+    }
+
+    const desafio = resultado.ChallengeName
+    const sessao = resultado.Session
+    const usuario = resultado.ChallengeParameters?.USER_ID_FOR_SRP ?? email
+
+    if (sessao && desafio === 'SOFTWARE_TOKEN_MFA') {
+      return { tipo: 'mfa', sessao, usuario }
+    }
+    // Quando o MFA é obrigatório e a pessoa ainda não cadastrou o aplicativo,
+    // o Cognito manda cadastrar antes de deixar entrar.
+    if (sessao && desafio === 'MFA_SETUP') {
+      return { tipo: 'cadastrar_mfa', sessao, usuario }
+    }
+
+    return { tipo: 'erro' }
+  } catch {
+    return { tipo: 'erro' }
+  }
+}
+
+/** Segundo passo: o código de seis dígitos do aplicativo autenticador. */
+export async function responderMfa(
+  usuario: string,
+  sessao: string,
+  codigo: string,
+): Promise<Tokens | null> {
+  const { clientId, clientSecret } = configuracao()
+  try {
+    const resultado = await cliente().send(
+      new RespondToAuthChallengeCommand({
+        ChallengeName: 'SOFTWARE_TOKEN_MFA',
+        ClientId: clientId,
+        Session: sessao,
+        ChallengeResponses: {
+          USERNAME: usuario,
+          SOFTWARE_TOKEN_MFA_CODE: codigo,
+          SECRET_HASH: secretHash(usuario, clientId, clientSecret),
+        },
+      }),
+    )
+    const auth = resultado.AuthenticationResult
     if (!auth?.IdToken || !auth.AccessToken || !auth.RefreshToken) return null
     return {
       idToken: auth.IdToken,
@@ -68,6 +143,46 @@ export async function entrar(
     }
   } catch {
     return null
+  }
+}
+
+/** Começa o cadastro do autenticador: devolve o segredo para virar QR Code. */
+export async function comecarCadastroMfa(
+  accessToken: string,
+): Promise<string | null> {
+  try {
+    const r = await cliente().send(
+      new AssociateSoftwareTokenCommand({ AccessToken: accessToken }),
+    )
+    return r.SecretCode ?? null
+  } catch {
+    return null
+  }
+}
+
+/** Confirma o cadastro e liga o TOTP para a pessoa. */
+export async function confirmarCadastroMfa(
+  accessToken: string,
+  codigo: string,
+): Promise<boolean> {
+  try {
+    const r = await cliente().send(
+      new VerifySoftwareTokenCommand({
+        AccessToken: accessToken,
+        UserCode: codigo,
+      }),
+    )
+    if (r.Status !== 'SUCCESS') return false
+
+    await cliente().send(
+      new SetUserMFAPreferenceCommand({
+        AccessToken: accessToken,
+        SoftwareTokenMfaSettings: { Enabled: true, PreferredMfa: true },
+      }),
+    )
+    return true
+  } catch {
+    return false
   }
 }
 
