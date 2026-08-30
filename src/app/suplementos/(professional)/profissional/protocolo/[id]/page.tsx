@@ -2,6 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import imgLogoBranca from '@/../public/logo-branca.png'
+import { registrarLeitura } from '@/lib/auditoria/leitura'
 import { getUserProfile } from '@/lib/auth/profile'
 import { getSql } from '@/lib/db'
 import {
@@ -69,6 +70,16 @@ export default async function ProtocoloPage({
   if (profile?.role !== 'professional' && profile?.role !== 'admin') {
     redirect('/suplementos/dashboard')
   }
+
+  // Esta é a tela que lê o quadro clínico inteiro — quiz, condições,
+  // medicações, alergias. É a leitura mais sensível do sistema, e a que mais
+  // importa ter registrada.
+  registrarLeitura({
+    quem: sessao.userId,
+    papel: profile.role,
+    oQue: 'protocolo',
+    alvo: id,
+  })
 
   if (
     !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(

@@ -11,6 +11,7 @@ import {
   montarComprasUnificadas,
 } from '@/lib/admin/compras-cliente'
 import { RFM_TIER_LABEL, RFM_TIER_TOM } from '@/lib/admin/rfm-tier'
+import { registrarLeitura } from '@/lib/auditoria/leitura'
 import { exigirAdmin } from '@/lib/auth/admin'
 import { asNumber, getSql } from '@/lib/db'
 import { createPrescriptionPdfSignedUrl } from '@/lib/pdf/signed-url'
@@ -256,9 +257,12 @@ export default async function AdminClienteDetalhePage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  await exigirAdmin()
-
+  const admin = await exigirAdmin()
   const { id } = await params
+
+  // Quem abriu a ficha de quem. Grava depois da resposta, pelo `after()`.
+  registrarLeitura({ quem: admin.userId, papel: admin.role, oQue: 'ficha', alvo: id })
+
   const sql = getSql()
 
   const clientRows = await sql<
