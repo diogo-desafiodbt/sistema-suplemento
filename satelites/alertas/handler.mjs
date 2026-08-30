@@ -110,7 +110,11 @@ function rotulo(tipo) {
 function textoDetalhe(detalhe) {
   if (!detalhe || typeof detalhe !== 'object') return ''
   const partes = []
-  if (detalhe.email) partes.push(String(detalhe.email))
+  // `cliente` e o codigo, nao o e-mail: o detalhe do alerta e JSONB e gravar
+  // e-mail ali contornava o controle por coluna deste papel, que nao alcanca
+  // `users`. Trocado em 30/08/2026.
+  if (detalhe.cliente) partes.push(String(detalhe.cliente))
+  if (detalhe.conversa) partes.push(`conversa ${String(detalhe.conversa).slice(0, 8)}`)
   if (detalhe.job) partes.push(String(detalhe.job))
   if (detalhe.valor != null) partes.push(`R$ ${detalhe.valor}`)
   if (detalhe.minutos != null) partes.push(`${detalhe.minutos} min`)

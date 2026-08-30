@@ -32,7 +32,7 @@ BEGIN
   -- 1) pagamento pago sem pedido
   INSERT INTO achados
   SELECT 'pagamento-sem-pedido:' || p.id, 'pagamento-sem-pedido',
-         jsonb_build_object('email', u.email, 'valor', p.amount,
+         jsonb_build_object('cliente', u.client_code, 'valor', p.amount,
            'minutos', round(extract(epoch FROM (now() - p.paid_at))/60))
   FROM payments p
   JOIN subscriptions s ON s.id = p.subscription_id
@@ -44,7 +44,7 @@ BEGIN
   -- 2) prescrição assinada sem despacho para a farmácia
   INSERT INTO achados
   SELECT 'assinada-sem-despacho:' || pr.id, 'assinada-sem-despacho',
-         jsonb_build_object('email', u.email,
+         jsonb_build_object('cliente', u.client_code,
            'minutos', round(extract(epoch FROM (now() - pr.signed_at))/60))
   FROM protocols pr
   JOIN users u         ON u.id = pr.user_id
@@ -106,7 +106,7 @@ BEGIN
   -- 5) cliente de suporte sem resposta
   INSERT INTO achados
   SELECT 'suporte-sem-resposta:' || t.id, 'suporte-sem-resposta',
-         jsonb_build_object('email', t.from_email, 'situacao', t.status,
+         jsonb_build_object('conversa', t.id, 'situacao', t.status,
            'horas', round(extract(epoch FROM (now() - t.last_message_at))/3600, 1))
   FROM support_threads t
   -- `encerrada` entrou junto com os cinco estados novos e é terminal. Sem ela
@@ -134,7 +134,7 @@ BEGIN
   -- 7) assinatura ativa com validade vencida
   INSERT INTO achados
   SELECT 'assinatura-vencida:' || s.id, 'assinatura-vencida',
-         jsonb_build_object('email', u.email, 'venceu_em', s.expires_at)
+         jsonb_build_object('cliente', u.client_code, 'venceu_em', s.expires_at)
   FROM subscriptions s JOIN users u ON u.id = s.user_id
   WHERE s.status = 'active' AND s.expires_at < now();
 
@@ -170,14 +170,14 @@ BEGIN
   -- apagada em 24/08/2026. A varredura vira esta pergunta.
   INSERT INTO achados
   SELECT 'assinatura-sem-protocolo:' || s.id, 'assinatura-sem-protocolo',
-         jsonb_build_object('assinatura', s.id, 'email', u.email,
+         jsonb_build_object('assinatura', s.id, 'cliente', u.client_code,
            'pago_em', min(p.paid_at))
   FROM subscriptions s
   JOIN users u ON u.id = s.user_id
   JOIN payments p ON p.subscription_id = s.id AND p.status = 'paid'
   WHERE s.protocol_id IS NULL
     AND p.paid_at < now() - interval '30 minutes'
-  GROUP BY s.id, u.email;
+  GROUP BY s.id, u.client_code;
 
   -- 10) pedido sem etiqueta
   -- A etiqueta passou a ser emitida logo depois que o pedido é gravado
@@ -190,7 +190,7 @@ BEGIN
   -- ninguém fica sabendo.
   INSERT INTO achados
   SELECT 'pedido-sem-etiqueta:' || o.id, 'pedido-sem-etiqueta',
-         jsonb_build_object('pedido', o.id, 'email', u.email,
+         jsonb_build_object('pedido', o.id, 'cliente', u.client_code,
            'minutos', round(extract(epoch FROM (now() - o.created_at))/60))
   FROM orders o
   JOIN users u ON u.id = o.user_id
@@ -245,3 +245,16 @@ END
 $vigia$;
 
 GRANT EXECUTE ON FUNCTION public.vigia_rodar() TO vigia;
+
+-- ---------------------------------------------------------------------------
+-- Por que `cliente` e não `email` no detalhe do alerta
+--
+-- O papel `satelite_alertas` lê uma tabela só, `alertas`, e nenhuma coluna de
+-- `users` — pelo desenho, ele não deveria enxergar e-mail de paciente. Mas o
+-- detalhe é JSONB, e gravar o e-mail ali contornava o controle por coluna sem
+-- ninguém ter decidido isso. Em 30/08/2026 havia 18 alertas nessa situação.
+--
+-- `client_code` é o identificador opaco que a Regra 4 manda atravessar a
+-- fronteira, e leva ao cliente com um clique de quem já tem acesso.
+-- O alerta de suporte aponta a conversa pelo id: o remetente nem sempre é
+-- cliente, e nesses casos não existe código para usar.

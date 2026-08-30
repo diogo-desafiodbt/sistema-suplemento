@@ -20,7 +20,7 @@ CREATE TEMP TABLE achados (digital text, tipo text, detalhe jsonb) ON COMMIT DRO
 -- 1) pagamento pago sem pedido
 INSERT INTO achados
 SELECT 'pagamento-sem-pedido:' || p.id, 'pagamento-sem-pedido',
-       jsonb_build_object('email', u.email, 'valor', p.amount,
+       jsonb_build_object('cliente', u.client_code, 'valor', p.amount,
          'minutos', round(extract(epoch FROM (now() - p.paid_at))/60))
 FROM payments p
 JOIN subscriptions s ON s.id = p.subscription_id
@@ -32,7 +32,7 @@ WHERE p.status = 'paid' AND p.paid_at < now() - interval '10 minutes'
 -- 2) prescrição assinada sem despacho para a farmácia
 INSERT INTO achados
 SELECT 'assinada-sem-despacho:' || pr.id, 'assinada-sem-despacho',
-       jsonb_build_object('email', u.email,
+       jsonb_build_object('cliente', u.client_code,
          'minutos', round(extract(epoch FROM (now() - pr.signed_at))/60))
 FROM protocols pr
 JOIN users u         ON u.id = pr.user_id
@@ -94,7 +94,7 @@ WHERE status = 'running' AND started_at < now() - interval '30 days';
 -- 5) cliente de suporte sem resposta
 INSERT INTO achados
 SELECT 'suporte-sem-resposta:' || t.id, 'suporte-sem-resposta',
-       jsonb_build_object('email', t.from_email, 'situacao', t.status,
+       jsonb_build_object('conversa', t.id, 'situacao', t.status,
          'horas', round(extract(epoch FROM (now() - t.last_message_at))/3600, 1))
 FROM support_threads t
 -- `encerrada` entrou junto com os cinco estados novos e é terminal. Sem ela
@@ -122,7 +122,7 @@ HAVING max(started_at) IS NULL OR max(started_at) < now() - interval '20 minutes
 -- 7) assinatura ativa com validade vencida
 INSERT INTO achados
 SELECT 'assinatura-vencida:' || s.id, 'assinatura-vencida',
-       jsonb_build_object('email', u.email, 'venceu_em', s.expires_at)
+       jsonb_build_object('cliente', u.client_code, 'venceu_em', s.expires_at)
 FROM subscriptions s JOIN users u ON u.id = s.user_id
 WHERE s.status = 'active' AND s.expires_at < now();
 
@@ -159,14 +159,14 @@ WHERE status = 'completed'
 -- apagada em 24/08/2026. A varredura vira esta pergunta.
 INSERT INTO achados
 SELECT 'assinatura-sem-protocolo:' || s.id, 'assinatura-sem-protocolo',
-       jsonb_build_object('assinatura', s.id, 'email', u.email,
+       jsonb_build_object('assinatura', s.id, 'cliente', u.client_code,
          'pago_em', min(p.paid_at))
 FROM subscriptions s
 JOIN users u ON u.id = s.user_id
 JOIN payments p ON p.subscription_id = s.id AND p.status = 'paid'
 WHERE s.protocol_id IS NULL
   AND p.paid_at < now() - interval '30 minutes'
-GROUP BY s.id, u.email;
+GROUP BY s.id, u.client_code;
 
 -- 10) pedido sem etiqueta
 -- A etiqueta passou a ser emitida logo depois que o pedido é gravado
@@ -174,7 +174,7 @@ GROUP BY s.id, u.email;
 -- dois dias antes de agir, e por isso não dava para cobrar prazo.
 INSERT INTO achados
 SELECT 'pedido-sem-etiqueta:' || o.id, 'pedido-sem-etiqueta',
-       jsonb_build_object('pedido', o.id, 'email', u.email,
+       jsonb_build_object('pedido', o.id, 'cliente', u.client_code,
          'minutos', round(extract(epoch FROM (now() - o.created_at))/60))
 FROM orders o
 JOIN users u ON u.id = o.user_id
