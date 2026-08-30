@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { getUserProfile } from '@/lib/auth/profile'
 import { sessaoAtual } from '@/lib/auth/sessao'
-import { getSql, withTransaction } from '@/lib/db'
+import { getSql } from '@/lib/db'
 import { generatePrescriptionPdf } from '@/lib/pdf/generator'
 import { createPrescriptionPdfSignedUrl } from '@/lib/pdf/signed-url'
 import { sendToPharmacyWithPdf } from '@/lib/pharmacy/sender'
@@ -186,33 +186,24 @@ export async function POST(request: NextRequest) {
     const userAgent = request.headers.get('user-agent') ?? 'unknown'
 
     try {
-      await withTransaction(async (tx) => {
-        await tx`
-          UPDATE protocols
-          SET
-            status = 'signed',
-            signed_at = ${signedAt},
-            signed_by = ${professional.id}::uuid,
-            prescription_pdf_path = ${fileName}
-          WHERE id = ${protocol_id}::uuid
-        `
-        await tx`
-          INSERT INTO prescription_audit_logs (
-            protocol_id, professional_id, action, signed_at,
-            ip_address, user_agent, pdf_url, pdf_hash, payload_snapshot
-          ) VALUES (
-            ${protocol_id}::uuid,
-            ${professional.id}::uuid,
-            'signed',
-            ${signedAt},
-            ${ipAddress},
-            ${userAgent},
-            ${null},
-            ${hash},
-            ${tx.json(protocol as never)}
-          )
-        `
-      })
+      // A escrita passa por `assinar_protocolo()`, e `app_web` perdeu o UPDATE
+      // direto em `protocols`. Antes, o mesmo processo que serve o admin e as
+      // rotas do público podia marcar qualquer prescrição como assinada por
+      // qualquer profissional. A função grava a assinatura e o log de auditoria
+      // juntos, então não existe caminho que faça uma coisa sem a outra — e
+      // recusa assinar o que já está assinado.
+      await sql`
+        SELECT assinar_protocolo(
+          ${protocol_id}::uuid,
+          ${professional.id}::uuid,
+          ${signedAt}::timestamptz,
+          ${fileName},
+          ${hash},
+          ${ipAddress},
+          ${userAgent},
+          ${sql.json(protocol as never)}
+        )
+      `
     } catch (writeError) {
       console.error('Assinar write error:', writeError)
       return NextResponse.json(
