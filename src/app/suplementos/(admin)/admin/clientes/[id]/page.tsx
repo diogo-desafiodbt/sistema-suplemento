@@ -287,8 +287,6 @@ export default async function AdminClienteDetalhePage({
     subscriptions,
     orders,
     protocols,
-    quizResponses,
-    healthRecords,
     notificationLogs,
     loginHistory,
     termsAcceptances,
@@ -341,14 +339,6 @@ export default async function AdminClienteDetalhePage({
       ORDER BY p.generated_at DESC
     `,
     sql<Record<string, unknown>[]>`
-      SELECT * FROM quiz_responses
-      WHERE user_id = ${id}::uuid
-      ORDER BY completed_at DESC NULLS LAST
-    `,
-    sql<Record<string, unknown>[]>`
-      SELECT * FROM health_records WHERE user_id = ${id}::uuid
-    `,
-    sql<Record<string, unknown>[]>`
       SELECT * FROM notification_logs
       WHERE user_id = ${id}::uuid
       ORDER BY sent_at DESC
@@ -395,8 +385,6 @@ export default async function AdminClienteDetalhePage({
       ),
     })),
   )
-  const quizList = quizResponses
-  const healthList = healthRecords
   const notifList = notificationLogs
   const loginList = loginHistory
   const termsList = termsAcceptances
@@ -911,50 +899,14 @@ export default async function AdminClienteDetalhePage({
         </div>
       </SectionCard>
 
-      {/* 2.7 — Saúde */}
-      <SectionCard title="Saúde">
-        {quizList.length === 0 && healthList.length === 0 && (
-          <Empty text="Nenhuma resposta de quiz ou registro de saúde." />
-        )}
-        <div className="admin-pilha">
-          {quizList.map((quiz, i) => (
-            <div key={String(quiz.id ?? i)} className="admin-item">
-              <p className="admin-campo-rotulo" style={{ marginBottom: 8 }}>
-                Resposta de quiz{' '}
-                {quizList.length > 1 ? `#${quizList.length - i}` : ''}
-              </p>
-              <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5">
-                {readableEntries(quiz).map(([key, value]) => (
-                  <div key={key} className="flex gap-2 text-xs">
-                    <dt className="admin-mono" style={{ flexShrink: 0 }}>
-                      {key}:
-                    </dt>
-                    <dd className="admin-campo-valor">{value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          ))}
-          {healthList.map((record, i) => (
-            <div key={String(record.id ?? i)} className="admin-item">
-              <p className="admin-campo-rotulo" style={{ marginBottom: 8 }}>
-                Registro de saúde{' '}
-                {healthList.length > 1 ? `#${healthList.length - i}` : ''}
-              </p>
-              <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5">
-                {readableEntries(record).map(([key, value]) => (
-                  <div key={key} className="flex gap-2 text-xs">
-                    <dt className="admin-mono" style={{ flexShrink: 0 }}>
-                      {key}:
-                    </dt>
-                    <dd className="admin-campo-valor">{value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          ))}
-        </div>
-      </SectionCard>
+      {/* 2.7 — Saúde: removida em 30/08/2026.
+          O quadro clínico não é dado de operação, e o admin não precisa dele
+          para atender. Quem lê prontuário é o profissional, na área dele.
+          As duas consultas eram `SELECT *`, o padrão que a Camada 5 da regra de
+          arquitetura nomeia como vazamento por conveniência: uma coluna nova na
+          tabela apareceria na tela sem ninguém decidir.
+          O protocolo continua visível abaixo, como estado e itens — o que foi
+          prescrito e enviado —, sem o raciocínio que levou até ele. */}
 
       {/* 2.8 — Comunicações e acesso */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">

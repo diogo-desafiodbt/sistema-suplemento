@@ -224,6 +224,10 @@
         {
           "name": "RESEND_MARKETING_API_KEY",
           "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/RESEND_MARKETING_API_KEY-GoRxq5"
+        },
+        {
+          "name": "DATABASE_URL_SUPORTE",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:768102455037:secret:sistema/DATABASE_URL_SUPORTE-EUX4uU"
         }
       ],
       "logConfiguration": {

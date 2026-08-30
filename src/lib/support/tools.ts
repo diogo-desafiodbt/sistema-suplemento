@@ -1,12 +1,13 @@
 import { z } from 'zod'
 import { betaZodTool } from '@anthropic-ai/sdk/helpers/beta/zod'
-import { asNumber, getSql } from '@/lib/db'
+import { asNumber } from '@/lib/db'
+import { getSqlSuporte } from '@/lib/support/db'
 import { getSqlConteudo } from '@/lib/conteudo/db'
 
 type Ator = 'ia' | 'pedro'
 
 async function emailDoUsuario(userId: string): Promise<string | null> {
-  const sql = getSql()
+  const sql = getSqlSuporte()
   const rows = await sql<{ email: string | null }[]>`
     SELECT email FROM users WHERE id = ${userId}::uuid LIMIT 1
   `
@@ -20,7 +21,7 @@ async function registrarLeitura(params: {
   ferramenta: string
   campos: string[]
 }): Promise<void> {
-  const sql = getSql()
+  const sql = getSqlSuporte()
   await sql`
     INSERT INTO support_access_log (thread_id, user_id, ator, ferramenta, campos)
     VALUES (
@@ -94,7 +95,7 @@ export function criarFerramentas(
       'Use quando o cliente perguntar onde está o pedido, se já foi enviado, ou reclamar de atraso. Devolve id, status, valor, data e rastreio.',
     inputSchema: z.object({}),
     run: async () => {
-      const sql = getSql()
+      const sql = getSqlSuporte()
       const rows = await sql<
         {
           id: string
@@ -138,7 +139,7 @@ export function criarFerramentas(
       pedido_id: z.string().uuid().optional(),
     }),
     run: async ({ pedido_id }) => {
-      const sql = getSql()
+      const sql = getSqlSuporte()
       const rows = pedido_id
         ? await sql<
             {
@@ -192,7 +193,7 @@ export function criarFerramentas(
       'Use quando o cliente perguntar sobre cobrança, valor pago, cartão, Pix, fatura ou cupom. Devolve cobranças: valor, status, data, forma e cupom.',
     inputSchema: z.object({}),
     run: async () => {
-      const sql = getSql()
+      const sql = getSqlSuporte()
       const rows = await sql<
         {
           amount: string | number | null
@@ -238,7 +239,7 @@ export function criarFerramentas(
       'Use quando o cliente perguntar sobre o plano, renovação, próxima cobrança, cancelamento ou se a assinatura está ativa.',
     inputSchema: z.object({}),
     run: async () => {
-      const sql = getSql()
+      const sql = getSqlSuporte()
       const rows = await sql<
         {
           plan_type: string | null
@@ -283,7 +284,7 @@ export function criarFerramentas(
       'Use quando o cliente perguntar sobre o próprio cadastro, e-mail da conta, código do cliente ou o que está liberado no acesso. Nunca peça nem devolva documento, data de nascimento ou endereço.',
     inputSchema: z.object({}),
     run: async () => {
-      const sql = getSql()
+      const sql = getSqlSuporte()
       const userRows = await sql<
         {
           full_name: string | null
@@ -342,7 +343,7 @@ export function criarFerramentas(
       'Use quando o cliente perguntar preço, o que tem no catálogo, diferença entre planos ou se um produto existe. Não depende do cliente.',
     inputSchema: z.object({}),
     run: async () => {
-      const sql = getSql()
+      const sql = getSqlSuporte()
       const rows = await sql<
         {
           name: string
