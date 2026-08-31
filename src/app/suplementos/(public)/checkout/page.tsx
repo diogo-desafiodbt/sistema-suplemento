@@ -75,6 +75,7 @@ function clearCheckoutSession() {
   sessionStorage.removeItem('selected_plan')
   sessionStorage.removeItem('protocol_id')
   sessionStorage.removeItem('triagem_data')
+  sessionStorage.removeItem('contato_quiz')
   sessionStorage.removeItem('quiz_data')
   sessionStorage.removeItem('mini_quiz_data')
   sessionStorage.removeItem('checkout_source')
@@ -110,6 +111,11 @@ export default function CheckoutPage() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  // Criar conta é o padrão porque a maioria de quem chega aqui é nova. Quem
+  // já tem conta troca num clique, sem sair da página — mandar para a tela de
+  // login perdia o carrinho e obrigava a refazer o quiz.
+  const [modoConta, setModoConta] = useState<'criar' | 'entrar'>('criar')
+  const [precisaDeAutenticador, setPrecisaDeAutenticador] = useState(false)
 
   const [cep, setCep] = useState('')
   const [street, setStreet] = useState('')
@@ -255,6 +261,24 @@ export default function CheckoutPage() {
       setPlan(nextPlan)
       setItems(parsed)
 
+      // Nome e e-mail já foram digitados no quiz. Repetir a pergunta a duas
+      // telas de distância é o tipo de atrito que faz a pessoa desistir no
+      // último passo.
+      try {
+        const contatoRaw = sessionStorage.getItem('contato_quiz')
+        if (contatoRaw) {
+          const contato = JSON.parse(contatoRaw) as {
+            full_name?: string
+            email?: string
+          }
+          if (contato.full_name) setFullName(contato.full_name)
+          if (contato.email) setEmail(contato.email)
+        }
+      } catch {
+        // Contato ausente ou corrompido não impede a compra: os campos
+        // simplesmente aparecem vazios, como antes.
+      }
+
       const profileRes = await fetch('/api/auth/profile')
       if (!profileRes.ok || cancelled) return
 
@@ -348,6 +372,63 @@ export default function CheckoutPage() {
       console.error('Cadastro catch:', err)
       const message = err instanceof Error ? err.message : String(err)
       toast.error(message || 'Erro desconhecido')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  /**
+   * Entrar sem sair do checkout.
+   *
+   * Depois do login o caminho é o mesmo do cadastro: puxa o perfil, preenche
+   * o resumo da conta e avança para o endereço. Se divergisse, quem entra
+   * cairia num checkout com o passo da conta ainda aberto.
+   */
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    setPrecisaDeAutenticador(false)
+
+    try {
+      const res = await fetch('/api/auth/entrar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+
+      if (!res.ok) {
+        toast.error('E-mail ou senha incorretos.')
+        return
+      }
+
+      // Conta com segundo fator não entra por aqui: o desafio do autenticador
+      // é uma tela inteira, e metê-la no meio do checkout seria pedir o código
+      // no lugar em que a pessoa está tentando pagar. Contas de administrador
+      // são as que têm isso ligado, e elas não compram por este caminho.
+      const dados = await res.json().catch(() => ({}))
+      if (dados.mfa) {
+        setPrecisaDeAutenticador(true)
+        return
+      }
+
+      await fetch('/api/auth/login-event', { method: 'POST' })
+
+      const perfil = await waitForProfile()
+      if (!perfil) {
+        toast.warning(
+          'Entrou, mas o perfil ainda está sincronizando. Você pode continuar.',
+        )
+      }
+
+      setAccountSummary({
+        name: perfil?.full_name ?? fullName,
+        email: perfil?.email ?? email,
+      })
+      setStep(3)
+      toast.success('Bem-vindo de volta!')
+    } catch (err) {
+      console.error('Login no checkout:', err)
+      toast.error('Não foi possível entrar. Tente de novo.')
     } finally {
       setLoading(false)
     }
@@ -658,27 +739,50 @@ export default function CheckoutPage() {
 
             {step === 2 && (
               <div className="px-6 pb-6 space-y-3 border-t border-gray-50">
-                <p className="text-sm md:text-base text-gray-400 pt-3">
-                  Já tem conta?{' '}
-                  <a
-                    href="/suplementos/login"
-                    className="text-[#f4001e] font-semibold hover:underline"
-                  >
-                    Faça login
-                  </a>
-                </p>
-                <form onSubmit={handleCreateAccount} className="space-y-3">
-                  <input
-                    type="text"
-                    placeholder="Nome completo"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
-                  />
+                <div className="flex gap-1 p-1 bg-gray-100 rounded-full mt-3">
+                  {(['criar', 'entrar'] as const).map((modo) => (
+                    <button
+                      key={modo}
+                      type="button"
+                      onClick={() => {
+                        setModoConta(modo)
+                        setPassword('')
+                        setPrecisaDeAutenticador(false)
+                      }}
+                      className={`flex-1 py-2 rounded-full text-sm font-semibold transition ${
+                        modoConta === modo
+                          ? 'bg-white text-[#13244f] shadow-sm'
+                          : 'text-gray-500'
+                      }`}
+                    >
+                      {modo === 'criar' ? 'Criar conta' : 'Já tenho conta'}
+                    </button>
+                  ))}
+                </div>
+
+                <form
+                  onSubmit={
+                    modoConta === 'criar' ? handleCreateAccount : handleLogin
+                  }
+                  className="space-y-3"
+                >
+                  {/* O nome só existe no cadastro: quem entra já tem um
+                      guardado, e pedir de novo abriria a porta para o cadastro
+                      de uma pessoa ser sobrescrito no meio de uma compra. */}
+                  {modoConta === 'criar' && (
+                    <input
+                      type="text"
+                      placeholder="Nome completo"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      required
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
+                    />
+                  )}
                   <input
                     type="email"
                     placeholder="E-mail"
+                    autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -686,20 +790,57 @@ export default function CheckoutPage() {
                   />
                   <input
                     type="password"
-                    placeholder="Crie uma senha (mínimo 6 caracteres)"
+                    placeholder={
+                      modoConta === 'criar'
+                        ? 'Crie uma senha (mínimo 6 caracteres)'
+                        : 'Sua senha'
+                    }
+                    autoComplete={
+                      modoConta === 'criar' ? 'new-password' : 'current-password'
+                    }
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    minLength={6}
+                    minLength={modoConta === 'criar' ? 6 : undefined}
                     required
                     className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                   />
+
+                  {precisaDeAutenticador && (
+                    <p className="text-sm text-[#a30000]">
+                      Esta conta pede código do aplicativo autenticador. Entre
+                      por{' '}
+                      <a
+                        href="/suplementos/login"
+                        className="font-semibold underline"
+                      >
+                        esta página
+                      </a>{' '}
+                      e volte para continuar a compra.
+                    </p>
+                  )}
+
                   <button
                     type="submit"
                     disabled={loading}
                     className="w-full bg-[#f4001e] hover:bg-[#a30000] text-white py-3.5 rounded-full font-bold text-sm transition active:scale-95 disabled:opacity-50"
                   >
-                    {loading ? 'Criando conta...' : 'Continuar'}
+                    {loading
+                      ? modoConta === 'criar'
+                        ? 'Criando conta...'
+                        : 'Entrando...'
+                      : 'Continuar'}
                   </button>
+
+                  {modoConta === 'entrar' && (
+                    <p className="text-center text-sm text-gray-400">
+                      <a
+                        href="/suplementos/recuperar-senha"
+                        className="hover:underline"
+                      >
+                        Esqueci minha senha
+                      </a>
+                    </p>
+                  )}
                 </form>
               </div>
             )}

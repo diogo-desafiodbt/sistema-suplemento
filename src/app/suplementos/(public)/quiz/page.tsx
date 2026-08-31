@@ -627,6 +627,19 @@ export default function QuizPage() {
 
       sessionStorage.setItem('protocol_items', JSON.stringify(protocolItems))
       sessionStorage.setItem('triagem_data', JSON.stringify(triagemData))
+      // O contato viaja separado da triagem de propósito. `triagem_data` é o
+      // que vai para a API do pedido como payload clínico; enfiar e-mail e
+      // telefone ali misturaria dado de contato com dado de saúde numa
+      // estrutura só, e a fronteira entre os dois é o que a arquitetura
+      // inteira existe para manter.
+      sessionStorage.setItem(
+        'contato_quiz',
+        JSON.stringify({
+          full_name: form.full_name.trim(),
+          email: form.email.trim(),
+          telefone: form.telefone.trim(),
+        }),
+      )
       sessionStorage.setItem(
         'triage_session_token',
         sessionData.token as string,
