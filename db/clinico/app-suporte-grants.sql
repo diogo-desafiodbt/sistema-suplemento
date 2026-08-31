@@ -27,3 +27,7 @@ GRANT SELECT ON public.products TO app_suporte;
 -- O que fica de fora, de propósito e por escrito: protocols, protocol_items,
 -- quiz_responses, health_records, prescription_audit_logs. Se uma ferramenta
 -- nova tentar, o banco recusa.
+
+-- Mesmo esquecimento do papel de marketing: `USAGE` no schema não dá `CONNECT`
+-- no banco.
+GRANT CONNECT ON DATABASE clinico TO app_suporte;

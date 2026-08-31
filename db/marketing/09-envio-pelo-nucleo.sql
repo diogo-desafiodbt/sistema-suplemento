@@ -35,3 +35,9 @@ GRANT UPDATE (situacao, resend_audience_id, resend_broadcast_id, publicada_em)
 GRANT EXECUTE ON FUNCTION marketing.publico_da_campanha(text[], timestamptz, integer)
   TO app_marketing_envio;
 GRANT SELECT, INSERT, DELETE ON marketing.campanha_publico TO app_marketing_envio;
+
+-- Sem isto o papel nem abre conexão: `USAGE` no schema não dá `CONNECT` no
+-- banco. Faltou em 30/08 e a tela do disparo deu branco, com
+-- `permission denied for database "clinico"` no log — invisível para quem
+-- estava usando.
+GRANT CONNECT ON DATABASE clinico TO app_marketing_envio;

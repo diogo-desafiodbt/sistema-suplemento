@@ -221,7 +221,7 @@ function pagina(pedidos) {
 async function listarPedidos(db) {
   return db`
     SELECT o.id, o.status, o.created_at, o.tracking_code, o.total_amount,
-           o.shipping_request_id, u.full_name, u.email, u.client_code
+           o.shipping_request_id, u.full_name, u.client_code
     FROM orders o
     LEFT JOIN users u ON u.id = o.user_id
     ORDER BY o.created_at DESC
