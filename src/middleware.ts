@@ -170,7 +170,18 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
+  // `api/funnel/track` fica de fora junto com os webhooks e o Inngest.
+  //
+  // Ele é anônimo por natureza — grava um passo e devolve `ok` — e não tem o
+  // que fazer com sessão. Rodar o caminho de autenticação nele custou caro em
+  // 31/08: a página pública passou a chamar essa rota a cada carregamento, e
+  // cada chamada tentava traduzir e renovar o token. Quando a renovação
+  // falhava, o `limparTokens` mandava um Set-Cookie apagando a sessão — e o
+  // navegador obedecia. A pessoa era deslogada por uma chamada de rastreio.
+  //
+  // A regra que fica: rota anônima de escrita não passa pelo middleware de
+  // sessão. Ela não ganha nada e pode destruir a sessão de quem tem uma.
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|api/webhooks|api/inngest).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/webhooks|api/inngest|api/funnel/track).*)',
   ],
 }
