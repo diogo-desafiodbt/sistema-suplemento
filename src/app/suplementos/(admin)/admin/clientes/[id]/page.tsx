@@ -16,6 +16,7 @@ import { exigirAdmin } from '@/lib/auth/admin'
 import { asNumber, getSql } from '@/lib/db'
 import { createPrescriptionPdfSignedUrl } from '@/lib/pdf/signed-url'
 import { PLAN_LABELS } from '@/lib/plans'
+import { jornadaDaPessoa } from '@/lib/rastro/consultas'
 import { getProductDisplayName } from '@/lib/product-display-names'
 import { isNorteNordeste } from '@/lib/shipping/sender-region'
 
@@ -229,6 +230,17 @@ function readableEntries(
   return entries
 }
 
+/** Os mesmos nomes neutros da tela do Rastro. Ver `docs/arquitetura/rastro-zona-1.md`. */
+const NOME_DO_PASSO: Record<string, string> = {
+  visita: 'Chegou no site',
+  triagem_iniciada: 'Começou a triagem',
+  triagem_respondida: 'Respondeu a triagem',
+  triagem_concluida: 'Terminou a triagem',
+  checkout_iniciado: 'Abriu o checkout',
+  compra_concluida: 'Comprou',
+  login: 'Entrou na conta',
+}
+
 function SectionCard({
   title,
   children,
@@ -399,6 +411,11 @@ export default async function AdminClienteDetalhePage({
       protocolList.map((p) => p.signed_by).filter((v): v is string => !!v),
     ),
   ]
+
+  // A jornada entra na mesma ficha, e não numa tela à parte: a decisão de
+  // 30/08 é que só o clínico se isola — o resto do cliente o Diogo tem que
+  // poder juntar quando quiser.
+  const jornada = await jornadaDaPessoa(id)
 
   const [payments, pros] = await Promise.all([
     subIds.length > 0
@@ -1010,6 +1027,28 @@ export default async function AdminClienteDetalhePage({
             </div>
           ))}
         </div>
+      </SectionCard>
+
+      <SectionCard title="Como chegou até aqui">
+        {jornada.length === 0 ? (
+          <Empty text="Nenhum passo registrado. A jornada começa a existir a partir da primeira visita depois de 31/08/2026." />
+        ) : (
+          <ol className="rastro-linha">
+            {jornada.map((passo) => (
+              <li key={`${passo.anonimo_id}-${passo.evento}-${passo.ocorrido_em}`}>
+                <div className="rastro-linha-topo">
+                  <span className="admin-nome">
+                    {NOME_DO_PASSO[passo.evento] ?? passo.evento}
+                  </span>
+                  <span className="admin-sub">{fmtDateTime(passo.ocorrido_em)}</span>
+                </div>
+                {passo.origem && (
+                  <p className="admin-sub">veio de {passo.origem}</p>
+                )}
+              </li>
+            ))}
+          </ol>
+        )}
       </SectionCard>
     </main>
   )

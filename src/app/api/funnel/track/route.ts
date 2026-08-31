@@ -1,11 +1,15 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { getSql } from '@/lib/db'
+import { nomeNeutro, registrar } from '@/lib/rastro/registrar'
 
 const VALID_TYPES = [
   'quiz_started',
   'quiz_completed',
   'quiz_eligible',
   'checkout_started',
+  // `visita` só existe no Rastro: é o primeiro passo, e é ele que carrega a
+  // origem. Não entra em `funnel_events`, que conta etapas de quiz.
+  'visita',
 ]
 
 const UUID_RE =
@@ -22,11 +26,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'payload inválido' }, { status: 400 })
     }
 
-    const sql = getSql()
-    await sql`
-      INSERT INTO funnel_events (session_id, event_type)
-      VALUES (${session_id}::uuid, ${event_type})
-    `
+    if (event_type !== 'visita') {
+      await getSql()`
+        INSERT INTO funnel_events (session_id, event_type)
+        VALUES (${session_id}::uuid, ${event_type})
+      `
+    }
+
+    // O mesmo passo entra no Rastro com nome neutro. As duas tabelas convivem
+    // de propósito: `funnel_events` é a contagem que já existe e alimenta os
+    // números de hoje; o Rastro é o que liga o passo a uma pessoa e a uma
+    // origem. Quando o Rastro estiver respondendo tudo, a primeira sai.
+    const neutro = nomeNeutro(event_type)
+    if (neutro) await registrar(session_id, neutro)
 
     return NextResponse.json({ ok: true })
   } catch (error) {

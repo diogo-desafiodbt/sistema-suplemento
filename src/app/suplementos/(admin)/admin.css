@@ -1688,3 +1688,82 @@ a.admin-pendencia-titulo:hover {
     align-items: start;
   }
 }
+
+/* ==========================================================================
+   Rastro — onde as pessoas param.
+   Barra em vez de número solto porque a pergunta aqui é comparativa: não
+   interessa quantos terminaram a triagem, interessa quantos sumiram entre uma
+   etapa e a seguinte, e isso o olho lê no comprimento antes de ler o número.
+   ========================================================================== */
+
+.rastro-funil {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rastro-etapa-topo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 7px;
+}
+
+.rastro-barra {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--admin-tinta);
+  min-width: 3px;
+}
+
+/* A última etapa é a que interessa: chegou lá é venda. */
+.rastro-etapa:last-child .rastro-barra {
+  background: var(--admin-vermelho);
+}
+
+.rastro-etapa .admin-sub {
+  margin-top: 6px;
+}
+
+/* A jornada na ficha do cliente: uma linha do tempo simples, do primeiro
+   passo ao último. O filete à esquerda liga os pontos; é o único enfeite. */
+.rastro-linha {
+  margin: 0;
+  padding: 0 0 0 18px;
+  list-style: none;
+  border-left: 2px solid var(--admin-borda);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rastro-linha li {
+  position: relative;
+}
+
+.rastro-linha li::before {
+  content: '';
+  position: absolute;
+  left: -24px;
+  top: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--admin-tinta-fraca);
+}
+
+.rastro-linha li:last-child::before {
+  background: var(--admin-vermelho);
+}
+
+.rastro-linha-topo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}

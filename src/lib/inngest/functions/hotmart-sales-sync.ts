@@ -48,6 +48,84 @@ async function garantirClientesDaHotmart(
 }
 
 /**
+ * A origem que a Hotmart devolve na venda.
+ *
+ * `src` é o parâmetro que a gente coloca no link do checkout; `source_sck` é
+ * o que a Hotmart preenche sozinha quando a venda nasce dentro dela (página
+ * do produto, vendedor). Preferimos o nosso: quando os dois existem, é porque
+ * a pessoa veio pelo nosso link e passou pela loja deles no caminho.
+ *
+ * Hoje `src` volta vazio em todas as vendas — o parâmetro nunca foi
+ * configurado nos links. É por isso que "configurar a Hotmart" está na lista
+ * do Diogo: sem esse passo, esta função devolve sempre a origem da Hotmart.
+ */
+function origemDaVenda(item: unknown): string | null {
+  if (!item || typeof item !== 'object') return null
+  const compra = (item as Record<string, unknown>).purchase
+  if (!compra || typeof compra !== 'object') return null
+  const rastreio = (compra as Record<string, unknown>).tracking
+  if (!rastreio || typeof rastreio !== 'object') return null
+
+  const r = rastreio as Record<string, unknown>
+  for (const chave of ['src', 'source_sck', 'sck']) {
+    const v = r[chave]
+    if (typeof v === 'string' && v.trim()) return v.trim().slice(0, 60)
+  }
+  return null
+}
+
+/**
+ * Registra a compra no Rastro, para quem já tem cadastro.
+ *
+ * O identificador de navegador vem da costura feita no login, quando existe.
+ * Quando não existe — comprador que nunca entrou no site, só clicou no link
+ * da Hotmart — grava com um identificador derivado da transação. É honesto:
+ * a compra aparece na ficha da pessoa, mas não é atribuída a uma jornada de
+ * navegação que nunca houve.
+ */
+async function registrarComprasNoRastro(
+  vendas: { buyer_email: string | null; transaction_code: string; origem: string | null }[],
+): Promise<void> {
+  const sql = getSql()
+  for (const venda of vendas) {
+    const email = venda.buyer_email?.trim().toLowerCase()
+    if (!email) continue
+    try {
+      const [pessoa] = await sql<{ id: string; anonimo_id: string | null }[]>`
+        SELECT u.id, l.anonimo_id
+        FROM users u
+        LEFT JOIN rastro_ligacoes l ON l.pessoa_id = u.id
+        WHERE lower(u.email) = ${email}
+        ORDER BY l.ligado_em
+        LIMIT 1
+      `
+      if (!pessoa) continue
+
+      // Idempotente pela transação: a sincronização relê a janela de dois dias
+      // toda madrugada, e sem isto a mesma compra viraria um evento por dia.
+      const anonimo = pessoa.anonimo_id ?? `hotmart:${venda.transaction_code}`
+      const [jaTem] = await sql<{ existe: boolean }[]>`
+        SELECT true AS existe FROM rastro_eventos
+        WHERE anonimo_id = ${anonimo} AND evento = 'compra_concluida'
+        LIMIT 1
+      `
+      if (jaTem) continue
+
+      await sql`
+        SELECT rastro_registrar(
+          ${anonimo}, 'compra_concluida', ${venda.origem}, ${pessoa.id}::uuid
+        )
+      `
+    } catch (erro) {
+      console.error('rastro: compra da Hotmart não entrou', {
+        transacao: venda.transaction_code,
+        erro,
+      })
+    }
+  }
+}
+
+/**
  * CPF do comprador, quando a Hotmart manda.
  *
  * O Diogo ligou a exigência de CPF no checkout em 25/08/2026. O campo não
@@ -209,6 +287,23 @@ export const hotmartSalesSync = inngest.createFunction(
         // entra na próxima rodada. Mas registra, porque silêncio aqui
         // significaria comprador invisível para sempre.
         console.error('Falha ao criar clientes da Hotmart:', error)
+      }
+
+      // A compra fecha a jornada: é o último passo, e é ele que dá sentido a
+      // todos os anteriores no relatório de origem.
+      try {
+        await registrarComprasNoRastro(
+          items.map((item) => ({
+            buyer_email:
+              (item as { buyer?: { email?: string } }).buyer?.email ?? null,
+            transaction_code:
+              (item as { purchase?: { transaction?: string } }).purchase
+                ?.transaction ?? '',
+            origem: origemDaVenda(item),
+          })).filter((v) => v.transaction_code),
+        )
+      } catch (error) {
+        console.error('Falha ao registrar compras no Rastro:', error)
       }
 
       const payload = {

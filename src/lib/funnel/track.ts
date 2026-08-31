@@ -57,6 +57,7 @@ export function idDoVisitante(): string {
 }
 
 export type FunnelEventType =
+  | 'visita'
   | 'quiz_started'
   | 'quiz_completed'
   | 'quiz_eligible'

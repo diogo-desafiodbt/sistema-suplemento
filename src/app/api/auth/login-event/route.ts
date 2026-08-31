@@ -1,7 +1,9 @@
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { garantirPerfil } from '@/lib/auth/garantir-perfil'
 import { sessaoAtual } from '@/lib/auth/sessao'
 import { getSql } from '@/lib/db'
+import { COOKIE_VISITANTE, costurar, registrar } from '@/lib/rastro/registrar'
 
 export async function POST(request: Request) {
   let userId: string | undefined
@@ -35,6 +37,16 @@ export async function POST(request: Request) {
       SET rfm_recalc_queued_at = ${new Date().toISOString()}
       WHERE id = ${sessao.userId}::uuid
     `
+
+    // O único momento em que o identificador do navegador e o da pessoa estão
+    // na mesma requisição. É aqui, e só aqui, que a jornada anterior ao login
+    // ganha dono — sem isto, quem vê um vídeo hoje e compra amanhã aparece
+    // como duas pessoas e o vídeo nunca recebe crédito pela venda.
+    const anonimoId = (await cookies()).get(COOKIE_VISITANTE)?.value
+    if (anonimoId) {
+      await costurar(anonimoId, sessao.userId)
+      await registrar(anonimoId, 'login', sessao.userId)
+    }
 
     return NextResponse.json({ ok: true })
   } catch (error) {

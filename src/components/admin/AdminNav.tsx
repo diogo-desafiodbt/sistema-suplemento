@@ -78,6 +78,16 @@ const grupos: { titulo: string; itens: Item[] }[] = [
     titulo: 'Comercial',
     itens: [
       {
+        label: 'Rastro',
+        href: '/suplementos/admin/rastro',
+        icone: (
+          <Icone>
+            <path d="M3 3v18h18" />
+            <path d="M7 15l4-4 3 3 5-6" />
+          </Icone>
+        ),
+      },
+      {
         label: 'Leads',
         href: '/suplementos/admin/comercial',
         icone: (
