@@ -72,15 +72,15 @@ export default async function AdminVisaoGeralPage({
     delivered,
   ] = await Promise.all([
     countN(sqlCounts<{ n: number }[]>`
-      SELECT COUNT(*)::int AS n FROM funnel_events
+      SELECT COUNT(DISTINCT session_id)::int AS n FROM funnel_events
       WHERE event_type = 'quiz_started' AND ${sinceFilter('created_at')}
     `),
     countN(sqlCounts<{ n: number }[]>`
-      SELECT COUNT(*)::int AS n FROM funnel_events
+      SELECT COUNT(DISTINCT session_id)::int AS n FROM funnel_events
       WHERE event_type = 'quiz_eligible' AND ${sinceFilter('created_at')}
     `),
     countN(sqlCounts<{ n: number }[]>`
-      SELECT COUNT(*)::int AS n FROM funnel_events
+      SELECT COUNT(DISTINCT session_id)::int AS n FROM funnel_events
       WHERE event_type = 'checkout_started' AND ${sinceFilter('created_at')}
     `),
     countN(sqlCounts<{ n: number }[]>`

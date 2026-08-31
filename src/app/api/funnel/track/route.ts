@@ -26,7 +26,6 @@ export async function POST(request: NextRequest) {
     await sql`
       INSERT INTO funnel_events (session_id, event_type)
       VALUES (${session_id}::uuid, ${event_type})
-      ON CONFLICT DO NOTHING
     `
 
     return NextResponse.json({ ok: true })
