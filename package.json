@@ -11,7 +11,7 @@
     "prebuild": "node scripts/conferir-isolamento.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.115.0",
+    "@anthropic-ai/sdk": "^0.116.0",
     "@aws-sdk/client-cognito-identity-provider": "^3.1111.0",
     "@aws-sdk/client-s3": "^3.1111.0",
     "@aws-sdk/rds-signer": "^3.1111.0",
@@ -29,6 +29,8 @@
     "radix-ui": "^1.4.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "resend": "^6.12.4",
     "shadcn": "^4.8.0",
     "sonner": "^2.0.7",

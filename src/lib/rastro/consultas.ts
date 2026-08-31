@@ -6,6 +6,7 @@
 // onde as pessoas param, de onde veio quem compra, o que uma pessoa fez, e
 // quem está parado agora e vale um contato.
 
+import { getSqlConteudo } from '@/lib/conteudo/db'
 import { getSql } from '@/lib/db'
 
 /** A ordem do funil. O que não está aqui não aparece na contagem por etapa. */
@@ -151,4 +152,74 @@ export async function paradosEm(
     ORDER BY u.ocorrido_em DESC
     LIMIT ${limite}
   `
+}
+
+// --- números que enchem o desenho do fluxo -------------------------------
+
+export type NumerosDoFluxo = {
+  porEvento: Record<string, number>
+  porOrigem: Record<string, number>
+  guia: number
+  pedidos: number
+  recorrentes: number
+  clientes: number
+}
+
+/**
+ * Tudo que o desenho precisa, em três consultas.
+ *
+ * Sempre contando navegador distinto, nunca evento: quem começa a triagem
+ * três vezes é uma pessoa hesitando, não três pessoas — e é justamente nas
+ * etapas com mais hesitação que o número inflado enganaria mais.
+ */
+export async function numerosDoFluxo(dias: number): Promise<NumerosDoFluxo> {
+  const sql = getSql()
+
+  const [eventos, origens, pedidos] = await Promise.all([
+    sql<{ evento: string; pessoas: number }[]>`
+      SELECT evento, COUNT(DISTINCT anonimo_id)::int AS pessoas
+      FROM rastro_eventos
+      WHERE ocorrido_em > now() - make_interval(days => ${dias})
+      GROUP BY evento
+    `,
+    sql<{ origem: string; pessoas: number }[]>`
+      SELECT origem, COUNT(DISTINCT anonimo_id)::int AS pessoas
+      FROM rastro_eventos
+      WHERE origem IS NOT NULL
+        AND ocorrido_em > now() - make_interval(days => ${dias})
+      GROUP BY origem
+    `,
+    sql<{ pedidos: number; recorrentes: number; clientes: number }[]>`
+      SELECT
+        (SELECT COUNT(DISTINCT user_id) FROM orders
+          WHERE created_at > now() - make_interval(days => ${dias}))::int AS pedidos,
+        (SELECT COUNT(*) FROM (
+          SELECT user_id FROM orders
+          WHERE created_at > now() - make_interval(days => ${dias})
+          GROUP BY user_id HAVING COUNT(*) > 1) x)::int AS recorrentes,
+        (SELECT COUNT(*) FROM users)::int AS clientes
+    `,
+  ])
+
+  // As vendas do guia moram no outro banco, e a ficha do cliente já as junta
+  // pelo e-mail. Aqui basta a contagem.
+  let guia = 0
+  try {
+    const [linha] = await getSqlConteudo()<{ n: number }[]>`
+      SELECT COUNT(*)::int AS n FROM hotmart_sales
+      WHERE approved_date > now() - make_interval(days => ${dias})
+    `
+    guia = linha?.n ?? 0
+  } catch (erro) {
+    console.error('rastro: não contou vendas do guia', erro)
+  }
+
+  return {
+    porEvento: Object.fromEntries(eventos.map((e) => [e.evento, e.pessoas])),
+    porOrigem: Object.fromEntries(origens.map((o) => [o.origem, o.pessoas])),
+    guia,
+    pedidos: pedidos[0]?.pedidos ?? 0,
+    recorrentes: pedidos[0]?.recorrentes ?? 0,
+    clientes: pedidos[0]?.clientes ?? 0,
+  }
 }

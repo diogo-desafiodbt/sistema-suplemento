@@ -16,10 +16,13 @@ export async function criarLink(_anterior: string | null, form: FormData) {
   if (!APELIDO.test(apelido)) {
     return 'O apelido aceita letra minúscula, número, ponto e hífen — até 60.'
   }
-  // Só caminho interno. Apelido apontando para fora vira link aberto: qualquer
-  // um com o endereço manda gente para onde quiser usando nosso domínio.
-  if (!destino.startsWith('/')) {
-    return 'O destino tem que começar com / — é um caminho dentro do site.'
+  // Caminho interno ou checkout da Hotmart, e nada mais. Apelido apontando
+  // para host arbitrário vira redirecionador aberto com o nosso domínio na
+  // frente. A mesma regra está no CHECK da tabela.
+  const interno = destino.startsWith('/')
+  const hotmart = destino.startsWith('https://pay.hotmart.com/')
+  if (!interno && !hotmart) {
+    return 'O destino tem que ser um caminho do site (começando com /) ou um checkout pay.hotmart.com.'
   }
 
   const [existe] = await getSql()<{ apelido: string }[]>`
@@ -40,5 +43,24 @@ export async function apagarLink(apelido: string) {
   // Apaga o rótulo, não o histórico: os eventos já gravados com esta origem
   // continuam contando no relatório. Sumir com eles reescreveria o passado.
   await getSql()`DELETE FROM rastro_links WHERE apelido = ${apelido}`
+  revalidatePath('/suplementos/admin/rastro/links')
+}
+
+/**
+ * Cria o link de um episódio a partir da Biblioteca de Transcrições.
+ *
+ * O destino é sempre a página de vendas, não o checkout: o tráfego do vídeo
+ * chega para ler, e a página é quem repassa a origem para a Hotmart no clique
+ * do botão. Mandar direto para o checkout pularia a venda.
+ */
+export async function criarLinkDeEpisodio(apelido: string, titulo: string) {
+  await exigirAdmin()
+  if (!APELIDO.test(apelido)) return
+
+  await getSql()`
+    INSERT INTO rastro_links (apelido, destino, descricao)
+    VALUES (${apelido}, '/oprimeiropasso/', ${titulo})
+    ON CONFLICT (apelido) DO NOTHING
+  `
   revalidatePath('/suplementos/admin/rastro/links')
 }

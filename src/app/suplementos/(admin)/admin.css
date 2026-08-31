@@ -1767,3 +1767,332 @@ a.admin-pendencia-titulo:hover {
   gap: 12px;
   flex-wrap: wrap;
 }
+
+/* ==========================================================================
+   Rastro — o palco do fluxo.
+   Desenho aprovado em 30/08: nós ligados por fio curvo sobre uma malha de
+   pontos, como um editor de fluxo. A forma carrega informação que barra
+   empilhada não carrega — de onde sai, para onde vai, e onde a pessoa some.
+   ========================================================================== */
+
+.rastro-abas {
+  display: inline-flex;
+  gap: 2px;
+  background: var(--admin-borda-fraca, rgba(0, 0, 0, .06));
+  border-radius: 9px;
+  padding: 2px;
+  margin-bottom: 16px;
+}
+
+.rastro-aba {
+  padding: 6px 14px;
+  border: 0;
+  background: none;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--admin-tinta-fraca);
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+
+.rastro-aba[aria-selected="true"] {
+  background: var(--admin-papel);
+  color: var(--admin-tinta);
+  font-weight: 550;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .08);
+}
+
+.rastro-tela {
+  position: relative;
+  background-color: #f1f1f4;
+  background-image: radial-gradient(rgba(0, 0, 0, .13) 1px, transparent 1px);
+  background-size: 22px 22px;
+  background-position: -1px -1px;
+  border: 1px solid var(--admin-borda);
+  border-radius: var(--admin-raio-g);
+  overflow: auto;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, .04);
+}
+
+.rastro-palco { position: relative; }
+
+.rastro-fios {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.rastro-fio {
+  fill: none;
+  stroke: rgba(0, 0, 0, .22);
+  stroke-linecap: round;
+  transition: stroke .15s, opacity .15s;
+}
+
+.rastro-fio--forte { stroke: #2a78d6; }
+.rastro-fio--apaga { opacity: .18; }
+
+/* O contorno na cor da tela abre espaço para o número no meio do fio, sem
+   caixa: o traço passa por baixo e o número continua legível. */
+.rastro-fio-rotulo {
+  fill: var(--admin-tinta-fraca);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  paint-order: stroke;
+  stroke: #f1f1f4;
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.rastro-coluna-rotulo {
+  position: absolute;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--admin-tinta-fraca);
+  text-align: center;
+}
+
+.rastro-no {
+  position: absolute;
+  width: 176px;
+  background: var(--admin-papel);
+  border: 1px solid var(--admin-borda);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .05), 0 4px 12px rgba(0, 0, 0, .06);
+  padding: 11px 13px 12px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: box-shadow .15s, border-color .15s, transform .08s;
+}
+
+.rastro-no:hover {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .06), 0 6px 16px rgba(0, 0, 0, .08);
+}
+
+.rastro-no:active { transform: scale(.99); }
+
+.rastro-no[aria-current="true"] {
+  border-color: var(--admin-vermelho);
+  box-shadow: 0 0 0 3px rgba(244, 0, 30, .08), 0 6px 16px rgba(0, 0, 0, .08);
+}
+
+.rastro-no--apaga { opacity: .4; }
+
+.rastro-no-topo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.rastro-no-icone {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+
+.rastro-no-icone svg { width: 13px; height: 13px; }
+
+.rastro-no-nome {
+  font-size: 12.5px;
+  font-weight: 550;
+  line-height: 1.25;
+  color: var(--admin-tinta);
+}
+
+.rastro-no-num {
+  display: block;
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--admin-tinta);
+}
+
+.rastro-no-pe {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.rastro-no-sub {
+  font-size: 11px;
+  color: var(--admin-tinta-fraca);
+}
+
+.rastro-queda {
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.rastro-queda--grave { color: #b3261e; }
+.rastro-queda--media { color: #8a6206; }
+.rastro-queda--leve  { color: var(--admin-tinta-fraca); }
+
+/* A etiqueta é informação, não enfeite: "cego" diz que a etapa existe e o
+   sistema ainda não a enxerga. Esconder o que não se mede daria a impressão
+   de que o funil acaba onde ele só some de vista. */
+.rastro-fita {
+  position: absolute;
+  top: -8px;
+  right: 10px;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--admin-borda);
+  background: var(--admin-papel);
+}
+
+.rastro-fita--medido { color: #2f6146; }
+.rastro-fita--cego { color: var(--admin-tinta-fraca); }
+
+@media (max-width: 859px) {
+  .rastro-tela { border-radius: var(--admin-raio); }
+}
+
+.rastro-fila {
+  display: flex;
+  flex-direction: column;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.rastro-pessoa {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--admin-borda-fraca, rgba(0, 0, 0, .06));
+}
+
+.rastro-pessoa:last-child { border-bottom: 0; }
+
+.rastro-origens {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rastro-origem {
+  display: grid;
+  grid-template-columns: minmax(0, 8rem) 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.rastro-origem-nome {
+  font-size: 12.5px;
+  color: var(--admin-tinta);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rastro-origem-trilho {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--admin-borda-fraca, rgba(0, 0, 0, .06));
+  overflow: hidden;
+}
+
+.rastro-origem-barra {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: #2a78d6;
+}
+
+.rastro-origem-num {
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--admin-tinta);
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Construtor do blog. O texto do rascunho é lido inteiro, não escaneado como
+   uma tabela — por isso largura de leitura e entrelinha de artigo, e não a
+   densidade do resto do painel.
+   ========================================================================== */
+
+.blog-leitura {
+  max-width: 68ch;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--admin-tinta);
+}
+
+.blog-leitura > * + * { margin-top: 1.1em; }
+
+.blog-leitura h1 { font-size: 1.5rem; font-weight: 600; line-height: 1.2; }
+.blog-leitura h2 { font-size: 1.2rem; font-weight: 600; margin-top: 2em; }
+.blog-leitura h3 { font-size: 1.02rem; font-weight: 600; margin-top: 1.6em; }
+
+.blog-leitura ul, .blog-leitura ol { padding-left: 1.35em; }
+.blog-leitura ul { list-style: disc; }
+.blog-leitura ol { list-style: decimal; }
+.blog-leitura li + li { margin-top: .4em; }
+
+.blog-leitura table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: .95em;
+}
+
+.blog-leitura th, .blog-leitura td {
+  border: 1px solid var(--admin-borda);
+  padding: .45em .7em;
+  text-align: left;
+}
+
+.blog-leitura th { background: var(--admin-papel-2); font-weight: 600; }
+
+.blog-afirmacoes {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.blog-afirmacao {
+  border: 1px solid var(--admin-borda);
+  border-radius: var(--admin-raio);
+  padding: 14px;
+}
+
+.blog-fonte {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: var(--admin-raio);
+  background: var(--admin-papel-2);
+}
+
+.blog-afirmacao-acoes {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.blog-decisao {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}

@@ -29,6 +29,11 @@ function portaoFechado(request: NextRequest): boolean {
   const path = request.nextUrl.pathname
   if (path === '/em-breve' || path === '/api/acesso-equipe') return false
   if (path === '/api/contato') return false
+  // O rastreio passa pelo portão fechado. Ele é só escrita — grava um passo
+  // anônimo e devolve `ok` — e barrá-lo faz a página de vendas registrar
+  // visita zero, que foi o que aconteceu no primeiro teste com link: a origem
+  // chegava na Hotmart e o Rastro não via ninguém passar.
+  if (path === '/api/funnel/track') return false
   if (/\.(png|jpg|jpeg|svg|webp|ico|gif|mp4|woff2?)$/i.test(path)) return false
 
   return true

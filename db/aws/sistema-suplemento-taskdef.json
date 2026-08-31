@@ -24,6 +24,14 @@
         {
           "name": "SUPORTE_ENVIO_AUTOMATICO",
           "value": "off"
+        },
+        {
+          "name": "AGENT_REDATOR_ID",
+          "value": "agent_01D1ua23zcRG918EUGBwJDU2"
+        },
+        {
+          "name": "ENVIRONMENT_ID",
+          "value": "env_0195a7jWVjjKXRxURa7Qec8U"
         }
       ],
       "mountPoints": [],

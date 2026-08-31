@@ -3,8 +3,9 @@ import { Card } from '@/components/admin/ui/Card'
 import { CopyButton } from '@/components/CopyButton'
 import { exigirAdmin } from '@/lib/auth/admin'
 import { getSql } from '@/lib/db'
+import { episodios } from '@/lib/rastro/episodios'
 import { FormularioLink } from './FormularioLink'
-import { apagarLink } from './actions'
+import { apagarLink, criarLinkDeEpisodio } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,6 +32,19 @@ export default async function LinksPage() {
     ORDER BY l.criado_em DESC
   `
 
+  // Os episódios que ainda não viraram link. Some da lista assim que o link
+  // existe, para a tela ir esvaziando conforme ele avança pelos vídeos.
+  let semLink: Awaited<ReturnType<typeof episodios>> = []
+  try {
+    const todos = await episodios()
+    const jaTem = new Set(links.map((l) => l.apelido))
+    semLink = todos.filter((e) => !jaTem.has(e.apelido))
+  } catch (erro) {
+    // A Biblioteca vive noutro banco. Se ela não responder, o resto da tela
+    // continua servindo — criar link à mão nunca depende dela.
+    console.error('rastro: não listou episódios', erro)
+  }
+
   return (
     <>
       <CabecaDePagina trilha="Comercial / Rastro" titulo="Links de origem" />
@@ -40,9 +54,64 @@ export default async function LinksPage() {
           O apelido é o que aparece no relatório de origem. Use um por lugar
           onde o link vai morar — descrição de vídeo, bio do Instagram,
           mensagem no grupo — senão os três viram uma linha só e não dá para
-          saber qual funcionou.
+          saber qual funcionou. O destino pode ser um caminho do site ou o
+          checkout do guia na Hotmart; o construtor põe o parâmetro que cada
+          um entende.
         </p>
         <FormularioLink />
+      </Card>
+
+      <Card rotulo={`Episódios sem link (${semLink.length})`}>
+        {semLink.length === 0 ? (
+          <p className="admin-vazio-texto">
+            Todos os episódios da Biblioteca já têm link.
+          </p>
+        ) : (
+          <>
+            <p className="admin-vazio-texto" style={{ margin: '0 0 18px', maxWidth: '64ch' }}>
+              Um link por vídeo. O apelido sai do título do episódio, e o
+              destino é a página de vendas — é ela que repassa a origem para a
+              Hotmart quando a pessoa clica em comprar.
+            </p>
+            <table className="admin-tabela">
+              <thead>
+                <tr>
+                  <th>Episódio</th>
+                  <th>Apelido que vai receber</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {semLink.map((e) => (
+                  <tr key={e.apelido}>
+                    <td>
+                      {e.url ? (
+                        <a
+                          href={e.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="admin-nome"
+                        >
+                          {e.titulo}
+                        </a>
+                      ) : (
+                        <span className="admin-nome">{e.titulo}</span>
+                      )}
+                    </td>
+                    <td className="admin-mono">{e.apelido}</td>
+                    <td>
+                      <form action={criarLinkDeEpisodio.bind(null, e.apelido, e.titulo)}>
+                        <button type="submit" className="admin-btn">
+                          Criar link
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
       </Card>
 
       <Card rotulo={`Links criados (${links.length})`}>
@@ -60,7 +129,12 @@ export default async function LinksPage() {
             </thead>
             <tbody>
               {links.map((l) => {
-                const url = `${SITE}${l.destino}${l.destino.includes('?') ? '&' : '?'}o=${l.apelido}`
+                // A Hotmart entende `src`; o nosso site entende `o`. Mesmo
+                // apelido nos dois, para o relatório juntar as duas pontas.
+                const externo = l.destino.startsWith('https://')
+                const base = externo ? l.destino : `${SITE}${l.destino}`
+                const parametro = externo ? 'src' : 'o'
+                const url = `${base}${base.includes('?') ? '&' : '?'}${parametro}=${l.apelido}`
                 return (
                   <tr key={l.apelido}>
                     <td>
