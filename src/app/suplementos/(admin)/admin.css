@@ -1669,3 +1669,22 @@ a.admin-pendencia-titulo:hover {
     transition: none;
   }
 }
+
+/* Cadastro do autenticador: chave de um lado, código do outro. */
+.mfa-passos {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 26px;
+}
+
+.mfa-passos > * {
+  min-width: 0;
+}
+
+@media (min-width: 900px) {
+  .mfa-passos {
+    grid-template-columns: 1.2fr 1fr;
+    gap: 32px;
+    align-items: start;
+  }
+}
