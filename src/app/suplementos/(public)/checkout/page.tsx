@@ -115,6 +115,10 @@ export default function CheckoutPage() {
   // já tem conta troca num clique, sem sair da página — mandar para a tela de
   // login perdia o carrinho e obrigava a refazer o quiz.
   const [modoConta, setModoConta] = useState<'criar' | 'entrar'>('criar')
+  // O telefone não aparece na tela: já foi perguntado no quiz. Ele viaja até
+  // aqui só para o cadastro guardá-lo — a Envie Agora exige celular do
+  // destinatário para emitir a etiqueta.
+  const [telefoneDoQuiz, setTelefoneDoQuiz] = useState('')
   const [precisaDeAutenticador, setPrecisaDeAutenticador] = useState(false)
 
   const [cep, setCep] = useState('')
@@ -270,9 +274,11 @@ export default function CheckoutPage() {
           const contato = JSON.parse(contatoRaw) as {
             full_name?: string
             email?: string
+            telefone?: string
           }
           if (contato.full_name) setFullName(contato.full_name)
           if (contato.email) setEmail(contato.email)
+          if (contato.telefone) setTelefoneDoQuiz(contato.telefone)
         }
       } catch {
         // Contato ausente ou corrompido não impede a compra: os campos
@@ -555,6 +561,7 @@ export default function CheckoutPage() {
           state,
         },
         cpf,
+        telefone: telefoneDoQuiz,
       }
 
       if (pixSubscriptionId) {

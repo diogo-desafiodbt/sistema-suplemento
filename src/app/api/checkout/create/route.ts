@@ -81,6 +81,9 @@ const checkoutSchema = z.object({
   terms_accepted: z.literal(true),
   card_token: z.string().min(5).optional(),
   cpf: z.string(),
+  // Vem do contato do quiz. Opcional porque compra antiga e retomada de
+  // carrinho podem não ter esse dado à mão.
+  telefone: z.string().optional(),
 })
 
 type PlanType = PurchasePlanType
@@ -810,6 +813,22 @@ export async function POST(request: NextRequest) {
           { error: replaced.error },
           { status: replaced.status },
         )
+      }
+    }
+
+    // O telefone tem a mesma história do CPF: o quiz perguntava, mandava para
+    // a base de leads e não guardava no cadastro. A Envie Agora recusa a
+    // etiqueta sem ele — "Celular do destinatario não informado".
+    const telefoneDigitos = (data.telefone ?? '').replace(/\D/g, '')
+    if (telefoneDigitos.length >= 10) {
+      try {
+        await sql`
+          UPDATE users SET phone = ${telefoneDigitos}
+          WHERE id = ${sessao.userId}::uuid
+            AND (phone IS NULL OR phone = '')
+        `
+      } catch (erro) {
+        console.error('checkout: telefone não gravado no cadastro:', erro)
       }
     }
 
