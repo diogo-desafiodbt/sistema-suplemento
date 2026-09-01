@@ -350,11 +350,8 @@ export default function CheckoutPage() {
       })
 
       if (!res.ok) {
-        const data = await res.json()
-        toast.error(
-          data.error ??
-            'Este email já está cadastrado. Faça login ou use outro email.',
-        )
+        const data = await res.json().catch(() => ({}))
+        toast.error(data.error ?? 'Não foi possível criar a conta.')
         return
       }
 
@@ -792,7 +789,7 @@ export default function CheckoutPage() {
                     type="password"
                     placeholder={
                       modoConta === 'criar'
-                        ? 'Crie uma senha (mínimo 6 caracteres)'
+                        ? 'Crie uma senha'
                         : 'Sua senha'
                     }
                     autoComplete={
@@ -800,10 +797,19 @@ export default function CheckoutPage() {
                     }
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    minLength={modoConta === 'criar' ? 6 : undefined}
+                    minLength={modoConta === 'criar' ? 10 : undefined}
                     required
                     className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm md:text-base bg-white focus:outline-none focus:border-[#13244f] focus:ring-1 focus:ring-[#13244f] placeholder-gray-400"
                   />
+
+                  {/* A regra aparece antes de a pessoa digitar, não depois de
+                      levar não. É a mesma frase que a API devolve, para os
+                      dois nunca discordarem. */}
+                  {modoConta === 'criar' && (
+                    <p className="text-xs text-gray-500 -mt-1">
+                      Pelo menos 10 caracteres, com letra minúscula e número.
+                    </p>
+                  )}
 
                   {precisaDeAutenticador && (
                     <p className="text-sm text-[#a30000]">
