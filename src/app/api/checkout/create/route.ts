@@ -513,20 +513,19 @@ async function cancelPagarmeSubscriptionBestEffort(
   }
 }
 
+/**
+ * Limpa a tentativa que não vingou.
+ *
+ * Passa por função no banco em vez de DELETE direto. `app_entrada` é o serviço
+ * que atende visitante anônimo, e um serviço capaz de apagar linha de
+ * pagamento é um serviço capaz de apagar o registro de uma cobrança. Com
+ * EXECUTE ele apaga só o que a função permite: assinatura ativa ou com
+ * pagamento pago o banco recusa.
+ */
 async function deleteSubscriptionLocal(subscriptionId: string) {
-  await withTransaction(async (tx) => {
-    await tx`
-      UPDATE terms_acceptances
-      SET subscription_id = NULL
-      WHERE subscription_id = ${subscriptionId}::uuid
-    `
-    await tx`
-      DELETE FROM payments WHERE subscription_id = ${subscriptionId}::uuid
-    `
-    await tx`
-      DELETE FROM subscriptions WHERE id = ${subscriptionId}::uuid
-    `
-  })
+  await getSql()`
+    SELECT apagar_assinatura_sem_pagamento(${subscriptionId}::uuid)
+  `
 }
 
 async function deleteFailedSubscription(
