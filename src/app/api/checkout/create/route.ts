@@ -814,6 +814,30 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // O CPF digitado aqui era usado só para cobrar e jogado fora em seguida.
+    // A consequência aparecia longe: o JSON da farmácia saía com o campo de
+    // CPF vazio, e a Envie Agora recusava a etiqueta com "CPF ou CNPJ do
+    // destinatario". Ninguém ligava uma coisa à outra porque a falha
+    // acontecia dois passos depois da digitação.
+    //
+    // Só grava quando está vazio. `users.cpf` tem índice único: se o número
+    // já pertence a outra conta, a compra segue e o conflito fica para a
+    // ficha do cliente resolver — recusar a venda aqui seria pior.
+    try {
+      await sql`
+        UPDATE users SET cpf = ${data.cpf.replace(/\D/g, '')}
+        WHERE id = ${sessao.userId}::uuid
+          AND (cpf IS NULL OR cpf = '')
+          AND NOT EXISTS (
+            SELECT 1 FROM users outro
+            WHERE outro.cpf = ${data.cpf.replace(/\D/g, '')}
+              AND outro.id <> ${sessao.userId}::uuid
+          )
+      `
+    } catch (erro) {
+      console.error('checkout: CPF não gravado no cadastro:', erro)
+    }
+
     const customer = {
       name: profile.full_name,
       email: profile.email,

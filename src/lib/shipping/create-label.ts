@@ -193,6 +193,23 @@ export async function createShippingLabelForOrder(orderId: string): Promise<{
 
   const user = order.users
 
+  // As duas recusas que derrubavam esta função antes de 21/08. Falhar aqui,
+  // dizendo o motivo, é melhor que mandar para a Envie Agora e receber um 400
+  // que ninguém sabe ler — era assim que o job ficava preso em `running`.
+  const nome = (user.full_name ?? '').trim()
+  if (nome.length <= 8) {
+    throw new Error(
+      `Envie Agora exige nome do destinatário com mais de 8 caracteres. ` +
+        `O cadastro do pedido ${orderId} tem "${nome}". Corrija o nome na ficha do cliente.`,
+    )
+  }
+  if (!(user.cpf ?? '').replace(/\D/g, '')) {
+    throw new Error(
+      `Envie Agora exige CPF do destinatário, e o cadastro do pedido ${orderId} ` +
+        `está sem. Preencha o CPF na ficha do cliente.`,
+    )
+  }
+
   const response = await criarEtiqueta({
     order: {
       id: order.id,
@@ -224,9 +241,34 @@ export async function createShippingLabelForOrder(orderId: string): Promise<{
   try {
     const pdf = await getPdfEtiqueta(response.id_requisicao)
     if (pdf?.url) {
+      // O JSON da farmácia é montado quando o pedido nasce, antes de a
+      // etiqueta existir — por isso ele sai com `NumeroObjeto: 'a emitir'`.
+      // É aqui que ele deixa de ser promessa: o rastreio e o link entram na
+      // mesma linha do pedido, e a farmácia lê o valor já preenchido quando
+      // vier buscar. Atualizar o JSON é obrigatório, não enfeite: sem isto a
+      // etiqueta existe na Envie Agora e a farmácia nunca fica sabendo.
       await sql`
         UPDATE orders
-        SET shipping_label_url = ${pdf.url}
+        SET
+          shipping_label_url = ${pdf.url},
+          pharmacy_json = jsonb_set(
+            jsonb_set(
+              pharmacy_json,
+              '{NumeroObjeto}',
+              -- O código de rastreio ainda não existe neste instante: a Envie
+              -- Agora devolve só o id da requisição, e o rastreio chega depois,
+              -- pelo webhook. Vai o id agora, e o webhook troca pelo rastreio.
+              to_jsonb(${response.id_requisicao}::text)
+            ),
+            '{Observacoes}',
+            to_jsonb(
+              CASE
+                WHEN COALESCE(pharmacy_json->>'Observacoes', '') = ''
+                  THEN ${`Etiqueta: ${pdf.url}`}::text
+                ELSE (pharmacy_json->>'Observacoes') || ${` | Etiqueta: ${pdf.url}`}::text
+              END
+            )
+          )
         WHERE id = ${orderId}::uuid
       `
     }

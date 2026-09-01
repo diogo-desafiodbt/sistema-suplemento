@@ -1,6 +1,7 @@
 import { serve } from 'inngest/next'
 import { inngest } from '@/lib/inngest/client'
 import { avulsoRenewalReminder } from '@/lib/inngest/functions/avulso-renewal-reminder'
+import { createShippingLabel } from '@/lib/inngest/functions/create-shipping-label'
 import { hotmartBackfill } from '@/lib/inngest/functions/hotmart-backfill'
 import { hotmartSalesSync } from '@/lib/inngest/functions/hotmart-sales-sync'
 import { omieBackfill } from '@/lib/inngest/functions/omie-backfill'
@@ -31,11 +32,14 @@ export const { GET, POST, PUT } = serve({
     pharmacyOrder,
     paymentRetry,
     avulsoRenewalReminder,
-    // create-shipping-label SAIU em 21/08/2026: quem trata com a
-    // transportadora agora é a farmácia. O job ficava preso em `running`
-    // porque a Envie Agora recusava o nome curto do destinatário — falha que
-    // não chegava a ninguém. O arquivo continua no repositório para o dia em
-    // que a emissão voltar para cá.
+    // Voltou em 01/09/2026: quem emite a etiqueta somos nós, não a farmácia.
+    // A saída em 21/08 partiu de um entendimento errado do combinado.
+    //
+    // As duas recusas que a derrubavam antes estão tratadas: o CPF do
+    // destinatário ia vazio porque o checkout nunca gravava o número no
+    // cadastro, e o nome curto agora falha com mensagem que diz o motivo em
+    // vez de deixar o job preso em `running`.
+    createShippingLabel,
     pharmacyReconciliation,
     processarProtocolos,
     omieFinanceiroSync,

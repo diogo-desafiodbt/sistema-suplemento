@@ -71,7 +71,18 @@ export async function POST(request: NextRequest) {
       SET
         tracking_code = ${payload.numero_etiqueta},
         status = 'dispatched',
-        shipping_json = COALESCE(shipping_json, '{}'::jsonb) || ${sql.json(patch as never)}
+        shipping_json = COALESCE(shipping_json, '{}'::jsonb) || ${sql.json(patch as never)},
+        -- O número do objeto no JSON da farmácia vinha com o id da requisição,
+        -- que era o único identificador existente na hora de criar a etiqueta.
+        -- Agora chegou o rastreio de verdade, e é ele que a farmácia precisa
+        -- ver quando vier buscar o pedido.
+        pharmacy_json = CASE
+          WHEN pharmacy_json IS NULL THEN NULL
+          ELSE jsonb_set(
+            pharmacy_json, '{NumeroObjeto}',
+            to_jsonb(${payload.numero_etiqueta}::text)
+          )
+        END
       WHERE id = ${order.id}::uuid
     `
 

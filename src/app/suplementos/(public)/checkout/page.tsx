@@ -355,6 +355,12 @@ export default function CheckoutPage() {
         return
       }
 
+      // O mesmo aviso de login que a tela de login dispara. É ele que costura
+      // o navegador à pessoa no Rastro — sem isto, quem cria conta no checkout
+      // perde toda a jornada anterior, que é justamente a que diz de onde ela
+      // veio.
+      await fetch('/api/auth/login-event', { method: 'POST' })
+
       const profile = await waitForProfile()
       if (!profile) {
         toast.warning(

@@ -212,6 +212,30 @@ export const purchaseConfirmed = inngest.createFunction(
       return { ok: false, reason: 'missing_email' }
     }
 
+    // Fecha a jornada no Rastro. É o último passo, e é ele que dá sentido a
+    // todos os anteriores: sem `compra_concluida`, o relatório de origem mostra
+    // de onde as pessoas vieram e nunca quem comprou.
+    //
+    // O identificador do navegador sai da costura feita no login. Quem comprou
+    // sem nunca ter tido navegador costurado — comprou de outro aparelho, ou
+    // entrou antes de a costura existir — não entra: inventar um identificador
+    // aqui criaria uma jornada que não aconteceu.
+    try {
+      await sql`
+        SELECT rastro_registrar(l.anonimo_id, 'compra_concluida', NULL, ${user_id}::uuid)
+        FROM rastro_ligacoes l
+        WHERE l.pessoa_id = ${user_id}::uuid
+          AND NOT EXISTS (
+            SELECT 1 FROM rastro_eventos e
+            WHERE e.anonimo_id = l.anonimo_id
+              AND e.evento = 'compra_concluida'
+          )
+      `
+    } catch (error) {
+      // Observação não derruba compra confirmada.
+      console.error('purchase-confirmed: compra não entrou no Rastro:', error)
+    }
+
     // Carimba o lead como convertido. É o núcleo que avisa marketing, porque
     // a tela de leads não pode perguntar quem comprou — ela não enxerga
     // `public`. Falhar aqui não desfaz a compra: o pior caso é um número de
