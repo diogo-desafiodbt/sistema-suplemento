@@ -40,6 +40,13 @@ export async function GET(request: NextRequest) {
       JOIN protocols p ON p.id = s.protocol_id
       WHERE p.status = 'signed'
         AND o.pharmacy_json IS NOT NULL
+        -- Só entra na lista o pedido que a farmácia consegue despachar: com a
+        -- prescrição assinada E com os dois documentos prontos, o PDF da
+        -- receita e a etiqueta. Entregar antes disso é oferecer trabalho que
+        -- ela vai separar e não vai conseguir postar — e o pedido volta a
+        -- ficar parado, agora com a culpa no lugar errado.
+        AND p.prescription_pdf_path IS NOT NULL
+        AND o.shipping_label_url IS NOT NULL
         AND (${gte}::timestamptz IS NULL OR o.created_at >= ${gte}::timestamptz)
         AND (${lt}::timestamptz IS NULL OR o.created_at < ${lt}::timestamptz)
       ORDER BY o.created_at ASC
