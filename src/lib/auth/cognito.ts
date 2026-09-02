@@ -203,9 +203,24 @@ export async function renovar(
       }),
     )
     const auth = resultado.AuthenticationResult
-    if (!auth?.IdToken || !auth.AccessToken) return null
+    if (!auth?.IdToken || !auth.AccessToken) {
+      console.error('renovar: Cognito respondeu sem token', {
+        sub,
+        desafio: resultado.ChallengeName ?? null,
+      })
+      return null
+    }
     return { idToken: auth.IdToken, accessToken: auth.AccessToken }
-  } catch {
+  } catch (erro) {
+    // O catch mudo aqui custou caro: quando a renovação falha, o middleware
+    // apaga os cookies e a pessoa volta para o login a cada clique — sem que
+    // nada em lugar nenhum diga por quê. O motivo do Cognito é a única coisa
+    // que separa "refresh expirado" de "configuração errada".
+    console.error('renovar: falhou', {
+      sub,
+      nome: erro instanceof Error ? erro.name : typeof erro,
+      mensagem: erro instanceof Error ? erro.message : String(erro),
+    })
     return null
   }
 }
