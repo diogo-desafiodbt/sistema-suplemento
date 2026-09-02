@@ -4,7 +4,9 @@ import { avulsoRenewalReminder } from '@/lib/inngest/functions/avulso-renewal-re
 import { hotmartBackfill } from '@/lib/inngest/functions/hotmart-backfill'
 import { hotmartSalesSync } from '@/lib/inngest/functions/hotmart-sales-sync'
 import { omieBackfill } from '@/lib/inngest/functions/omie-backfill'
+import { omieClienteSync } from '@/lib/inngest/functions/omie-cliente-sync'
 import { omieFinanceiroSync } from '@/lib/inngest/functions/omie-financeiro-sync'
+import { pagarmeRecebiveisSync } from '@/lib/inngest/functions/pagarme-recebiveis-sync'
 import { paymentRetry } from '@/lib/inngest/functions/payment-retry'
 import { pharmacyOrder } from '@/lib/inngest/functions/pharmacy-order'
 import { pharmacyReconciliation } from '@/lib/inngest/functions/pharmacy-reconciliation'
@@ -46,6 +48,8 @@ export const { GET, POST, PUT } = serve({
     processarProtocolos,
     omieFinanceiroSync,
     omieBackfill,
+    omieClienteSync,
+    pagarmeRecebiveisSync,
     hotmartSalesSync,
     hotmartBackfill,
     // youtube-analytics-sync DESLIGADO em 23/08/2026: o Diogo não vai usar o

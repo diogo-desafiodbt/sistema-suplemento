@@ -111,7 +111,7 @@ function variarTamanhoPagina(param: Record<string, unknown>): void {
  * POST Omie com pausa implícita no caller, leitura do tempo pedido na recusa
  * e no máximo 3 tentativas. Bloqueio que persiste depois disso falha visível.
  */
-async function omiePost(
+export async function omiePost(
   url: string,
   call: string,
   param: Record<string, unknown>,

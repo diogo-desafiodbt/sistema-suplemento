@@ -4,6 +4,7 @@ import { CabecaDePagina } from '@/components/admin/CabecaDePagina'
 import { Card } from '@/components/admin/ui/Card'
 import { Selo } from '@/components/admin/ui/Selo'
 import { CopyButton } from '@/components/CopyButton'
+import { SincronizarOmie } from '@/components/admin/SincronizarOmie'
 import {
   buscarComprasHotmartPorEmail,
   formatarValorCompra,
@@ -416,6 +417,10 @@ export default async function AdminClienteDetalhePage({
   // 30/08 é que só o clínico se isola — o resto do cliente o Diogo tem que
   // poder juntar quando quiser.
   const jornada = await jornadaDaPessoa(id)
+
+  const [ligacaoOmie] = await getSql()<{ codigo_cliente: number }[]>`
+    SELECT codigo_cliente FROM omie_clientes WHERE user_id = ${id}::uuid
+  `
 
   const [payments, pros] = await Promise.all([
     subIds.length > 0
@@ -1027,6 +1032,19 @@ export default async function AdminClienteDetalhePage({
             </div>
           ))}
         </div>
+      </SectionCard>
+
+      <SectionCard title="Faturamento">
+        <p className="admin-vazio-texto" style={{ margin: '0 0 14px', maxWidth: '64ch' }}>
+          O cadastro vai para o Omie sozinho quando a compra é confirmada. Este
+          botão serve para conferir a integração ou para recuperar um envio que
+          falhou — por exemplo, um cadastro que estava sem CPF na hora da
+          compra e foi completado depois.
+        </p>
+        <SincronizarOmie
+          clienteId={id}
+          codigoAtual={ligacaoOmie?.codigo_cliente ?? null}
+        />
       </SectionCard>
 
       <SectionCard title="Como chegou até aqui">
