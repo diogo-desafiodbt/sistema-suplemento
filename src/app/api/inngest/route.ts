@@ -1,7 +1,6 @@
 import { serve } from 'inngest/next'
 import { inngest } from '@/lib/inngest/client'
 import { avulsoRenewalReminder } from '@/lib/inngest/functions/avulso-renewal-reminder'
-import { createShippingLabel } from '@/lib/inngest/functions/create-shipping-label'
 import { hotmartBackfill } from '@/lib/inngest/functions/hotmart-backfill'
 import { hotmartSalesSync } from '@/lib/inngest/functions/hotmart-sales-sync'
 import { omieBackfill } from '@/lib/inngest/functions/omie-backfill'
@@ -32,14 +31,17 @@ export const { GET, POST, PUT } = serve({
     pharmacyOrder,
     paymentRetry,
     avulsoRenewalReminder,
-    // Voltou em 01/09/2026: quem emite a etiqueta somos nós, não a farmácia.
-    // A saída em 21/08 partiu de um entendimento errado do combinado.
+    // create-shipping-label saiu de novo em 02/09/2026, agora com o motivo
+    // conhecido: a Envie Agora não emite etiqueta sem documento fiscal, e
+    // quem tem como resolver isso é a Miligrama, que fala com eles direto.
     //
-    // As duas recusas que a derrubavam antes estão tratadas: o CPF do
-    // destinatário ia vazio porque o checkout nunca gravava o número no
-    // cadastro, e o nome curto agora falha com mensagem que diz o motivo em
-    // vez de deixar o job preso em `running`.
-    createShippingLabel,
+    // O que NÃO saiu é o rastreio. O aviso de envio ao cliente passou a ser
+    // disparado pelo webhook da farmácia, que é quem agora conhece o número
+    // do objeto. Ver `src/app/api/webhooks/farmacia/route.ts`.
+    //
+    // O arquivo continua no repositório, e as correções feitas nele — CPF e
+    // telefone gravados no cadastro, nome validado — ficam: são dados que a
+    // farmácia também precisa para emitir a etiqueta do lado dela.
     pharmacyReconciliation,
     processarProtocolos,
     omieFinanceiroSync,

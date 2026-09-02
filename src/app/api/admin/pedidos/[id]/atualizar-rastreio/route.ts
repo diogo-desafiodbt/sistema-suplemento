@@ -3,7 +3,10 @@ import { getUserProfile } from '@/lib/auth/profile'
 import { sessaoAtual } from '@/lib/auth/sessao'
 import { getSql } from '@/lib/db'
 import { mergeTrackingEvents } from '@/lib/shipping/tracking-events'
-import { getRastreamento } from '@/lib/shipping/envie-agora/rastreamento'
+import {
+  getRastreamento,
+  getRastreamentoPorObjeto,
+} from '@/lib/shipping/envie-agora/rastreamento'
 import {
   getNewTrackingEvents,
   notifyNewTrackingEvents,
@@ -33,23 +36,30 @@ export async function POST(
       {
         id: string
         shipping_request_id: string | null
+        tracking_code: string | null
         shipping_json: unknown
       }[]
     >`
-      SELECT id, shipping_request_id, shipping_json FROM orders
+      SELECT id, shipping_request_id, tracking_code, shipping_json FROM orders
       WHERE id = ${id}::uuid
       LIMIT 1
     `
     const order = orderRows[0] ?? null
 
-    if (!order?.shipping_request_id) {
+    // Dois caminhos desde 02/09/2026. Etiqueta emitida por nós tem o
+    // identificador da requisição. Etiqueta emitida pela Miligrama dentro da
+    // nossa conta não tem — e aí o elo é o número do objeto, que a farmácia
+    // nos conta quando despacha.
+    if (!order?.shipping_request_id && !order?.tracking_code) {
       return NextResponse.json(
-        { error: 'Pedido sem shipping_request_id' },
+        { error: 'Pedido sem etiqueta e sem número de objeto — nada a rastrear ainda.' },
         { status: 400 },
       )
     }
 
-    const tracking = await getRastreamento(order.shipping_request_id)
+    const tracking = order.shipping_request_id
+      ? await getRastreamento(order.shipping_request_id)
+      : await getRastreamentoPorObjeto(order.tracking_code as string)
     const eventos = tracking.eventos ?? []
 
     const merged = mergeTrackingEvents(

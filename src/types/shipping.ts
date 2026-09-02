@@ -110,6 +110,12 @@ export type RastreamentoRequest = {
 export type RastreamentoEvento = {
   id: number
   id_requisicao: string
+  /**
+   * O número do objeto nos Correios. Passou a importar em 02/09/2026: com a
+   * Miligrama emitindo dentro da nossa conta, é por ele que a gente encontra
+   * o pedido, já que a requisição da etiqueta não nasceu aqui.
+   */
+  numero_objeto?: string
   descricao: string | null
   local: string | null
   cidade: string | null

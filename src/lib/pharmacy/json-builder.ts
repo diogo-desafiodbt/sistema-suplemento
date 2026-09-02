@@ -74,10 +74,11 @@ export function buildPharmacyJson(params: {
     CupomDescontoCodigo: '',
     Origem: 'S',
     CupomDescontoValor: '0.00',
-    // Decisão do Diogo em 21/08/2026: a etiqueta deixa de ser emitida por nós.
-    // A farmácia pega direto com a transportadora, então mandamos o aviso no
-    // lugar do número do objeto — em branco parecia esquecimento nosso.
-    NumeroObjeto: 'a emitir',
+    // Quem emite a etiqueta é a Miligrama, direto com a Envie Agora — decisão
+    // de 02/09/2026, depois de a Envie Agora recusar a emissão do nosso lado
+    // por falta de documento fiscal. O número do objeto nasce lá e volta para
+    // cá pelo webhook deles; em branco pareceria esquecimento nosso.
+    NumeroObjeto: 'a emitir pela farmácia',
     Observacoes: params.prescriptionPdfUrl,
     ObservacoesLoja: 'Importado via API Desafio Diabetes',
     CodigoStatus: 11,

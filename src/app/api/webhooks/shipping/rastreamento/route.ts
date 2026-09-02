@@ -61,12 +61,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
+    // Desde 02/09/2026 a Miligrama emite a etiqueta dentro da NOSSA conta da
+    // Envie Agora. O webhook chega igual, mas o `shipping_request_id` do
+    // pedido está vazio — nunca fomos nós que criamos a requisição. Sem a
+    // segunda busca, todo evento de rastreio dessas etiquetas cairia em
+    // "pedido não encontrado" e o cliente veria o pedido parado para sempre.
+    //
+    // O número do objeto é o elo: a farmácia já nos contou qual é, pelo
+    // webhook dela, quando despachou.
+    const numeroObjeto =
+      eventos.find((e) => (e as { numero_objeto?: string }).numero_objeto)
+        ?.numero_objeto ?? null
+
     const orderRows = await sql<{ id: string; shipping_json: unknown }[]>`
       SELECT id, shipping_json FROM orders
       WHERE shipping_request_id = ${idReq}
+         OR (${numeroObjeto}::text IS NOT NULL AND tracking_code = ${numeroObjeto}::text)
       LIMIT 1
     `
     const order = orderRows[0] ?? null
+
+    // Guarda o identificador da requisição na primeira vez que ele aparece.
+    // Assim os eventos seguintes resolvem direto, e o botão de atualizar
+    // rastreio no admin volta a funcionar para estes pedidos.
+    if (order) {
+      await sql`
+        UPDATE orders SET shipping_request_id = ${idReq}
+        WHERE id = ${order.id}::uuid AND shipping_request_id IS NULL
+      `
+    }
 
     if (!order) {
       console.error('Pedido não encontrado para rastreio', idReq)

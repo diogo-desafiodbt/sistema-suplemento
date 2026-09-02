@@ -117,9 +117,21 @@ function urlAcao(id, acao) {
 }
 
 function botoes(order) {
+  // Era `status === 'sent_to_pharmacy'`, um estado que o sistema não usa
+  // mais: pedido nasce `pending` e vai para `dispatched`. Nenhum passava por
+  // lá, então o botão nunca aparecia — e pedido cuja etiqueta falhou não
+  // tinha como ser retomado por ninguém. O que decide é ter ou não etiqueta.
+  // Emitir etiqueta saiu do nosso fluxo em 02/09/2026: quem emite é a
+  // Miligrama, dentro da nossa conta da Envie Agora. O botão fica para a
+  // exceção — pedido que precise de uma etiqueta emitida à mão.
   const canGenerate =
-    order.status === 'sent_to_pharmacy' && !order.shipping_request_id
-  const hasLabel = !!order.shipping_request_id
+    !order.shipping_request_id &&
+    !order.tracking_code &&
+    order.status !== 'cancelled'
+
+  // Rastrear passou a depender do número do objeto, não da nossa requisição:
+  // nas etiquetas da farmácia a requisição não nasceu aqui.
+  const hasLabel = !!order.shipping_request_id || !!order.tracking_code
 
   if (!canGenerate && !hasLabel) {
     return '<span class="sem-acao">—</span>'

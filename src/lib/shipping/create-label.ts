@@ -247,34 +247,12 @@ export async function createShippingLabelForOrder(orderId: string): Promise<{
   try {
     const pdf = await getPdfEtiqueta(response.id_requisicao)
     if (pdf?.url) {
-      // O JSON da farmácia é montado quando o pedido nasce, antes de a
-      // etiqueta existir — por isso ele sai com `NumeroObjeto: 'a emitir'`.
-      // É aqui que ele deixa de ser promessa: o rastreio e o link entram na
-      // mesma linha do pedido, e a farmácia lê o valor já preenchido quando
-      // vier buscar. Atualizar o JSON é obrigatório, não enfeite: sem isto a
-      // etiqueta existe na Envie Agora e a farmácia nunca fica sabendo.
+      // Esta função não roda mais no fluxo automático desde 02/09/2026: quem
+      // emite a etiqueta é a Miligrama. Ela continua servindo o botão do
+      // admin, para o caso de a gente precisar emitir uma à mão — e aí grava
+      // só o link, sem mexer no JSON da farmácia, que é dela.
       await sql`
-        UPDATE orders
-        SET
-          shipping_label_url = ${pdf.url},
-          pharmacy_json = jsonb_set(
-            jsonb_set(
-              pharmacy_json,
-              '{NumeroObjeto}',
-              -- O código de rastreio ainda não existe neste instante: a Envie
-              -- Agora devolve só o id da requisição, e o rastreio chega depois,
-              -- pelo webhook. Vai o id agora, e o webhook troca pelo rastreio.
-              to_jsonb(${response.id_requisicao}::text)
-            ),
-            '{Observacoes}',
-            to_jsonb(
-              CASE
-                WHEN COALESCE(pharmacy_json->>'Observacoes', '') = ''
-                  THEN ${`Etiqueta: ${pdf.url}`}::text
-                ELSE (pharmacy_json->>'Observacoes') || ${` | Etiqueta: ${pdf.url}`}::text
-              END
-            )
-          )
+        UPDATE orders SET shipping_label_url = ${pdf.url}
         WHERE id = ${orderId}::uuid
       `
     }
