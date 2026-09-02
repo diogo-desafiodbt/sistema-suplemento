@@ -85,9 +85,13 @@ export function PedidosActions({ orders }: { orders: OrderRow[] }) {
           <tbody>
             {orders.map((order) => {
               const busy = busyId === order.id
+              // A condição era `status === 'sent_to_pharmacy'`, um estado que
+              // o sistema não usa mais — os pedidos hoje nascem `pending` e vão
+              // para `dispatched`. Resultado: o botão nunca aparecia, e um
+              // pedido cuja etiqueta falhou não tinha como ser retomado por
+              // ninguém. O que decide é ter ou não etiqueta, não o estado.
               const canGenerate =
-                order.status === 'sent_to_pharmacy' &&
-                !order.shipping_request_id
+                !order.shipping_request_id && order.status !== 'cancelled'
               const hasLabel = !!order.shipping_request_id
 
               return (

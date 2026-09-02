@@ -224,7 +224,13 @@ export async function createShippingLabelForOrder(orderId: string): Promise<{
   })
 
   if (!response?.id_requisicao) {
-    throw new Error('Envie Agora não retornou id_requisicao')
+    // Sem o corpo da resposta esta mensagem não serve para nada: o pedido
+    // passou pela validação da Envie Agora e ela devolveu 200 com outra coisa
+    // dentro. Ou é um campo com nome diferente, ou é um recado que só aparece
+    // aqui. Mostrar o que veio é o que permite decidir qual dos dois.
+    throw new Error(
+      `Envie Agora não retornou id_requisicao. Resposta: ${JSON.stringify(response)}`,
+    )
   }
 
   await sql`
