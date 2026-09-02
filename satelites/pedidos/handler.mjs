@@ -15,12 +15,27 @@ const USER = 'satelite_pedidos'
 const ORIGEM = 'https://desafiodiabetes.com'
 const LISTA = '/suplementos/admin/painel/pedidos'
 
-const statusLabel = {
-  pending: 'Aguardando',
-  sent_to_pharmacy: 'Na farmácia',
-  dispatched: 'A caminho',
-  delivered: 'Entregue',
-  failed: 'Falhou',
+// A fase vem calculada da visão `pedido_fase`, não da coluna `status`. A
+// coluna diz pouco — quase todo pedido fica em `pending` do pagamento até o
+// despacho, e é justamente nesse intervalo que ele pode travar em três
+// lugares diferentes.
+const faseLabel = {
+  aguardando_assinatura: 'Aguardando assinatura',
+  aguardando_etiqueta: 'Aguardando etiqueta',
+  pronto_nao_buscado: 'Pronto, não buscado',
+  buscado_nao_despachado: 'Buscado, não despachado',
+  a_caminho: 'A caminho',
+  entregue: 'Entregue',
+  cancelado: 'Cancelado',
+}
+
+/** Quanto tempo parado nesta fase. É este número que denuncia o problema. */
+function hMuito(desde) {
+  if (!desde) return ''
+  const horas = Math.floor((Date.now() - new Date(desde).getTime()) / 3600000)
+  if (horas < 1) return 'agora há pouco'
+  if (horas < 48) return `há ${horas} h`
+  return `há ${Math.floor(horas / 24)} dias`
 }
 
 /** @type {postgres.Sql | undefined} */
@@ -158,12 +173,14 @@ function botoes(order) {
 }
 
 function pagina(pedidos) {
-  const seloStatus = {
-    pending: 'selo-neutro',
-    sent_to_pharmacy: 'selo-info',
-    dispatched: 'selo-atencao',
-    delivered: 'selo-ok',
-    failed: 'selo-perigo',
+  const seloFase = {
+    aguardando_assinatura: 'selo-atencao',
+    aguardando_etiqueta: 'selo-atencao',
+    pronto_nao_buscado: 'selo-info',
+    buscado_nao_despachado: 'selo-info',
+    a_caminho: 'selo-info',
+    entregue: 'selo-ok',
+    cancelado: 'selo-perigo',
   }
 
   const corpo =
@@ -177,7 +194,7 @@ function pagina(pedidos) {
             <thead>
               <tr>
                 <th>Paciente</th>
-                <th>Status</th>
+                <th>Fase</th>
                 <th>Valor</th>
                 <th>Rastreio</th>
                 <th>Data</th>
@@ -187,15 +204,18 @@ function pagina(pedidos) {
             <tbody>
               ${pedidos
                 .map((order) => {
-                  const tom =
-                    seloStatus[order.status] ?? 'selo-neutro'
-                  const rotulo = statusLabel[order.status] ?? order.status
+                  const tom = seloFase[order.fase] ?? 'selo-neutro'
+                  const rotulo = faseLabel[order.fase] ?? order.fase
+                  const parado = hMuito(order.na_fase_desde)
                   return `<tr>
                     <td>
                       <p class="nome">${esc(order.full_name ?? '—')}</p>
                       <p class="sub">${esc(order.client_code ?? '')}</p>
                     </td>
-                    <td><span class="selo ${tom}">${esc(rotulo)}</span></td>
+                    <td>
+                      <span class="selo ${tom}">${esc(rotulo)}</span>
+                      ${parado ? `<p class="sub">${esc(parado)}</p>` : ''}
+                    </td>
                     <td class="num">${esc(formatValor(order.total_amount))}</td>
                     <td class="mono">${esc(order.tracking_code ?? '—')}</td>
                     <td class="num muted">${esc(formatData(order.created_at))}</td>
@@ -233,9 +253,11 @@ function pagina(pedidos) {
 async function listarPedidos(db) {
   return db`
     SELECT o.id, o.status, o.created_at, o.tracking_code, o.total_amount,
-           o.shipping_request_id, u.full_name, u.client_code
+           o.shipping_request_id, u.full_name, u.client_code,
+           f.fase, f.na_fase_desde
     FROM orders o
     LEFT JOIN users u ON u.id = o.user_id
+    LEFT JOIN pedido_fase f ON f.pedido_id = o.id
     ORDER BY o.created_at DESC
     LIMIT 50
   `
